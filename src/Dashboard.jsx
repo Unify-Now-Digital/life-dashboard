@@ -11,6 +11,7 @@ import Trends from "./components/Trends.jsx";
 import Metrics from "./components/Metrics.jsx";
 import Drilldowns from "./components/Drilldowns.jsx";
 import Reflection from "./components/Reflection.jsx";
+import Integrations from "./components/Integrations.jsx";
 import UndoToast from "./components/UndoToast.jsx";
 
 // Track viewport so we can switch to two-column layout above ~860px wide
@@ -151,6 +152,43 @@ export default function Dashboard() {
 
   const updateMetric = (key, value) =>
     setState((s) => ({ ...s, metrics: { ...s.metrics, [key]: value } }));
+
+  const toggleIntegration = (id) =>
+    setState((s) => {
+      const cur = s.integrations[id];
+      const nextConnected = !cur.connected;
+      return {
+        ...s,
+        integrations: {
+          ...s.integrations,
+          [id]: {
+            ...cur,
+            connected: nextConnected,
+            lastSync: nextConnected ? new Date().toISOString() : cur.lastSync,
+          },
+        },
+      };
+    });
+
+  const toggleStripeAccount = (accountId) =>
+    setState((s) => ({
+      ...s,
+      integrations: {
+        ...s.integrations,
+        stripe: {
+          ...s.integrations.stripe,
+          accounts: s.integrations.stripe.accounts.map((a) =>
+            a.id === accountId
+              ? {
+                  ...a,
+                  connected: !a.connected,
+                  lastSync: !a.connected ? new Date().toISOString() : a.lastSync,
+                }
+              : a
+          ),
+        },
+      },
+    }));
 
   const drilldownHandlers = {
     businesses: {
@@ -394,6 +432,13 @@ export default function Dashboard() {
           <div style={{ marginTop: 20 }}>
             <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
           </div>
+          <div style={{ marginTop: 20 }}>
+            <Integrations
+              integrations={state.integrations}
+              onToggle={toggleIntegration}
+              onToggleStripeAccount={toggleStripeAccount}
+            />
+          </div>
         </>
       ) : (
         <div style={styles.stack}>
@@ -416,6 +461,11 @@ export default function Dashboard() {
             handlers={drilldownHandlers}
           />
           <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
+          <Integrations
+            integrations={state.integrations}
+            onToggle={toggleIntegration}
+            onToggleStripeAccount={toggleStripeAccount}
+          />
           <Reflection value={state.journal} onChange={setJournal} />
         </div>
       )}

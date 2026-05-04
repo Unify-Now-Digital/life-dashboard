@@ -89,6 +89,19 @@ export const defaultState = {
       { id: 3, title: "Huberman Lab — Sleep & cognition", author: "Podcast · 1 episode behind", progress: null, sub: "" },
     ],
   },
+  integrations: {
+    revolut: { connected: false, lastSync: null },
+    appleHealth: { connected: false, lastSync: null },
+    calendar: { connected: false, lastSync: null, calendarIds: [] },
+    stripe: {
+      accounts: [
+        { id: "sm", label: "Sears Melvin", connected: false, lastSync: null, accountKey: null },
+        { id: "churchill", label: "Churchill", connected: false, lastSync: null, accountKey: null },
+        { id: "boddy", label: "BODDY", connected: false, lastSync: null, accountKey: null },
+        { id: "unify", label: "Unify Digital", connected: false, lastSync: null, accountKey: null },
+      ],
+    },
+  },
 };
 
 export const nextId = (items) => (items.length ? Math.max(...items.map((i) => i.id || 0)) + 1 : 1);

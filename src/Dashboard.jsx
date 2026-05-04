@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
 import { defaultState, nextId } from "./lib/defaultState";
 
@@ -12,6 +12,7 @@ import Metrics from "./components/Metrics.jsx";
 import Drilldowns from "./components/Drilldowns.jsx";
 import NorthStar from "./components/NorthStar.jsx";
 import Reflection from "./components/Reflection.jsx";
+import UndoToast from "./components/UndoToast.jsx";
 
 // Track viewport so we can switch to two-column layout above ~860px wide
 function useIsDesktop(breakpoint = 860) {
@@ -34,6 +35,40 @@ export default function Dashboard() {
   const start = new Date(today.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((today - start) / 86400000);
   const quote = QUOTES[dayOfYear % QUOTES.length];
+
+  const [undo, setUndo] = useState(null);
+  const undoTimerRef = useRef(null);
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    []
+  );
+
+  const enqueueUndo = (entry) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndo(null), 5000);
+    setUndo(entry);
+  };
+
+  const removeWithUndo = (getList, replaceList, label) => (id) => {
+    const list = getList(state);
+    const idx = list.findIndex((it) => it.id === id);
+    if (idx < 0) return;
+    const item = list[idx];
+    setState((s) => replaceList(s, getList(s).filter((it) => it.id !== id)));
+    enqueueUndo({
+      label,
+      onUndo: () => {
+        setState((s) => {
+          const cur = getList(s);
+          return replaceList(s, [...cur.slice(0, idx), item, ...cur.slice(idx)]);
+        });
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        setUndo(null);
+      },
+    });
+  };
 
   // Update an item by id within a nested list path
   const updateItemInList = (path, id, field, value) => {
@@ -94,7 +129,11 @@ export default function Dashboard() {
           },
         ],
       })),
-    onRemove: (id) => setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
+    onRemove: removeWithUndo(
+      (s) => s.goals,
+      (s, g) => ({ ...s, goals: g }),
+      "Goal removed"
+    ),
   };
 
   const upcomingHandlers = {
@@ -104,7 +143,11 @@ export default function Dashboard() {
         ...s,
         upcoming: [...s.upcoming, { id: nextId(s.upcoming), date: "—", text: "New item", cat: "Personal" }],
       })),
-    onRemove: (id) => setState((s) => ({ ...s, upcoming: s.upcoming.filter((u) => u.id !== id) })),
+    onRemove: removeWithUndo(
+      (s) => s.upcoming,
+      (s, u) => ({ ...s, upcoming: u }),
+      "Upcoming item removed"
+    ),
   };
 
   const updateMetric = (key, value) =>
@@ -130,11 +173,11 @@ export default function Dashboard() {
             ],
           },
         })),
-      onRemove: (id) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, businesses: s.drilldowns.businesses.filter((b) => b.id !== id) },
-        })),
+      onRemove: removeWithUndo(
+        (s) => s.drilldowns.businesses,
+        (s, b) => ({ ...s, drilldowns: { ...s.drilldowns, businesses: b } }),
+        "Business removed"
+      ),
     },
     finances: {
       onUpdate: (key, value) =>
@@ -164,14 +207,14 @@ export default function Dashboard() {
             },
           },
         })),
-      onRemoveTrip: (id) =>
-        setState((s) => ({
+      onRemoveTrip: removeWithUndo(
+        (s) => s.drilldowns.travel.trips,
+        (s, t) => ({
           ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            travel: { ...s.drilldowns.travel, trips: s.drilldowns.travel.trips.filter((t) => t.id !== id) },
-          },
-        })),
+          drilldowns: { ...s.drilldowns, travel: { ...s.drilldowns.travel, trips: t } },
+        }),
+        "Trip removed"
+      ),
     },
     relationships: {
       onUpdate: (id, field, value) => updateItemInList(["drilldowns", "relationships"], id, field, value),
@@ -194,14 +237,11 @@ export default function Dashboard() {
             ],
           },
         })),
-      onRemove: (id) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            relationships: s.drilldowns.relationships.filter((r) => r.id !== id),
-          },
-        })),
+      onRemove: removeWithUndo(
+        (s) => s.drilldowns.relationships,
+        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, relationships: r } }),
+        "Person removed"
+      ),
     },
     reading: {
       onUpdate: (id, field, value) => updateItemInList(["drilldowns", "reading"], id, field, value),
@@ -218,11 +258,11 @@ export default function Dashboard() {
             ],
           },
         })),
-      onRemove: (id) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, reading: s.drilldowns.reading.filter((r) => r.id !== id) },
-        })),
+      onRemove: removeWithUndo(
+        (s) => s.drilldowns.reading,
+        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, reading: r } }),
+        "Reading item removed"
+      ),
     },
   };
 
@@ -284,6 +324,8 @@ export default function Dashboard() {
 
       {/* Floating habit ring bar — fixed at bottom on all viewports */}
       <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+
+      {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
     </div>
   );
 }

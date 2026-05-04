@@ -49,6 +49,17 @@ export default function Priorities({ priorities, onToggle, onChange }) {
               </svg>
             )}
           </div>
+          <span
+            style={{
+              fontSize: 13,
+              color: C.textTertiary,
+              fontVariantNumeric: "tabular-nums",
+              width: 14,
+              flexShrink: 0,
+            }}
+          >
+            {i + 1}.
+          </span>
           <input
             value={p.text}
             onChange={(e) => onChange(i, e.target.value)}

@@ -31,6 +31,7 @@ export const defaultState = {
   northStar:
     "Build Sears Melvin into the UK's most trusted memorial mason while running a healthy, multilingual, well-travelled life from Barcelona.",
   metrics: {
+    unifyMTD: "£0",
     smMTD: "£3,240",
     cmMTD: "£18,420",
     boddyPipeline: "CHF 84k",
@@ -50,14 +51,30 @@ export const defaultState = {
       { id: 3, name: "BODDY", color: "#185FA5", value: "CHF 84k", meta: "12 deals · 3 close this week" },
       { id: 4, name: "Unify Digital", color: "#534AB7", value: "Mason App", meta: "65% to launch" },
     ],
-    finances: { income: 8450, spending: 5210, saved: 3240, currency: "€" },
+    finances: {
+      income: 8450,
+      spending: 5210,
+      saved: 3240,
+      currency: "€",
+      incomeBreakdown: [
+        { id: 1, label: "Churchill", amount: 7000 },
+        { id: 2, label: "Sears Melvin", amount: 1200 },
+        { id: 3, label: "Other", amount: 250 },
+      ],
+      expenseBreakdown: [
+        { id: 1, label: "Rent", amount: 1800 },
+        { id: 2, label: "Food & social", amount: 1300 },
+        { id: 3, label: "Travel & fun", amount: 600 },
+        { id: 4, label: "Living", amount: 1510 },
+      ],
+    },
     travel: {
       countries: 12,
       daysAwayYTD: 38,
       trips: [
-        { id: 1, name: "Buenos Aires", sub: "Jun 15 – Jul 2 · 17 nights", days: 42 },
-        { id: 2, name: "London — Churchill / Matt", sub: "Jul 20 – Jul 24 · 4 nights", days: 77 },
-        { id: 3, name: "Tbilisi — UD", sub: "Sep 10 – Sep 17 · 7 nights", days: 129 },
+        { id: 1, name: "Buenos Aires", start: "2026-06-15", end: "2026-07-02", sub: "Jun 15 – Jul 2 · 17 nights", days: 42 },
+        { id: 2, name: "London — Churchill / Matt", start: "2026-07-20", end: "2026-07-24", sub: "Jul 20 – Jul 24 · 4 nights", days: 77 },
+        { id: 3, name: "Tbilisi — UD", start: "2026-09-10", end: "2026-09-17", sub: "Sep 10 – Sep 17 · 7 nights", days: 129 },
       ],
     },
     relationships: [

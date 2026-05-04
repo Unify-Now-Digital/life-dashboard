@@ -1,7 +1,8 @@
 import React from "react";
 import { C, styles } from "../lib/tokens";
+import { EditableText } from "./Editable.jsx";
 
-export default function Priorities({ priorities, onToggle, onChange }) {
+export default function Priorities({ priorities, onToggle, onChange, northStar, onNorthStarChange }) {
   const done = priorities.filter((p) => p.done).length;
   return (
     <div style={styles.card}>
@@ -78,6 +79,41 @@ export default function Priorities({ priorities, onToggle, onChange }) {
           />
         </div>
       ))}
+
+      {onNorthStarChange && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `0.5px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, marginBottom: 8, letterSpacing: "0.02em" }}>
+            North star
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: C.textSecondary,
+              lineHeight: 1.6,
+              padding: "10px 12px",
+              borderLeft: `2px solid ${C.accent}`,
+              background: C.bgSecondary,
+              borderRadius: "0 8px 8px 0",
+              fontStyle: "italic",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+            }}
+          >
+            <EditableText
+              value={northStar}
+              onChange={onNorthStarChange}
+              multiline
+              style={{
+                fontSize: 13,
+                fontStyle: "italic",
+                lineHeight: 1.6,
+                color: C.textSecondary,
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                display: "block",
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

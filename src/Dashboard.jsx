@@ -10,7 +10,6 @@ import Upcoming from "./components/Upcoming.jsx";
 import Trends from "./components/Trends.jsx";
 import Metrics from "./components/Metrics.jsx";
 import Drilldowns from "./components/Drilldowns.jsx";
-import NorthStar from "./components/NorthStar.jsx";
 import Reflection from "./components/Reflection.jsx";
 import UndoToast from "./components/UndoToast.jsx";
 
@@ -185,6 +184,68 @@ export default function Dashboard() {
           ...s,
           drilldowns: { ...s.drilldowns, finances: { ...s.drilldowns.finances, [key]: value } },
         })),
+      onUpdateIncome: (id, field, value) =>
+        updateItemInList(["drilldowns", "finances", "incomeBreakdown"], id, field, value),
+      onAddIncome: () =>
+        setState((s) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            finances: {
+              ...s.drilldowns.finances,
+              incomeBreakdown: [
+                ...(s.drilldowns.finances.incomeBreakdown || []),
+                {
+                  id: nextId(s.drilldowns.finances.incomeBreakdown || []),
+                  label: "New income",
+                  amount: 0,
+                },
+              ],
+            },
+          },
+        })),
+      onRemoveIncome: removeWithUndo(
+        (s) => s.drilldowns.finances.incomeBreakdown || [],
+        (s, list) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            finances: { ...s.drilldowns.finances, incomeBreakdown: list },
+          },
+        }),
+        "Income row removed"
+      ),
+      onUpdateExpense: (id, field, value) =>
+        updateItemInList(["drilldowns", "finances", "expenseBreakdown"], id, field, value),
+      onAddExpense: () =>
+        setState((s) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            finances: {
+              ...s.drilldowns.finances,
+              expenseBreakdown: [
+                ...(s.drilldowns.finances.expenseBreakdown || []),
+                {
+                  id: nextId(s.drilldowns.finances.expenseBreakdown || []),
+                  label: "New expense",
+                  amount: 0,
+                },
+              ],
+            },
+          },
+        })),
+      onRemoveExpense: removeWithUndo(
+        (s) => s.drilldowns.finances.expenseBreakdown || [],
+        (s, list) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            finances: { ...s.drilldowns.finances, expenseBreakdown: list },
+          },
+        }),
+        "Expense row removed"
+      ),
     },
     travel: {
       onUpdateStat: (key, value) =>
@@ -194,19 +255,32 @@ export default function Dashboard() {
         })),
       onUpdateTrip: (id, field, value) => updateItemInList(["drilldowns", "travel", "trips"], id, field, value),
       onAddTrip: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            travel: {
-              ...s.drilldowns.travel,
-              trips: [
-                ...s.drilldowns.travel.trips,
-                { id: nextId(s.drilldowns.travel.trips), name: "New trip", sub: "dates · nights", days: 0 },
-              ],
+        setState((s) => {
+          const start = new Date();
+          start.setDate(start.getDate() + 30);
+          const end = new Date(start);
+          end.setDate(end.getDate() + 7);
+          const iso = (d) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          return {
+            ...s,
+            drilldowns: {
+              ...s.drilldowns,
+              travel: {
+                ...s.drilldowns.travel,
+                trips: [
+                  ...s.drilldowns.travel.trips,
+                  {
+                    id: nextId(s.drilldowns.travel.trips),
+                    name: "New trip",
+                    start: iso(start),
+                    end: iso(end),
+                  },
+                ],
+              },
             },
-          },
-        })),
+          };
+        }),
       onRemoveTrip: removeWithUndo(
         (s) => s.drilldowns.travel.trips,
         (s, t) => ({
@@ -272,17 +346,29 @@ export default function Dashboard() {
 
   const leftColumn = (
     <div style={styles.stack}>
-      <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
+      <Priorities
+        priorities={state.priorities}
+        onToggle={togglePriority}
+        onChange={changePriority}
+        northStar={state.northStar}
+        onNorthStarChange={setNorthStar}
+      />
       <Goals goals={state.goals} {...goalHandlers} />
       <Trends trends={state.trends} />
-      <NorthStar text={state.northStar} onChange={setNorthStar} />
     </div>
   );
 
   const rightColumn = (
     <div style={styles.stack}>
       <Upcoming items={state.upcoming} {...upcomingHandlers} />
-      <Metrics m={state.metrics} onUpdate={updateMetric} />
+      <Metrics
+        m={state.metrics}
+        onUpdate={updateMetric}
+        habitLog={state.habitLog}
+        habitNoLog={state.habitNoLog}
+        drilldowns={state.drilldowns}
+        handlers={drilldownHandlers}
+      />
       <Reflection value={state.journal} onChange={setJournal} />
     </div>
   );
@@ -311,13 +397,25 @@ export default function Dashboard() {
         </>
       ) : (
         <div style={styles.stack}>
-          <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
+          <Priorities
+            priorities={state.priorities}
+            onToggle={togglePriority}
+            onChange={changePriority}
+            northStar={state.northStar}
+            onNorthStarChange={setNorthStar}
+          />
           <Goals goals={state.goals} {...goalHandlers} />
           <Upcoming items={state.upcoming} {...upcomingHandlers} />
           <Trends trends={state.trends} />
-          <Metrics m={state.metrics} onUpdate={updateMetric} />
+          <Metrics
+            m={state.metrics}
+            onUpdate={updateMetric}
+            habitLog={state.habitLog}
+            habitNoLog={state.habitNoLog}
+            drilldowns={state.drilldowns}
+            handlers={drilldownHandlers}
+          />
           <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-          <NorthStar text={state.northStar} onChange={setNorthStar} />
           <Reflection value={state.journal} onChange={setJournal} />
         </div>
       )}

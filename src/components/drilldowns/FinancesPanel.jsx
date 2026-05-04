@@ -1,74 +1,138 @@
-import React from "react";
-import { C } from "../../lib/tokens";
-import { EditableText } from "../Editable.jsx";
+import React, { useState } from "react";
+import { C, styles } from "../../lib/tokens";
+import { EditableText, IconBtn } from "../Editable.jsx";
 import PanelHeader from "./PanelHeader.jsx";
 
-export default function FinancesPanel({ data, onClose, onUpdate }) {
-  const { income, spending, saved, currency } = data;
-  const rate = income > 0 ? Math.round((saved / income) * 100) : 0;
-  const living = Math.round(spending * 0.62);
-  const food = Math.round(spending * 0.25);
-  const fun = Math.max(0, spending - living - food);
-  const total = income || 1;
-  const segs = [
-    { lbl: "Living", val: living, color: "#185FA5" },
-    { lbl: "Food/social", val: food, color: "#378ADD" },
-    { lbl: "Travel/fun", val: fun, color: "#85B7EB" },
-    { lbl: "Saved", val: saved, color: "#1D9E75" },
-  ];
-  const fmt = (n) => `${currency}${n.toLocaleString()}`;
+const SEG_COLORS = ["#185FA5", "#378ADD", "#85B7EB", "#1D9E75", "#993556", "#BA7517", "#534AB7", "#3B6D11"];
 
-  const editRow = (key, label, color) => (
+function Row({ item, onUpdate, onRemove, currency, editing, color }) {
+  return (
     <div
-      key={key}
       style={{
         display: "flex",
-        justifyContent: "space-between",
         alignItems: "center",
-        padding: "10px 0",
+        gap: 8,
+        padding: "8px 0",
         borderBottom: `0.5px solid ${C.border}`,
       }}
     >
-      <span style={{ fontSize: 13, color: C.textSecondary }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums", color }}>
+      {color && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: 2,
+            background: color,
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <span style={{ flex: 1, fontSize: 13, color: C.textSecondary }}>
+        <EditableText
+          value={item.label}
+          onChange={(v) => onUpdate(item.id, "label", v)}
+          style={{ fontSize: 13 }}
+        />
+      </span>
+      <span style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
         {currency}
         <EditableText
-          value={String(data[key])}
-          onChange={(v) => onUpdate(key, parseFloat(v) || 0)}
+          value={String(item.amount)}
+          onChange={(v) => onUpdate(item.id, "amount", parseFloat(v) || 0)}
           style={{ fontSize: 14, fontWeight: 500 }}
           type="number"
         />
       </span>
+      {editing && (
+        <IconBtn onClick={() => onRemove(item.id)} danger label="Remove">
+          ×
+        </IconBtn>
+      )}
     </div>
   );
+}
+
+function StackedBar({ rows, total }) {
+  if (!total) return null;
+  return (
+    <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", gap: 2, background: C.bgTertiary }}>
+      {rows.map((r, i) => (
+        <div
+          key={r.id}
+          style={{
+            width: `${(r.amount / total) * 100}%`,
+            height: "100%",
+            background: SEG_COLORS[i % SEG_COLORS.length],
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function FinancesPanel({
+  data,
+  onClose,
+  onUpdate,
+  onUpdateIncome,
+  onAddIncome,
+  onRemoveIncome,
+  onUpdateExpense,
+  onAddExpense,
+  onRemoveExpense,
+}) {
+  const [editing, setEditing] = useState(false);
+  const currency = data.currency || "€";
+  const incomeRows = data.incomeBreakdown || [];
+  const expenseRows = data.expenseBreakdown || [];
+  const incomeTotal = incomeRows.reduce((a, b) => a + (b.amount || 0), 0);
+  const expenseTotal = expenseRows.reduce((a, b) => a + (b.amount || 0), 0);
+  const saved = Math.max(0, incomeTotal - expenseTotal);
+  const rate = incomeTotal > 0 ? Math.round((saved / incomeTotal) * 100) : 0;
+  const fmt = (n) => `${currency}${n.toLocaleString()}`;
 
   return (
     <div>
-      <PanelHeader title="Finances — this month" onClose={onClose} />
-      {editRow("income", "Income", C.success)}
-      {editRow("spending", "Spending", C.text)}
-      {editRow("saved", "Saved", C.text)}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "10px 0",
-          borderBottom: `0.5px solid ${C.border}`,
-        }}
-      >
-        <span style={{ fontSize: 13, color: C.textSecondary }}>Savings rate</span>
-        <span style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums", color: C.accent }}>
-          {rate}%
-        </span>
+      <PanelHeader title="Finances — this month" editing={editing} onToggleEdit={() => setEditing(!editing)} onClose={onClose} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+        <div style={{ background: C.bgSecondary, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: C.textSecondary }}>Income</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2, color: C.success, fontVariantNumeric: "tabular-nums" }}>
+            {fmt(incomeTotal)}
+          </div>
+        </div>
+        <div style={{ background: C.bgSecondary, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: C.textSecondary }}>Spending</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+            {fmt(expenseTotal)}
+          </div>
+        </div>
+        <div style={{ background: C.bgSecondary, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: C.textSecondary }}>Saved</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+            {fmt(saved)}
+          </div>
+        </div>
+        <div style={{ background: C.bgSecondary, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: C.textSecondary }}>Rate</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2, color: C.accent, fontVariantNumeric: "tabular-nums" }}>
+            {rate}%
+          </div>
+        </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
-        <span style={{ fontSize: 13, color: C.textSecondary }}>Currency</span>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Income
+        </div>
         <select
           value={currency}
           onChange={(e) => onUpdate("currency", e.target.value)}
           style={{
-            fontSize: 13,
+            fontSize: 11,
             padding: "2px 6px",
             borderRadius: 4,
             border: `0.5px solid ${C.border}`,
@@ -83,49 +147,54 @@ export default function FinancesPanel({ data, onClose, onUpdate }) {
           ))}
         </select>
       </div>
-      <div style={{ marginTop: 12 }}>
-        <div
-          style={{
-            display: "flex",
-            height: 8,
-            borderRadius: 4,
-            overflow: "hidden",
-            gap: 2,
-            background: C.bgTertiary,
-          }}
-        >
-          {segs.map((s, i) => (
-            <div key={i} style={{ width: `${(s.val / total) * 100}%`, height: "100%", background: s.color }} />
-          ))}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            marginTop: 8,
-            flexWrap: "wrap",
-            fontSize: 11,
-            color: C.textSecondary,
-          }}
-        >
-          {segs.map((s, i) => (
-            <span key={i}>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: 2,
-                  marginRight: 5,
-                  verticalAlign: "middle",
-                  background: s.color,
-                }}
-              />
-              {s.lbl} {fmt(s.val)}
-            </span>
-          ))}
-        </div>
+      {incomeRows.map((r, i) => (
+        <Row
+          key={r.id}
+          item={r}
+          onUpdate={onUpdateIncome}
+          onRemove={onRemoveIncome}
+          currency={currency}
+          editing={editing}
+          color={SEG_COLORS[i % SEG_COLORS.length]}
+        />
+      ))}
+      <StackedBar rows={incomeRows} total={incomeTotal} />
+      {editing && (
+        <button onClick={onAddIncome} style={styles.addBtn}>
+          + Add income
+        </button>
+      )}
+
+      <div
+        style={{
+          fontSize: 11,
+          color: C.textTertiary,
+          fontWeight: 500,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          marginTop: 18,
+          marginBottom: 8,
+        }}
+      >
+        Expenses
       </div>
+      {expenseRows.map((r, i) => (
+        <Row
+          key={r.id}
+          item={r}
+          onUpdate={onUpdateExpense}
+          onRemove={onRemoveExpense}
+          currency={currency}
+          editing={editing}
+          color={SEG_COLORS[i % SEG_COLORS.length]}
+        />
+      ))}
+      <StackedBar rows={expenseRows} total={expenseTotal} />
+      {editing && (
+        <button onClick={onAddExpense} style={styles.addBtn}>
+          + Add expense
+        </button>
+      )}
     </div>
   );
 }

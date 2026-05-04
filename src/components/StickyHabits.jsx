@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { C } from "../lib/tokens";
-import { isoYesterday, statusFor, streakFor, hasUnanswered } from "../lib/habits";
+import { isoYesterday, statusFor, streakFor, hasUnanswered, historyFor } from "../lib/habits";
 import HabitRing from "./HabitRing.jsx";
+import HabitDots from "./HabitDots.jsx";
 
 const HABITS = [
   { key: "gym", label: "Gym session" },
@@ -35,11 +36,11 @@ export default function StickyHabits({ habitLog, habitNoLog, onConfirm }) {
           backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
           border: `0.5px solid ${C.borderStrong}`,
-          borderRadius: 999,
-          padding: "8px 14px",
+          borderRadius: 22,
+          padding: "10px 14px",
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 14,
           boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
           zIndex: 100,
         }}
@@ -47,14 +48,20 @@ export default function StickyHabits({ habitLog, habitNoLog, onConfirm }) {
         {HABITS.map((h) => {
           const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
           const streak = streakFor(h.key, habitLog, habitNoLog);
+          const history = historyFor(h.key, habitLog, habitNoLog, 7);
           return (
-            <HabitRing
+            <div
               key={h.key}
-              habit={h.key}
-              status={status}
-              streak={streak}
-              onClick={() => setOpen(open === h.key ? null : h.key)}
-            />
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}
+            >
+              <HabitRing
+                habit={h.key}
+                status={status}
+                streak={streak}
+                onClick={() => setOpen(open === h.key ? null : h.key)}
+              />
+              <HabitDots history={history} />
+            </div>
           );
         })}
       </div>

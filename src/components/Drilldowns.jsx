@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import { C, styles } from "../lib/tokens";
 import BusinessesPanel from "./drilldowns/BusinessesPanel.jsx";
-import FinancesPanel from "./drilldowns/FinancesPanel.jsx";
-import TravelPanel from "./drilldowns/TravelPanel.jsx";
 import RelationshipsPanel from "./drilldowns/RelationshipsPanel.jsx";
 import ReadingPanel from "./drilldowns/ReadingPanel.jsx";
 
@@ -41,21 +39,6 @@ export default function Drilldowns({ data, handlers }) {
       sub: data.businesses.map((b) => b.name.split(" ")[0]).join(" · "),
     },
     {
-      id: "fin",
-      label: "Finances",
-      value:
-        data.finances.income > 0
-          ? `${Math.round((data.finances.saved / data.finances.income) * 100)}%`
-          : "—",
-      sub: "savings rate this month",
-    },
-    {
-      id: "travel",
-      label: "Travel",
-      value: data.travel.trips.length ? `${data.travel.trips[0].days}d` : "—",
-      sub: data.travel.trips.length ? `to ${data.travel.trips[0].name}` : "no trips planned",
-    },
-    {
       id: "rel",
       label: "Relationships",
       value: data.relationships.filter((r) => r.stale).length,
@@ -88,10 +71,6 @@ export default function Drilldowns({ data, handlers }) {
           {open === "biz" && (
             <BusinessesPanel items={data.businesses} {...handlers.businesses} onClose={() => setOpen(null)} />
           )}
-          {open === "fin" && (
-            <FinancesPanel data={data.finances} {...handlers.finances} onClose={() => setOpen(null)} />
-          )}
-          {open === "travel" && <TravelPanel data={data.travel} {...handlers.travel} onClose={() => setOpen(null)} />}
           {open === "rel" && (
             <RelationshipsPanel items={data.relationships} {...handlers.relationships} onClose={() => setOpen(null)} />
           )}

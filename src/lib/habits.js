@@ -56,3 +56,18 @@ export function hasUnanswered(habit, habitLog, habitNoLog) {
 
 // Goal length used to size the visual ring fill. Default: 30-day cycle.
 export const STREAK_GOAL = 30;
+
+// Returns the last `days` statuses for a habit, oldest first, ending at yesterday.
+export function historyFor(habit, habitLog, habitNoLog, days = 7) {
+  const out = [];
+  const cursor = new Date();
+  cursor.setDate(cursor.getDate() - days); // start `days` ago
+  for (let i = 0; i < days; i++) {
+    cursor.setDate(cursor.getDate() + 1);
+    out.push({
+      date: isoDate(cursor),
+      status: statusFor(habit, isoDate(cursor), habitLog, habitNoLog),
+    });
+  }
+  return out;
+}

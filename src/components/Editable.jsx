@@ -68,11 +68,15 @@ export function EditableText({ value, onChange, placeholder, style, multiline, t
 }
 
 export function IconBtn({ children, onClick, danger, label }) {
+  // Visible chip stays small; the button itself extends ~44px hit area via an
+  // absolutely-positioned transparent overlay that doesn't affect layout.
   return (
     <button
       onClick={onClick}
       title={label}
+      aria-label={label}
       style={{
+        position: "relative",
         background: "transparent",
         border: `0.5px solid ${C.border}`,
         borderRadius: 6,
@@ -84,6 +88,17 @@ export function IconBtn({ children, onClick, danger, label }) {
         fontFamily: "inherit",
       }}
     >
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 44,
+          height: 44,
+        }}
+      />
       {children}
     </button>
   );

@@ -53,8 +53,9 @@ export const styles = {
     background: C.bg,
     color: C.text,
     minHeight: "100vh",
-    padding: "24px 24px 80px",
-    width: "100%",
+    padding: "24px 20px 120px", // extra bottom padding so floating habit bar doesn't cover content
+    maxWidth: 1080,
+    margin: "0 auto",
     fontSize: 15,
     lineHeight: 1.5,
   },

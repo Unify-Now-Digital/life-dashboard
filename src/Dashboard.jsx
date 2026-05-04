@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
 import { defaultState, nextId } from "./lib/defaultState";
 
 import Header from "./components/Header.jsx";
 import Priorities from "./components/Priorities.jsx";
-import Streaks from "./components/Streaks.jsx";
+import StickyHabits from "./components/StickyHabits.jsx";
 import Goals from "./components/Goals.jsx";
 import Upcoming from "./components/Upcoming.jsx";
 import Trends from "./components/Trends.jsx";
@@ -13,8 +13,22 @@ import Drilldowns from "./components/Drilldowns.jsx";
 import NorthStar from "./components/NorthStar.jsx";
 import Reflection from "./components/Reflection.jsx";
 
+// Track viewport so we can switch to two-column layout above ~860px wide
+function useIsDesktop(breakpoint = 860) {
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= breakpoint : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+  return isDesktop;
+}
+
 export default function Dashboard() {
   const [state, setState] = useState(defaultState);
+  const isDesktop = useIsDesktop();
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
@@ -48,14 +62,18 @@ export default function Dashboard() {
       return { ...s, priorities: next };
     });
 
-  const tickHabit = (key) =>
+  // Habit confirmation: answer is "yes" | "no" | "clear"
+  const confirmHabit = (habit, dateISO, answer) =>
     setState((s) => {
-      const wasLogged = s.habitsLoggedToday[key];
-      const newLogged = { ...s.habitsLoggedToday, [key]: !wasLogged };
-      const newStreaks = { ...s.habitStreaks };
-      if (wasLogged) newStreaks[key] = Math.max(0, newStreaks[key] - 1);
-      else newStreaks[key] = newStreaks[key] + 1;
-      return { ...s, habitsLoggedToday: newLogged, habitStreaks: newStreaks };
+      const yes = (s.habitLog[habit] || []).filter((d) => d !== dateISO);
+      const no = (s.habitNoLog[habit] || []).filter((d) => d !== dateISO);
+      if (answer === "yes") yes.push(dateISO);
+      if (answer === "no") no.push(dateISO);
+      return {
+        ...s,
+        habitLog: { ...s.habitLog, [habit]: yes },
+        habitNoLog: { ...s.habitNoLog, [habit]: no },
+      };
     });
 
   const setJournal = (text) => setState((s) => ({ ...s, journal: text }));
@@ -208,20 +226,64 @@ export default function Dashboard() {
     },
   };
 
+  // ---- Render -----------------------------------------------------------
+  // On mobile: single column, sections stack in order.
+  // On desktop: two columns side by side. Drill-downs + reflection span full width below.
+
+  const leftColumn = (
+    <div style={styles.stack}>
+      <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
+      <Goals goals={state.goals} {...goalHandlers} />
+      <Trends trends={state.trends} />
+      <NorthStar text={state.northStar} onChange={setNorthStar} />
+    </div>
+  );
+
+  const rightColumn = (
+    <div style={styles.stack}>
+      <Upcoming items={state.upcoming} {...upcomingHandlers} />
+      <Metrics m={state.metrics} onUpdate={updateMetric} />
+      <Reflection value={state.journal} onChange={setJournal} />
+    </div>
+  );
+
   return (
     <div style={styles.page}>
       <Header today={today} dayOfYear={dayOfYear} quote={quote} />
-      <div style={styles.stack}>
-        <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
-        <Streaks streaks={state.habitStreaks} logged={state.habitsLoggedToday} onTick={tickHabit} />
-        <Goals goals={state.goals} {...goalHandlers} />
-        <Upcoming items={state.upcoming} {...upcomingHandlers} />
-        <Trends trends={state.trends} />
-        <Metrics m={state.metrics} onUpdate={updateMetric} />
-        <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-        <NorthStar text={state.northStar} onChange={setNorthStar} />
-        <Reflection value={state.journal} onChange={setJournal} />
-      </div>
+
+      {isDesktop ? (
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 20,
+              alignItems: "start",
+            }}
+          >
+            {leftColumn}
+            {rightColumn}
+          </div>
+          {/* Full-width drill-downs below */}
+          <div style={{ marginTop: 20 }}>
+            <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
+          </div>
+        </>
+      ) : (
+        <div style={styles.stack}>
+          <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
+          <Goals goals={state.goals} {...goalHandlers} />
+          <Upcoming items={state.upcoming} {...upcomingHandlers} />
+          <Trends trends={state.trends} />
+          <Metrics m={state.metrics} onUpdate={updateMetric} />
+          <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
+          <NorthStar text={state.northStar} onChange={setNorthStar} />
+          <Reflection value={state.journal} onChange={setJournal} />
+        </div>
+      )}
+
+      {/* Floating habit ring bar — fixed at bottom on all viewports */}
+      <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
     </div>
   );
 }

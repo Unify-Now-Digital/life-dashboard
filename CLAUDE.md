@@ -36,6 +36,20 @@ Defined in `src/lib/defaultState.js`. The shape matters because it'll become the
 - **Add a new drill-down panel**: create a file in `src/components/drilldowns/`, register it in `Drilldowns.jsx` (tile + render block), add data to `defaultState.js` under `drilldowns`.
 - **Change colors / spacing**: edit `src/lib/tokens.js`. Don't hardcode hex values in components.
 
+## Habit logic (important — not obvious)
+
+Habits are confirmed **retrospectively, one day late**. Each morning you confirm what you did "yesterday" — never "today". This is by design (you can't honestly know what you did today before the day is over, so the streak would be a guess).
+
+Data shape:
+- `habitLog: { gym: ["2026-05-03", "2026-05-02"], ... }` — ISO dates of confirmed YES days
+- `habitNoLog: { gym: ["2026-05-01"], ... }` — ISO dates of confirmed NO days
+
+Streak calculation lives in `src/lib/habits.js` (`streakFor`). It walks backwards from yesterday counting consecutive YES days, stopping on first NO or first unanswered (where unanswered isn't yesterday — yesterday being unanswered just means "haven't checked in yet today", it shouldn't break the streak yet).
+
+The floating bar (`StickyHabits.jsx`) shows a pulsing ring for any habit with unanswered yesterday. Tap → tiny popover with Yes / No / clear answer. Once answered, the ring solidifies and the streak updates.
+
+Don't refactor this to "did you do it today?" — Arin specifically chose retrospective confirmation.
+
 ## Things Arin will probably ask for next
 
 1. **Persistence** — localStorage with daily rollover for priorities/journal/habits-logged. The pattern from the artifact version exists in chat history.

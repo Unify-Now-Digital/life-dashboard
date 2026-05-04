@@ -9,8 +9,12 @@ export const defaultState = {
     { text: "", done: false },
     { text: "", done: false },
   ],
-  habitsLoggedToday: { gym: false, spanish: false, clean: false, sleep: false },
-  habitStreaks: { gym: 0, spanish: 0, clean: 0, sleep: 0 },
+  // Per-habit list of ISO dates ("YYYY-MM-DD") when the habit was confirmed YES.
+  // The streak = consecutive most-recent days in this list, ending at "yesterday or earlier".
+  // "Today" is never logged here — we only confirm past days.
+  habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
+  // Per-habit list of ISO dates explicitly confirmed NO. Used to know "answered" vs "unanswered".
+  habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },
   journal: "",
   goals: [
     { id: "sm", label: "Sears Melvin — first 10 orders", current: 2, target: 10 },

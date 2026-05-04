@@ -25,15 +25,17 @@ Future changes: commit to GitHub → Vercel auto-redeploys.
 
 ```
 src/
-  Dashboard.jsx              — top-level component, owns state
+  Dashboard.jsx              — top-level component, owns state, two-column layout
   main.jsx                   — React entry
   lib/
     tokens.js                — colors, styles, design tokens
     defaultState.js          — initial data shown on first load
+    habits.js                — date helpers and streak calculation
   components/
     Header.jsx               — date, greeting, quote
     Priorities.jsx           — top 3 daily
-    Streaks.jsx              — habit tiles
+    StickyHabits.jsx         — floating bottom bar with 4 habit rings
+    HabitRing.jsx            — single Apple-style ring icon
     Goals.jsx                — progress bars
     Upcoming.jsx             — next 7 days
     Trends.jsx               — sparklines
@@ -53,10 +55,12 @@ src/
 
 ## What works
 
+- Two-column responsive layout (single column on mobile, two columns ≥860px wide)
+- Floating habit ring bar with Apple-style progress rings — pinned to bottom of viewport, stays visible while scrolling
+- Habits track yesterday, not today. Tap a ring → confirm yes/no for yesterday → streak updates. Pulsing animation on rings with unanswered yesterday.
 - Inline tap-to-edit on every text and number field
 - Edit mode toggle on each list section (Goals, Upcoming, Businesses, Travel, Relationships, Reading)
 - Add and remove items in edit mode
-- Habit streak counters
 - Priority ticking
 - Daily journal
 

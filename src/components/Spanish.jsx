@@ -160,10 +160,12 @@ function RateBtn({ children, onClick, primary }) {
   );
 }
 
-function VerbCell({ value, onChange, onKeyDown, status, correct }) {
+function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
   const borderColor =
-    status === true ? C.success : status === false ? C.accent : C.border;
-  const bg = status === false ? C.accentLight : C.bg;
+    status === true ? C.success : status === false ? C.accent : C.borderStrong;
+  const bg = status === false ? C.accentLight : revealed ? C.bgSecondary : C.bgSecondary;
+  const color = revealed ? C.textTertiary : C.text;
+  const fontStyle = revealed ? "italic" : "normal";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <input
@@ -177,14 +179,15 @@ function VerbCell({ value, onChange, onKeyDown, status, correct }) {
         style={{
           width: "100%",
           boxSizing: "border-box",
-          border: `0.5px solid ${borderColor}`,
+          border: `1px solid ${borderColor}`,
           background: bg,
           borderRadius: 5,
           padding: "5px 7px",
           fontSize: 12,
           fontFamily: "inherit",
           outline: "none",
-          color: C.text,
+          color,
+          fontStyle,
         }}
       />
       {status === false && (
@@ -196,7 +199,10 @@ function VerbCell({ value, onChange, onKeyDown, status, correct }) {
 
 // Per-row state model:
 //   evals[verbId]?.[tk]: undefined = not yet checked, true = right, false = wrong
-//   editing a cell after a check resets that cell's eval back to undefined
+//   revealed[verbId]?.[tk]: true = filled by clicking "show", false/undefined = user-typed
+//   editing a cell clears its eval and revealed flags
+const GRID_COLS = "minmax(96px, 1.4fr) repeat(3, minmax(56px, 78px)) 26px 38px";
+
 function VerbsView({ verbs, onCheckVerb }) {
   const blankDrafts = () =>
     verbs.reduce((acc, v) => {
@@ -205,7 +211,8 @@ function VerbsView({ verbs, onCheckVerb }) {
     }, {});
 
   const [drafts, setDrafts] = useState(blankDrafts);
-  const [evals, setEvals] = useState({}); // { [verbId]: { past, present, future } }
+  const [evals, setEvals] = useState({});
+  const [revealed, setRevealed] = useState({}); // { [verbId]: { past, present, future } as bool }
 
   const updateDraft = (verbId, tk, value) => {
     setDrafts((d) => ({ ...d, [verbId]: { ...d[verbId], [tk]: value } }));
@@ -214,18 +221,25 @@ function VerbsView({ verbs, onCheckVerb }) {
       if (!row || row[tk] === undefined) return e;
       return { ...e, [verbId]: { ...row, [tk]: undefined } };
     });
+    // Typing into a revealed cell makes it user-typed
+    setRevealed((r) => {
+      if (!r[verbId]?.[tk]) return r;
+      return { ...r, [verbId]: { ...r[verbId], [tk]: false } };
+    });
   };
 
   const checkRow = (verbId) => {
     const v = verbs.find((x) => x.id === verbId);
     const d = drafts[verbId];
+    const r = revealed[verbId] || {};
     const cell = {};
     let anyAttempted = false;
     let allFilled = true;
     let allRight = true;
     for (const t of TENSES) {
       const filled = (d[t.key] || "").trim().length > 0;
-      if (!filled) {
+      // Revealed cells don't count as user attempts — they're study, not test
+      if (!filled || r[t.key]) {
         cell[t.key] = undefined;
         allFilled = false;
         continue;
@@ -236,20 +250,48 @@ function VerbsView({ verbs, onCheckVerb }) {
     }
     if (!anyAttempted) return;
     setEvals((e) => ({ ...e, [verbId]: cell }));
-    // Only update mastery state when the row is complete. Partial attempts get
-    // local feedback (right/wrong cells) but don't reset progress.
     if (allFilled) onCheckVerb(verbId, allRight);
+  };
+
+  const toggleRowReveal = (verbId) => {
+    const v = verbs.find((x) => x.id === verbId);
+    const cur = revealed[verbId] || {};
+    const anyRevealed = TENSES.some((t) => cur[t.key]);
+    if (anyRevealed) {
+      // Hide: clear revealed cells and their drafts
+      setDrafts((d) => {
+        const row = { ...d[verbId] };
+        for (const t of TENSES) if (cur[t.key]) row[t.key] = "";
+        return { ...d, [verbId]: row };
+      });
+      setRevealed((r) => ({ ...r, [verbId]: {} }));
+    } else {
+      // Show: fill empty cells with correct answers
+      const newRev = {};
+      setDrafts((d) => {
+        const row = { ...d[verbId] };
+        for (const t of TENSES) {
+          if (!(row[t.key] || "").trim()) {
+            row[t.key] = v.forms[t.key];
+            newRev[t.key] = true;
+          }
+        }
+        return { ...d, [verbId]: row };
+      });
+      setRevealed((r) => ({ ...r, [verbId]: newRev }));
+    }
   };
 
   const handleResetAll = () => {
     setDrafts(blankDrafts());
     setEvals({});
+    setRevealed({});
   };
 
   const masteredCount = verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
 
   return (
-    <div>
+    <div style={{ maxWidth: 560 }}>
       <div
         style={{
           fontSize: 11,
@@ -261,7 +303,7 @@ function VerbsView({ verbs, onCheckVerb }) {
           gap: 8,
         }}
       >
-        <span>Type the yo form. Press Enter (or tap ↩) to check that row.</span>
+        <span>Type the yo form. Enter (or ↩) to check, show to reveal.</span>
         <span style={{ color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
           {masteredCount} / {verbs.length} mastered
         </span>
@@ -271,8 +313,8 @@ function VerbsView({ verbs, onCheckVerb }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(140px, 1.4fr) repeat(3, minmax(64px, 1fr)) 28px",
-          gap: 8,
+          gridTemplateColumns: GRID_COLS,
+          gap: 6,
           padding: "0 0 6px 0",
           borderBottom: `0.5px solid ${C.border}`,
           fontSize: 10,
@@ -285,15 +327,18 @@ function VerbsView({ verbs, onCheckVerb }) {
         <div>yo present</div>
         <div>yo future</div>
         <div></div>
+        <div></div>
       </div>
 
       {verbs.map((v) => {
         const rowEvals = evals[v.id] || {};
+        const rowRev = revealed[v.id] || {};
         const checkedAny = TENSES.some((t) => rowEvals[t.key] !== undefined);
         const anyWrong = TENSES.some((t) => rowEvals[t.key] === false);
         const masteredEnough = v.correctPasses >= RULE_MASTERY_THRESHOLD;
         const showRule = (checkedAny && anyWrong) || masteredEnough;
         const masteryFilled = Math.min(v.correctPasses, RULE_MASTERY_THRESHOLD);
+        const anyRevealed = TENSES.some((t) => rowRev[t.key]);
 
         const onKey = (e) => {
           if (e.key === "Enter") {
@@ -307,18 +352,37 @@ function VerbsView({ verbs, onCheckVerb }) {
             key={v.id}
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(140px, 1.4fr) repeat(3, minmax(64px, 1fr)) 28px",
-              gap: 8,
+              gridTemplateColumns: GRID_COLS,
+              gap: 6,
               alignItems: "start",
               padding: "8px 0",
               borderBottom: `0.5px solid ${C.border}`,
             }}
           >
             <div style={{ minWidth: 0, paddingTop: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  lineHeight: 1.2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {v.infinitive}
               </div>
-              <div style={{ fontSize: 10, color: C.textTertiary, lineHeight: 1.2, marginTop: 2 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: C.textTertiary,
+                  lineHeight: 1.2,
+                  marginTop: 2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {v.en}
               </div>
               <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
@@ -343,6 +407,7 @@ function VerbsView({ verbs, onCheckVerb }) {
                 onKeyDown={onKey}
                 status={rowEvals[t.key]}
                 correct={v.forms[t.key]}
+                revealed={!!rowRev[t.key]}
               />
             ))}
             <button
@@ -351,8 +416,8 @@ function VerbsView({ verbs, onCheckVerb }) {
               title="Check this row"
               aria-label="Check this row"
               style={{
-                background: "transparent",
-                border: `0.5px solid ${C.border}`,
+                background: C.bg,
+                border: `1px solid ${C.borderStrong}`,
                 borderRadius: 5,
                 padding: "5px 0",
                 fontSize: 12,
@@ -364,6 +429,27 @@ function VerbsView({ verbs, onCheckVerb }) {
               }}
             >
               ↩
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleRowReveal(v.id)}
+              title={anyRevealed ? "Hide revealed answers" : "Reveal answers in empty cells"}
+              aria-label={anyRevealed ? "Hide revealed answers" : "Reveal answers"}
+              style={{
+                background: anyRevealed ? C.accentLight : C.bg,
+                border: `1px solid ${anyRevealed ? C.accent : C.borderStrong}`,
+                borderRadius: 5,
+                padding: "5px 0",
+                fontSize: 10,
+                lineHeight: 1,
+                color: anyRevealed ? C.accentDark : C.textSecondary,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                height: 27,
+                fontWeight: 500,
+              }}
+            >
+              {anyRevealed ? "hide" : "show"}
             </button>
             {showRule && (
               <div
@@ -419,21 +505,54 @@ function normalize(s) {
 
 export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb }) {
   const [tab, setTab] = useState("verbs");
+  const [collapsed, setCollapsed] = useState(false);
+
+  const masteredCount = data.verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
 
   return (
     <div style={styles.card}>
-      <div style={styles.sectionH}>
-        Spanish
-        <span style={styles.sectionSub}>B1 → B2 · vos · yo across past/present/future</span>
+      <div
+        style={{
+          ...styles.sectionH,
+          marginBottom: collapsed ? 0 : 12,
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: C.textTertiary,
+              transition: "transform 0.15s ease",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+              display: "inline-block",
+              width: 10,
+            }}
+          >
+            ▾
+          </span>
+          Spanish
+        </span>
+        <span style={styles.sectionSub}>
+          {collapsed
+            ? `${masteredCount} / ${data.verbs.length} mastered · tap to expand`
+            : "B1 → B2 · vos · yo across past/present/future"}
+        </span>
       </div>
-      <SubTabs tab={tab} setTab={setTab} />
-      {tab === "phrase" && (
-        <PhraseView phrases={data.phrases} index={data.phraseIndex} onCycle={onCyclePhrase} />
+      {!collapsed && (
+        <>
+          <SubTabs tab={tab} setTab={setTab} />
+          {tab === "phrase" && (
+            <PhraseView phrases={data.phrases} index={data.phraseIndex} onCycle={onCyclePhrase} />
+          )}
+          {tab === "chunks" && (
+            <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
+          )}
+          {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
+        </>
       )}
-      {tab === "chunks" && (
-        <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
-      )}
-      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
     </div>
   );
 }

@@ -160,17 +160,17 @@ function RateBtn({ children, onClick, primary }) {
   );
 }
 
-function VerbInput({ value, onChange, disabled, status, correct }) {
+function VerbCell({ value, onChange, onKeyDown, status, correct }) {
   const borderColor =
-    status === "wrong" ? C.accent : status === "right" ? C.success : C.border;
-  const bg = status === "wrong" ? C.accentLight : C.bg;
+    status === true ? C.success : status === false ? C.accent : C.border;
+  const bg = status === false ? C.accentLight : C.bg;
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <input
         type="text"
         value={value}
         onChange={onChange}
-        disabled={disabled}
+        onKeyDown={onKeyDown}
         autoComplete="off"
         autoCapitalize="none"
         spellCheck={false}
@@ -179,111 +179,25 @@ function VerbInput({ value, onChange, disabled, status, correct }) {
           boxSizing: "border-box",
           border: `0.5px solid ${borderColor}`,
           background: bg,
-          borderRadius: 6,
-          padding: "6px 8px",
-          fontSize: 13,
+          borderRadius: 5,
+          padding: "5px 7px",
+          fontSize: 12,
           fontFamily: "inherit",
           outline: "none",
           color: C.text,
         }}
       />
-      {status === "wrong" && (
-        <div style={{ fontSize: 11, color: C.accentDark, marginTop: 2, paddingLeft: 2 }}>
-          {correct}
-        </div>
+      {status === false && (
+        <div style={{ fontSize: 10, color: C.accentDark, paddingLeft: 2 }}>{correct}</div>
       )}
     </div>
   );
 }
 
-function VerbRow({ verb, drafts, onChangeDraft, checked, revealed, onToggleReveal }) {
-  const tenseStatus = (tk) => {
-    if (!checked) return null;
-    return normalize(drafts[tk]) === normalize(verb.forms[tk]) ? "right" : "wrong";
-  };
-  const allRight =
-    checked && TENSES.every((t) => normalize(drafts[t.key]) === normalize(verb.forms[t.key]));
-  const anyWrong = checked && !allRight;
-  const showNote = anyWrong || verb.correctPasses >= RULE_MASTERY_THRESHOLD;
-  const masteryDots = Math.min(verb.correctPasses, RULE_MASTERY_THRESHOLD);
-
-  return (
-    <div
-      style={{
-        padding: "10px 0",
-        borderBottom: `0.5px solid ${C.border}`,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, minWidth: 70 }}>{verb.infinitive}</div>
-        <button
-          type="button"
-          onClick={onToggleReveal}
-          style={{
-            background: revealed ? "transparent" : C.bgSecondary,
-            color: revealed ? C.textSecondary : C.textTertiary,
-            border: `0.5px solid ${C.border}`,
-            borderRadius: 4,
-            padding: "2px 8px",
-            fontSize: 11,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontStyle: revealed ? "normal" : "italic",
-          }}
-        >
-          {revealed ? verb.en : "tap for meaning"}
-        </button>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", gap: 3 }}>
-          {Array.from({ length: RULE_MASTERY_THRESHOLD }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                background: i < masteryDots ? C.accent : C.bgTertiary,
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        {TENSES.map((t) => (
-          <div key={t.key}>
-            <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 2 }}>{t.label}</div>
-            <VerbInput
-              value={drafts[t.key]}
-              onChange={(e) => onChangeDraft(t.key, e.target.value)}
-              disabled={checked}
-              status={tenseStatus(t.key)}
-              correct={verb.forms[t.key]}
-            />
-          </div>
-        ))}
-      </div>
-      {checked && showNote && (
-        <div
-          style={{
-            marginTop: 8,
-            padding: "6px 10px",
-            background: C.accentLight,
-            border: `0.5px solid ${C.border}`,
-            borderRadius: 6,
-            fontSize: 11,
-            color: C.accentDark,
-            lineHeight: 1.5,
-          }}
-        >
-          <span style={{ fontWeight: 500 }}>{anyWrong ? "Why: " : "Pattern: "}</span>
-          {verb.rule}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VerbsView({ verbs, onCheckBatch }) {
+// Per-row state model:
+//   evals[verbId]?.[tk]: undefined = not yet checked, true = right, false = wrong
+//   editing a cell after a check resets that cell's eval back to undefined
+function VerbsView({ verbs, onCheckVerb }) {
   const blankDrafts = () =>
     verbs.reduce((acc, v) => {
       acc[v.id] = { past: "", present: "", future: "" };
@@ -291,106 +205,206 @@ function VerbsView({ verbs, onCheckBatch }) {
     }, {});
 
   const [drafts, setDrafts] = useState(blankDrafts);
-  const [revealed, setRevealed] = useState({}); // { [verbId]: true }
-  const [checked, setChecked] = useState(false);
+  const [evals, setEvals] = useState({}); // { [verbId]: { past, present, future } }
 
-  const updateDraft = (verbId, tenseKey, value) =>
-    setDrafts((d) => ({ ...d, [verbId]: { ...d[verbId], [tenseKey]: value } }));
-
-  const toggleReveal = (verbId) =>
-    setRevealed((r) => ({ ...r, [verbId]: !r[verbId] }));
-
-  const handleCheck = (e) => {
-    e.preventDefault();
-    setChecked(true);
-    const results = verbs.map((v) => ({
-      id: v.id,
-      allRight: TENSES.every((t) => normalize(drafts[v.id][t.key]) === normalize(v.forms[t.key])),
-      anyAttempted: TENSES.some((t) => (drafts[v.id][t.key] || "").trim().length > 0),
-    }));
-    onCheckBatch(results);
+  const updateDraft = (verbId, tk, value) => {
+    setDrafts((d) => ({ ...d, [verbId]: { ...d[verbId], [tk]: value } }));
+    setEvals((e) => {
+      const row = e[verbId];
+      if (!row || row[tk] === undefined) return e;
+      return { ...e, [verbId]: { ...row, [tk]: undefined } };
+    });
   };
 
-  const handleReset = () => {
+  const checkRow = (verbId) => {
+    const v = verbs.find((x) => x.id === verbId);
+    const d = drafts[verbId];
+    const cell = {};
+    let anyAttempted = false;
+    let allFilled = true;
+    let allRight = true;
+    for (const t of TENSES) {
+      const filled = (d[t.key] || "").trim().length > 0;
+      if (!filled) {
+        cell[t.key] = undefined;
+        allFilled = false;
+        continue;
+      }
+      anyAttempted = true;
+      cell[t.key] = normalize(d[t.key]) === normalize(v.forms[t.key]);
+      if (!cell[t.key]) allRight = false;
+    }
+    if (!anyAttempted) return;
+    setEvals((e) => ({ ...e, [verbId]: cell }));
+    // Only update mastery state when the row is complete. Partial attempts get
+    // local feedback (right/wrong cells) but don't reset progress.
+    if (allFilled) onCheckVerb(verbId, allRight);
+  };
+
+  const handleResetAll = () => {
     setDrafts(blankDrafts());
-    setRevealed({});
-    setChecked(false);
+    setEvals({});
   };
 
-  const totalCorrect = checked
-    ? verbs.filter((v) =>
-        TENSES.every((t) => normalize(drafts[v.id][t.key]) === normalize(v.forms[t.key]))
-      ).length
-    : 0;
+  const masteredCount = verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
 
   return (
-    <form onSubmit={handleCheck}>
+    <div>
       <div
         style={{
           fontSize: 11,
           color: C.textTertiary,
-          marginBottom: 8,
+          marginBottom: 10,
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        <span>Type the yo form for each tense. Tap meaning to reveal.</span>
-        {checked && (
-          <span style={{ color: totalCorrect === verbs.length ? C.success : C.textSecondary }}>
-            {totalCorrect} / {verbs.length} verbs
-          </span>
-        )}
+        <span>Type the yo form. Press Enter (or tap ↩) to check that row.</span>
+        <span style={{ color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+          {masteredCount} / {verbs.length} mastered
+        </span>
       </div>
-      <div>
-        {verbs.map((v) => (
-          <VerbRow
+
+      {/* Header row — labels appear once at top so each verb row stays compact */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(140px, 1.4fr) repeat(3, minmax(64px, 1fr)) 28px",
+          gap: 8,
+          padding: "0 0 6px 0",
+          borderBottom: `0.5px solid ${C.border}`,
+          fontSize: 10,
+          color: C.textTertiary,
+          textTransform: "lowercase",
+        }}
+      >
+        <div></div>
+        <div>yo past</div>
+        <div>yo present</div>
+        <div>yo future</div>
+        <div></div>
+      </div>
+
+      {verbs.map((v) => {
+        const rowEvals = evals[v.id] || {};
+        const checkedAny = TENSES.some((t) => rowEvals[t.key] !== undefined);
+        const anyWrong = TENSES.some((t) => rowEvals[t.key] === false);
+        const masteredEnough = v.correctPasses >= RULE_MASTERY_THRESHOLD;
+        const showRule = (checkedAny && anyWrong) || masteredEnough;
+        const masteryFilled = Math.min(v.correctPasses, RULE_MASTERY_THRESHOLD);
+
+        const onKey = (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            checkRow(v.id);
+          }
+        };
+
+        return (
+          <div
             key={v.id}
-            verb={v}
-            drafts={drafts[v.id]}
-            onChangeDraft={(tk, val) => updateDraft(v.id, tk, val)}
-            checked={checked}
-            revealed={!!revealed[v.id]}
-            onToggleReveal={() => toggleReveal(v.id)}
-          />
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        {!checked ? (
-          <button
-            type="submit"
             style={{
-              background: C.accent,
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-              padding: "8px 16px",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
+              display: "grid",
+              gridTemplateColumns: "minmax(140px, 1.4fr) repeat(3, minmax(64px, 1fr)) 28px",
+              gap: 8,
+              alignItems: "start",
+              padding: "8px 0",
+              borderBottom: `0.5px solid ${C.border}`,
             }}
           >
-            Check all
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleReset}
-            style={{
-              background: "transparent",
-              border: `0.5px solid ${C.border}`,
-              borderRadius: 6,
-              padding: "8px 16px",
-              fontSize: 13,
-              color: C.accent,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            Try again
-          </button>
-        )}
+            <div style={{ minWidth: 0, paddingTop: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
+                {v.infinitive}
+              </div>
+              <div style={{ fontSize: 10, color: C.textTertiary, lineHeight: 1.2, marginTop: 2 }}>
+                {v.en}
+              </div>
+              <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+                {Array.from({ length: RULE_MASTERY_THRESHOLD }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 3,
+                      background: i < masteryFilled ? C.accent : C.bgTertiary,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            {TENSES.map((t) => (
+              <VerbCell
+                key={t.key}
+                value={drafts[v.id][t.key]}
+                onChange={(e) => updateDraft(v.id, t.key, e.target.value)}
+                onKeyDown={onKey}
+                status={rowEvals[t.key]}
+                correct={v.forms[t.key]}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => checkRow(v.id)}
+              title="Check this row"
+              aria-label="Check this row"
+              style={{
+                background: "transparent",
+                border: `0.5px solid ${C.border}`,
+                borderRadius: 5,
+                padding: "5px 0",
+                fontSize: 12,
+                lineHeight: 1,
+                color: C.accent,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                height: 27,
+              }}
+            >
+              ↩
+            </button>
+            {showRule && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  marginTop: 6,
+                  padding: "5px 9px",
+                  background: C.accentLight,
+                  borderRadius: 5,
+                  fontSize: 11,
+                  color: C.accentDark,
+                  lineHeight: 1.4,
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{anyWrong ? "Why: " : "Pattern: "}</span>
+                {v.rule}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={handleResetAll}
+          style={{
+            background: "transparent",
+            border: `0.5px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "5px 12px",
+            fontSize: 11,
+            color: C.textSecondary,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Clear all
+        </button>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -403,7 +417,7 @@ function normalize(s) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerbBatch }) {
+export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb }) {
   const [tab, setTab] = useState("verbs");
 
   return (
@@ -419,7 +433,7 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerbB
       {tab === "chunks" && (
         <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
       )}
-      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckBatch={onCheckVerbBatch} />}
+      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
     </div>
   );
 }

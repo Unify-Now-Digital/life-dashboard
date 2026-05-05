@@ -372,18 +372,17 @@ export default function Dashboard() {
             },
           };
         }),
-      // results: [{ id, allRight, anyAttempted }]. Bump correctPasses on full correctness;
-      // reset on any mistake. Untouched verbs (anyAttempted=false) keep their state.
-      onCheckVerbBatch: (results) =>
+      // Per-row check. allFilledAndRight=true bumps correctPasses; any mistake resets to 0.
+      // Partial rows (allFilledAndRight=false from missing cells) also reset since user
+      // didn't fully demonstrate mastery — matches the "all 3 forms or no point" rule.
+      onCheckVerb: (id, allFilledAndRight) =>
         setState((s) => {
           const sp = s.drilldowns.spanish;
-          const byId = Object.fromEntries(results.map((r) => [r.id, r]));
-          const verbs = sp.verbs.map((v) => {
-            const r = byId[v.id];
-            if (!r || !r.anyAttempted) return v;
-            if (r.allRight) return { ...v, correctPasses: v.correctPasses + 1 };
-            return { ...v, correctPasses: 0 };
-          });
+          const verbs = sp.verbs.map((v) =>
+            v.id === id
+              ? { ...v, correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0 }
+              : v
+          );
           return { ...s, drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs } } };
         }),
     },

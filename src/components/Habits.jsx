@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { C, styles } from "../lib/tokens";
 import HabitRing from "./HabitRing.jsx";
-import HabitDots from "./HabitDots.jsx";
+import HabitMonth from "./HabitMonth.jsx";
 import HabitConfirm from "./HabitConfirm.jsx";
-import { isoYesterday, statusFor, streakFor, hasUnanswered, historyFor } from "../lib/habits";
+import { isoYesterday, statusFor, streakFor, hasUnanswered } from "../lib/habits";
 
 const HABITS = [
   { key: "gym", label: "Gym" },
@@ -29,11 +29,10 @@ export default function Habits({ habitLog, habitNoLog, onConfirm }) {
         {HABITS.map((h) => {
           const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
           const streak = streakFor(h.key, habitLog, habitNoLog);
-          const history = historyFor(h.key, habitLog, habitNoLog, 7);
           return (
             <div
               key={h.key}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
             >
               <HabitRing
                 habit={h.key}
@@ -46,7 +45,7 @@ export default function Habits({ habitLog, habitNoLog, onConfirm }) {
               <div style={{ fontSize: 11, color: C.textTertiary, fontVariantNumeric: "tabular-nums" }}>
                 {streak}d streak
               </div>
-              <HabitDots history={history} />
+              <HabitMonth habit={h.key} habitLog={habitLog} habitNoLog={habitNoLog} />
             </div>
           );
         })}

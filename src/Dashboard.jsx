@@ -10,7 +10,6 @@ import Priorities from "./components/Priorities.jsx";
 import StickyHabits from "./components/StickyHabits.jsx";
 import Goals from "./components/Goals.jsx";
 import Upcoming from "./components/Upcoming.jsx";
-import Trends from "./components/Trends.jsx";
 import Metrics from "./components/Metrics.jsx";
 import Drilldowns from "./components/Drilldowns.jsx";
 import Reflection from "./components/Reflection.jsx";
@@ -396,7 +395,6 @@ export default function Dashboard() {
     <div style={styles.stack}>
       <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
       <Goals goals={state.goals} {...goalHandlers} />
-      <Trends trends={state.trends} />
     </div>
   );
 
@@ -452,7 +450,6 @@ export default function Dashboard() {
           <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
           <Goals goals={state.goals} {...goalHandlers} />
           <Upcoming items={state.upcoming} {...upcomingHandlers} />
-          <Trends trends={state.trends} />
           <Metrics
             m={state.metrics}
             onUpdate={updateMetric}

@@ -1,18 +1,8 @@
 import React, { useState } from "react";
 import { C, styles } from "../lib/tokens";
 import { EditableText } from "./Editable.jsx";
-import HabitRing from "./HabitRing.jsx";
-import HabitDots from "./HabitDots.jsx";
-import { isoYesterday, statusFor, streakFor, historyFor } from "../lib/habits";
 import TravelPanel from "./drilldowns/TravelPanel.jsx";
 import FinancesPanel from "./drilldowns/FinancesPanel.jsx";
-
-const HABITS = [
-  { key: "gym", label: "Gym" },
-  { key: "spanish", label: "Spanish" },
-  { key: "clean", label: "Clean" },
-  { key: "sleep", label: "Sleep" },
-];
 
 function RevenueTile({ label, value, onChange, sub }) {
   return (
@@ -22,32 +12,6 @@ function RevenueTile({ label, value, onChange, sub }) {
         <EditableText value={value} onChange={onChange} style={{ fontSize: 20, fontWeight: 500 }} />
       </div>
       {sub && <div style={{ fontSize: 11, marginTop: 2, color: C.textTertiary }}>{sub}</div>}
-    </div>
-  );
-}
-
-function HabitsTile({ habitLog, habitNoLog }) {
-  const yesISO = isoYesterday();
-  return (
-    <div style={{ background: C.bgSecondary, borderRadius: 8, padding: 14, gridColumn: "1 / -1" }}>
-      <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 10 }}>Habits</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-        {HABITS.map((h) => {
-          const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
-          const streak = streakFor(h.key, habitLog, habitNoLog);
-          const history = historyFor(h.key, habitLog, habitNoLog, 7);
-          return (
-            <div
-              key={h.key}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-            >
-              <HabitRing habit={h.key} status={status} streak={streak} onClick={() => {}} />
-              <div style={{ fontSize: 11, color: C.textSecondary }}>{h.label}</div>
-              <HabitDots history={history} />
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -76,7 +40,7 @@ function ExpandableTile({ label, value, sub, expanded, onToggle }) {
   );
 }
 
-export default function Metrics({ m, onUpdate, habitLog, habitNoLog, drilldowns, handlers }) {
+export default function Metrics({ m, onUpdate, drilldowns, handlers }) {
   const [open, setOpen] = useState(null);
   const toggle = (id) => setOpen(open === id ? null : id);
 
@@ -114,7 +78,6 @@ export default function Metrics({ m, onUpdate, habitLog, habitNoLog, drilldowns,
           onChange={(v) => onUpdate("smMTD", v)}
           sub="this month"
         />
-        <HabitsTile habitLog={habitLog} habitNoLog={habitNoLog} />
         <ExpandableTile
           label="Travel"
           value={travelValue}

@@ -3,6 +3,9 @@ import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
 import { defaultState, nextId } from "./lib/defaultState";
 
 import Header from "./components/Header.jsx";
+import Spanish from "./components/Spanish.jsx";
+import NorthStar from "./components/NorthStar.jsx";
+import Habits from "./components/Habits.jsx";
 import Priorities from "./components/Priorities.jsx";
 import StickyHabits from "./components/StickyHabits.jsx";
 import Goals from "./components/Goals.jsx";
@@ -338,6 +341,52 @@ export default function Dashboard() {
         "Reading item removed"
       ),
     },
+    spanish: {
+      onCyclePhrase: () =>
+        setState((s) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            spanish: {
+              ...s.drilldowns.spanish,
+              phraseIndex: (s.drilldowns.spanish.phraseIndex + 1) % s.drilldowns.spanish.phrases.length,
+            },
+          },
+        })),
+      // Leitner: "good" promotes the bucket and advances; "hard" stays; "again" resets to 0.
+      // The chunk index always advances so you don't see the same one twice.
+      onRateChunk: (id, rating) =>
+        setState((s) => {
+          const sp = s.drilldowns.spanish;
+          const chunks = sp.chunks.map((c) => {
+            if (c.id !== id) return c;
+            if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
+            if (rating === "hard") return { ...c, lastSeen: Date.now() };
+            return { ...c, bucket: 0, lastSeen: Date.now() };
+          });
+          return {
+            ...s,
+            drilldowns: {
+              ...s.drilldowns,
+              spanish: { ...sp, chunks, chunkIndex: (sp.chunkIndex + 1) % sp.chunks.length },
+            },
+          };
+        }),
+      // results: [{ id, allRight, anyAttempted }]. Bump correctPasses on full correctness;
+      // reset on any mistake. Untouched verbs (anyAttempted=false) keep their state.
+      onCheckVerbBatch: (results) =>
+        setState((s) => {
+          const sp = s.drilldowns.spanish;
+          const byId = Object.fromEntries(results.map((r) => [r.id, r]));
+          const verbs = sp.verbs.map((v) => {
+            const r = byId[v.id];
+            if (!r || !r.anyAttempted) return v;
+            if (r.allRight) return { ...v, correctPasses: v.correctPasses + 1 };
+            return { ...v, correctPasses: 0 };
+          });
+          return { ...s, drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs } } };
+        }),
+    },
   };
 
   // ---- Render -----------------------------------------------------------
@@ -346,13 +395,7 @@ export default function Dashboard() {
 
   const leftColumn = (
     <div style={styles.stack}>
-      <Priorities
-        priorities={state.priorities}
-        onToggle={togglePriority}
-        onChange={changePriority}
-        northStar={state.northStar}
-        onNorthStarChange={setNorthStar}
-      />
+      <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
       <Goals goals={state.goals} {...goalHandlers} />
       <Trends trends={state.trends} />
     </div>
@@ -364,8 +407,6 @@ export default function Dashboard() {
       <Metrics
         m={state.metrics}
         onUpdate={updateMetric}
-        habitLog={state.habitLog}
-        habitNoLog={state.habitNoLog}
         drilldowns={state.drilldowns}
         handlers={drilldownHandlers}
       />
@@ -373,9 +414,21 @@ export default function Dashboard() {
     </div>
   );
 
+  // Full-width sections that pin to the top of the page on every viewport.
+  // Order: Spanish (active drill), North Star (vision), Habits (status).
+  const topStack = (
+    <div style={{ ...styles.stack, marginBottom: 20 }}>
+      <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
+      <NorthStar value={state.northStar} onChange={setNorthStar} />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+    </div>
+  );
+
   return (
     <div style={styles.page}>
       <Header today={today} dayOfYear={dayOfYear} quote={quote} />
+
+      {topStack}
 
       {isDesktop ? (
         <>
@@ -397,21 +450,13 @@ export default function Dashboard() {
         </>
       ) : (
         <div style={styles.stack}>
-          <Priorities
-            priorities={state.priorities}
-            onToggle={togglePriority}
-            onChange={changePriority}
-            northStar={state.northStar}
-            onNorthStarChange={setNorthStar}
-          />
+          <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
           <Goals goals={state.goals} {...goalHandlers} />
           <Upcoming items={state.upcoming} {...upcomingHandlers} />
           <Trends trends={state.trends} />
           <Metrics
             m={state.metrics}
             onUpdate={updateMetric}
-            habitLog={state.habitLog}
-            habitNoLog={state.habitNoLog}
             drilldowns={state.drilldowns}
             handlers={drilldownHandlers}
           />

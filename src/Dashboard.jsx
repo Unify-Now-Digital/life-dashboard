@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
-import { defaultState, nextId } from "./lib/defaultState";
+import { nextId } from "./lib/defaultState";
+import { loadState, saveState, applyDailyRollover } from "./lib/storage";
 
 import Header from "./components/Header.jsx";
 import Priorities from "./components/Priorities.jsx";
@@ -28,8 +29,22 @@ function useIsDesktop(breakpoint = 860) {
 }
 
 export default function Dashboard() {
-  const [state, setState] = useState(defaultState);
+  const [state, setState] = useState(() => applyDailyRollover(loadState()));
   const isDesktop = useIsDesktop();
+
+  // Persist on every state change.
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
+
+  // If the app stays open across midnight, roll over when it regains focus.
+  useEffect(() => {
+    const onVis = () => {
+      if (!document.hidden) setState((s) => applyDailyRollover(s));
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);

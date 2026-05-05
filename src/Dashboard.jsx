@@ -420,7 +420,7 @@ export default function Dashboard() {
     <div style={{ ...styles.stack, marginBottom: 20 }}>
       <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
       <NorthStar value={state.northStar} onChange={setNorthStar} />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
     </div>
   );
 

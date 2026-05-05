@@ -3,6 +3,7 @@ import { C, styles } from "../lib/tokens";
 import BusinessesPanel from "./drilldowns/BusinessesPanel.jsx";
 import RelationshipsPanel from "./drilldowns/RelationshipsPanel.jsx";
 import ReadingPanel from "./drilldowns/ReadingPanel.jsx";
+import SpanishPanel from "./drilldowns/SpanishPanel.jsx";
 
 function Tile({ label, value, sub, onClick, fullWidth, active }) {
   return (
@@ -51,7 +52,12 @@ export default function Drilldowns({ data, handlers }) {
         data.reading.filter((r) => r.progress === null).length
       } podcast`,
       sub: "in progress",
-      fullWidth: true,
+    },
+    {
+      id: "spanish",
+      label: "Spanish",
+      value: `${data.spanish.verbs.length} verbs · ${data.spanish.chunks.length} chunks`,
+      sub: "phrase, conversations, conjugations",
     },
   ];
 
@@ -75,6 +81,9 @@ export default function Drilldowns({ data, handlers }) {
             <RelationshipsPanel items={data.relationships} {...handlers.relationships} onClose={() => setOpen(null)} />
           )}
           {open === "read" && <ReadingPanel items={data.reading} {...handlers.reading} onClose={() => setOpen(null)} />}
+          {open === "spanish" && (
+            <SpanishPanel data={data.spanish} {...handlers.spanish} onClose={() => setOpen(null)} />
+          )}
         </div>
       )}
     </div>

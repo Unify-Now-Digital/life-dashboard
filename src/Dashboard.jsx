@@ -338,6 +338,61 @@ export default function Dashboard() {
         "Reading item removed"
       ),
     },
+    spanish: {
+      onCyclePhrase: () =>
+        setState((s) => ({
+          ...s,
+          drilldowns: {
+            ...s.drilldowns,
+            spanish: {
+              ...s.drilldowns.spanish,
+              phraseIndex: (s.drilldowns.spanish.phraseIndex + 1) % s.drilldowns.spanish.phrases.length,
+            },
+          },
+        })),
+      // Simple Leitner-style: "good" promotes the bucket and advances; "hard" stays;
+      // "again" demotes to 0. The chunk index always advances so you don't see the same one twice.
+      onRateChunk: (id, rating) =>
+        setState((s) => {
+          const sp = s.drilldowns.spanish;
+          const chunks = sp.chunks.map((c) => {
+            if (c.id !== id) return c;
+            if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
+            if (rating === "hard") return { ...c, lastSeen: Date.now() };
+            return { ...c, bucket: 0, lastSeen: Date.now() };
+          });
+          return {
+            ...s,
+            drilldowns: {
+              ...s.drilldowns,
+              spanish: {
+                ...sp,
+                chunks,
+                chunkIndex: (sp.chunkIndex + 1) % sp.chunks.length,
+              },
+            },
+          };
+        }),
+      // result === true: full conjugation correct → bump correctPasses.
+      // result === false: any mistake → reset correctPasses (so rule stays hidden until they re-master).
+      // result === null: just advance index (user clicked Next without re-checking).
+      onVerbResult: (id, result) =>
+        setState((s) => {
+          const sp = s.drilldowns.spanish;
+          const verbs = sp.verbs.map((v) => {
+            if (v.id !== id) return v;
+            if (result === true) return { ...v, correctPasses: v.correctPasses + 1 };
+            if (result === false) return { ...v, correctPasses: 0 };
+            return v;
+          });
+          // Only advance verbIndex when user clicks Next (result === null)
+          const verbIndex = result === null ? (sp.verbIndex + 1) % sp.verbs.length : sp.verbIndex;
+          return {
+            ...s,
+            drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs, verbIndex } },
+          };
+        }),
+    },
   };
 
   // ---- Render -----------------------------------------------------------

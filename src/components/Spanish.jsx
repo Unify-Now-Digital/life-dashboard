@@ -277,6 +277,11 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
         value={value}
         onChange={onChange}
         onKeyDown={onKeyDown}
+        onFocus={(e) => {
+          // Auto-select revealed answers so the first keystroke replaces them
+          // and the user can practise typing over the prompt.
+          if (revealed) e.target.select();
+        }}
         autoComplete="off"
         autoCapitalize="none"
         spellCheck={false}

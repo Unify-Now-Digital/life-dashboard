@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { C, styles } from "../lib/tokens";
 
 const TENSES = [
@@ -74,66 +74,166 @@ function PhraseView({ phrases, index, onCycle }) {
   );
 }
 
+function TappableSpanish({ es, en, revealed, onToggle, variant }) {
+  // variant: "them" (left chat bubble) | "option" (subtle, with left border)
+  const baseStyle = {
+    cursor: "pointer",
+    userSelect: "none",
+  };
+  if (variant === "them") {
+    return (
+      <div onClick={onToggle} style={baseStyle}>
+        <div
+          style={{
+            background: C.bgSecondary,
+            border: `0.5px solid ${C.border}`,
+            borderRadius: 8,
+            padding: "10px 13px",
+            fontSize: 15,
+          }}
+        >
+          {es}
+        </div>
+        {revealed && (
+          <div
+            style={{
+              fontSize: 12,
+              color: C.textTertiary,
+              fontStyle: "italic",
+              marginTop: 4,
+              paddingLeft: 13,
+            }}
+          >
+            {en}
+          </div>
+        )}
+        {!revealed && (
+          <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 4, paddingLeft: 13 }}>
+            tap to translate
+          </div>
+        )}
+      </div>
+    );
+  }
+  // option variant
+  return (
+    <div onClick={onToggle} style={{ ...baseStyle, borderLeft: `2px solid ${C.accent}`, padding: "4px 12px" }}>
+      <div style={{ fontSize: 14 }}>{es}</div>
+      {revealed && (
+        <div style={{ fontSize: 12, color: C.textTertiary, fontStyle: "italic", marginTop: 2 }}>
+          {en}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChunksView({ chunks, index, onAdvance }) {
-  const [revealed, setRevealed] = useState(false);
   const chunk = chunks[index % chunks.length];
+  const [step, setStep] = useState(1); // number of turns currently visible
+  const [revealedEN, setRevealedEN] = useState({}); // keys: "t-{idx}" or "o-{turnIdx}-{optIdx}"
+
+  // Reset progress when the chunk changes (after a rating advances index)
+  useEffect(() => {
+    setStep(1);
+    setRevealedEN({});
+  }, [chunk.id]);
+
+  const totalTurns = chunk.turns.length;
+  const visibleTurns = chunk.turns.slice(0, step);
+  const isComplete = step >= totalTurns;
+
+  const toggleEn = (key) => setRevealedEN((r) => ({ ...r, [key]: !r[key] }));
 
   const handleRate = (rating) => {
     onAdvance(chunk.id, rating);
-    setRevealed(false);
+    // useEffect on chunk.id change will reset step + revealedEN
   };
 
   return (
     <div>
-      <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 6 }}>{chunk.situation}</div>
-      <div
-        style={{
-          background: C.bgSecondary,
-          border: `0.5px solid ${C.border}`,
-          borderRadius: 8,
-          padding: "12px 14px",
-          fontSize: 15,
-        }}
-      >
-        {chunk.prompt}
+      <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 8 }}>
+        {chunk.situation} · turn {step} of {totalTurns}
       </div>
 
-      {!revealed ? (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {visibleTurns.map((turn, ti) => {
+          if (turn.speaker === "them") {
+            const key = `t-${ti}`;
+            return (
+              <div key={ti}>
+                <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 4 }}>them</div>
+                <TappableSpanish
+                  es={turn.es}
+                  en={turn.en}
+                  revealed={!!revealedEN[key]}
+                  onToggle={() => toggleEn(key)}
+                  variant="them"
+                />
+              </div>
+            );
+          }
+          // you turn — render the option list
+          return (
+            <div key={ti}>
+              <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 6 }}>
+                you — pick the register that fits
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {turn.options.map((opt, oi) => {
+                  const key = `o-${ti}-${oi}`;
+                  return (
+                    <div key={oi}>
+                      <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 2, paddingLeft: 14 }}>
+                        {opt.tone}
+                      </div>
+                      <TappableSpanish
+                        es={opt.es}
+                        en={opt.en}
+                        revealed={!!revealedEN[key]}
+                        onToggle={() => toggleEn(key)}
+                        variant="option"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {!isComplete ? (
         <button
-          onClick={() => setRevealed(true)}
+          onClick={() => setStep((s) => Math.min(s + 1, totalTurns))}
           style={{
-            marginTop: 14,
+            marginTop: 16,
             background: C.accent,
             color: "white",
             border: "none",
             borderRadius: 6,
-            padding: "8px 14px",
+            padding: "8px 16px",
             fontSize: 13,
             cursor: "pointer",
             fontFamily: "inherit",
           }}
         >
-          Reveal responses
+          Next
         </button>
       ) : (
-        <>
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-            {chunk.responses.map((r, i) => (
-              <div key={i} style={{ borderLeft: `2px solid ${C.accent}`, padding: "4px 12px" }}>
-                <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 2 }}>{r.tone}</div>
-                <div style={{ fontSize: 14 }}>{r.text}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <RateBtn onClick={() => handleRate("again")}>Again</RateBtn>
             <RateBtn onClick={() => handleRate("hard")}>Hard</RateBtn>
-            <RateBtn onClick={() => handleRate("good")} primary>Good</RateBtn>
+            <RateBtn onClick={() => handleRate("good")} primary>
+              Good
+            </RateBtn>
           </div>
           <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 8 }}>
-            Bucket: {chunk.bucket} · {chunk.bucket >= 3 ? "well-known" : chunk.bucket === 0 ? "new" : "learning"}
+            Bucket: {chunk.bucket} ·{" "}
+            {chunk.bucket >= 3 ? "well-known" : chunk.bucket === 0 ? "new" : "learning"}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -163,9 +263,13 @@ function RateBtn({ children, onClick, primary }) {
 function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
   const borderColor =
     status === true ? C.success : status === false ? C.accent : C.borderStrong;
-  const bg = status === false ? C.accentLight : revealed ? C.bgSecondary : C.bgSecondary;
+  const bg = status === false ? C.accentLight : C.bgSecondary;
   const color = revealed ? C.textTertiary : C.text;
   const fontStyle = revealed ? "italic" : "normal";
+  // After a check, show the canonical answer beneath every typed cell so the
+  // user can compare against what they typed — even when correct (useful when
+  // accent-insensitive matching forgave a missing accent).
+  const showAnswerBeneath = status !== undefined && !revealed;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <input
@@ -190,8 +294,16 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
           fontStyle,
         }}
       />
-      {status === false && (
-        <div style={{ fontSize: 10, color: C.accentDark, paddingLeft: 2 }}>{correct}</div>
+      {showAnswerBeneath && (
+        <div
+          style={{
+            fontSize: 10,
+            color: status ? C.textTertiary : C.accentDark,
+            paddingLeft: 2,
+          }}
+        >
+          {correct}
+        </div>
       )}
     </div>
   );

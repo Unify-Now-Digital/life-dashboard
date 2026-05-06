@@ -105,46 +105,99 @@ export const defaultState = {
         { id: 11, es: "Me re copó la idea", en: "I really loved the idea", note: "Argentine slang — 're' intensifier" },
         { id: 12, es: "¿Podrías pasarme el contacto?", en: "Could you send me the contact?", note: "conditional request" },
       ],
+      // Conversations are multi-turn dialogues. Each turn is either:
+      //   { speaker: "them", es, en }     — counterpart speaks
+      //   { speaker: "you", options: [{ tone, es, en }, ...] }  — your possible replies
+      // The user steps through one turn at a time, optionally tapping any
+      // Spanish line to reveal its English translation beneath.
       chunks: [
-        { id: 1, situation: "First-date opener at a café", prompt: "¿Qué te gusta hacer los fines de semana?", responses: [
-          { tone: "casual", text: "Depende del fin. Si estoy con energía, gym y algo afuera; si no, leer y descansar." },
-          { tone: "neutral", text: "Suelo entrenar y, cuando puedo, viajar. ¿Y vos?" },
-          { tone: "playful", text: "Depende con quién los pase. ¿Qué tenés en mente?" },
+        { id: 1, situation: "First-date opener at a café", turns: [
+          { speaker: "them", es: "¿Qué te gusta hacer los fines de semana?", en: "What do you like to do on weekends?" },
+          { speaker: "you", options: [
+            { tone: "casual", es: "Depende del fin. Si estoy con energía, gym y algo afuera; si no, leer y descansar.", en: "Depends on the weekend. If I have energy, gym and something outside; if not, reading and resting." },
+            { tone: "neutral", es: "Suelo entrenar y, cuando puedo, viajar. ¿Y vos?", en: "I usually train and, when I can, travel. And you?" },
+            { tone: "playful", es: "Depende con quién los pase. ¿Qué tenés en mente?", en: "Depends who I spend them with. What do you have in mind?" },
+          ]},
+          { speaker: "them", es: "Ah, copado. ¿Y solés salir o más bien quedarte tranquilo?", en: "Oh, cool. And do you usually go out or rather stay in?" },
+          { speaker: "you", options: [
+            { tone: "honest", es: "Mitad y mitad. Algo de gimnasio, algo de café, algo de cama.", en: "Half and half. Some gym, some café, some bed." },
+            { tone: "outgoing", es: "Salir, pero sin volverme loco. ¿Tenés algún lugar favorito?", en: "Going out, but not crazy. Do you have a favourite spot?" },
+            { tone: "homebody", es: "Más quedarme. Pero por la persona indicada hago una excepción.", en: "More staying in. But for the right person I make an exception." },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 2, situation: "Pushing back on a client deadline", prompt: "Necesitamos esto para el lunes.", responses: [
-          { tone: "diplomatic", text: "Entiendo la urgencia. Para hacerlo bien, te propongo el miércoles." },
-          { tone: "firm", text: "Para garantizar la calidad, lo más temprano sería el miércoles." },
-          { tone: "collaborative", text: "Si movemos algunas piezas, ¿podríamos apuntar al martes?" },
+
+        { id: 2, situation: "Pushing back on a client deadline", turns: [
+          { speaker: "them", es: "Necesitamos esto para el lunes.", en: "We need this by Monday." },
+          { speaker: "you", options: [
+            { tone: "diplomatic", es: "Entiendo la urgencia. Para hacerlo bien, te propongo el miércoles.", en: "I understand the urgency. To do it right, I'd propose Wednesday." },
+            { tone: "firm", es: "Para garantizar la calidad, lo más temprano sería el miércoles.", en: "To guarantee quality, the earliest would be Wednesday." },
+            { tone: "collaborative", es: "Si movemos algunas piezas, ¿podríamos apuntar al martes?", en: "If we move some pieces around, could we aim for Tuesday?" },
+          ]},
+          { speaker: "them", es: "El cliente está esperando.", en: "The client is waiting." },
+          { speaker: "you", options: [
+            { tone: "calm", es: "Lo sé. Prefiero entregar algo sólido el miércoles que algo a medias el lunes.", en: "I know. I'd rather deliver something solid Wednesday than half-baked Monday." },
+            { tone: "owning", es: "Yo me encargo de comunicárselo. ¿Te paso un texto que puedas reenviar?", en: "I'll handle telling them. Want me to send a message you can forward?" },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 3, situation: "Declining an invitation politely", prompt: "¿Te sumás a cenar el sábado?", responses: [
-          { tone: "warm", text: "Me encantaría, pero ya tengo algo. ¿Lo dejamos para la próxima?" },
-          { tone: "brief", text: "El sábado no puedo. ¿Otro día de la semana?" },
-          { tone: "open", text: "Esta vez no llego, pero avisame la próxima." },
+
+        { id: 3, situation: "Declining an invitation politely", turns: [
+          { speaker: "them", es: "¿Te sumás a cenar el sábado?", en: "Want to join us for dinner Saturday?" },
+          { speaker: "you", options: [
+            { tone: "warm", es: "Me encantaría, pero ya tengo algo. ¿Lo dejamos para la próxima?", en: "I'd love to, but I already have something. Can we leave it for next time?" },
+            { tone: "brief", es: "El sábado no puedo. ¿Otro día de la semana?", en: "I can't Saturday. Another day this week?" },
+            { tone: "open", es: "Esta vez no llego, pero avisame la próxima.", en: "Can't make it this time, but let me know next time." },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 4, situation: "Asking for a raise opener", prompt: "Quería hablar de algo importante.", responses: [
-          { tone: "direct", text: "Quería revisar mi compensación a la luz de los resultados de los últimos meses." },
-          { tone: "framed", text: "Me gustaría conversar sobre el siguiente paso en mi rol y lo que eso implica." },
-          { tone: "data-led", text: "Te preparé un resumen de lo que entregué este trimestre. ¿Lo revisamos juntos?" },
+
+        { id: 4, situation: "Boss invites you for a one-on-one", turns: [
+          { speaker: "them", es: "¿Tenés un minuto? Quería ver cómo te está yendo.", en: "Got a minute? I wanted to see how you're doing." },
+          { speaker: "you", options: [
+            { tone: "direct", es: "Sí, justo quería revisar mi compensación a la luz de los últimos meses.", en: "Yes, I actually wanted to review my compensation given the last few months." },
+            { tone: "framed", es: "Sí. Me gustaría hablar del siguiente paso en mi rol.", en: "Yes. I'd like to talk about the next step in my role." },
+            { tone: "data-led", es: "Sí. Te preparé un resumen de lo que entregué este trimestre, ¿lo vemos?", en: "Yes. I put together a summary of what I delivered this quarter, shall we look at it?" },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 5, situation: "Recovering from missing a message", prompt: "Te escribí hace tres días.", responses: [
-          { tone: "honest", text: "Perdón, se me pasó. Estuve a full y recién lo veo." },
-          { tone: "warm", text: "Me hiciste falta esta semana. Perdón por la demora." },
-          { tone: "playful", text: "Estoy en deuda. ¿Cómo te compenso?" },
+
+        { id: 5, situation: "Recovering from a missed message", turns: [
+          { speaker: "them", es: "Te escribí hace tres días.", en: "I wrote to you three days ago." },
+          { speaker: "them", es: "¿Está todo bien?", en: "Is everything OK?" },
+          { speaker: "you", options: [
+            { tone: "honest", es: "Perdón, se me pasó. Estuve a full y recién lo veo.", en: "Sorry, it slipped by. I was swamped and just saw it." },
+            { tone: "warm", es: "Me hiciste falta esta semana. Perdón por la demora.", en: "I missed you this week. Sorry for the delay." },
+            { tone: "playful", es: "Estoy en deuda. ¿Cómo te compenso?", en: "I owe you. How do I make it up to you?" },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 6, situation: "Disagreeing with a teammate", prompt: "Yo lo haría así, sin más.", responses: [
-          { tone: "respectful", text: "Entiendo tu punto, pero me preocupa el impacto a largo plazo." },
-          { tone: "questioning", text: "¿Y si lo miramos desde otro ángulo antes de decidir?" },
-          { tone: "alternative", text: "No necesariamente. Hay otra forma que podría funcionar mejor." },
+
+        { id: 6, situation: "Disagreeing with a teammate", turns: [
+          { speaker: "them", es: "Yo lo haría así, sin más.", en: "I'd just do it this way, end of story." },
+          { speaker: "you", options: [
+            { tone: "respectful", es: "Entiendo tu punto, pero me preocupa el impacto a largo plazo.", en: "I get your point, but I'm worried about the long-term impact." },
+            { tone: "questioning", es: "¿Y si lo miramos desde otro ángulo antes de decidir?", en: "What if we look at it from another angle before deciding?" },
+            { tone: "alternative", es: "No necesariamente. Hay otra forma que podría funcionar mejor.", en: "Not necessarily. There's another way that could work better." },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 7, situation: "Catching up after a long time", prompt: "¡Tanto tiempo! ¿Cómo andás?", responses: [
-          { tone: "honest", text: "Bastante movido, la verdad. Mil cosas pasando, pero contento. ¿Vos?" },
-          { tone: "brief", text: "Todo bien, con mucho laburo. ¿Cómo va lo tuyo?" },
-          { tone: "deflect", text: "Largo de contar. Mejor contame vos primero." },
+
+        { id: 7, situation: "Catching up after a long time", turns: [
+          { speaker: "them", es: "¡Tanto tiempo! ¿Cómo andás?", en: "It's been so long! How are you?" },
+          { speaker: "you", options: [
+            { tone: "honest", es: "Bastante movido, la verdad. Mil cosas pasando, pero contento. ¿Vos?", en: "Pretty busy, honestly. A thousand things going on, but happy. You?" },
+            { tone: "brief", es: "Todo bien, con mucho laburo. ¿Cómo va lo tuyo?", en: "All good, lots of work. How's yours going?" },
+            { tone: "deflect", es: "Largo de contar. Mejor contame vos primero.", en: "Long story. You go first." },
+          ]},
         ], bucket: 0, lastSeen: null },
-        { id: 8, situation: "Negotiating at a market", prompt: "Son cincuenta euros.", responses: [
-          { tone: "polite", text: "¿Habría algo de margen si me llevo dos?" },
-          { tone: "direct", text: "Te ofrezco cuarenta en efectivo." },
-          { tone: "soft", text: "Me encanta, pero está fuera de mi presupuesto. ¿Algo más cerca de treinta?" },
+
+        { id: 8, situation: "Negotiating at a market", turns: [
+          { speaker: "them", es: "Son cincuenta euros.", en: "That'll be fifty euros." },
+          { speaker: "you", options: [
+            { tone: "polite", es: "¿Habría algo de margen si me llevo dos?", en: "Would there be some flexibility if I take two?" },
+            { tone: "direct", es: "Te ofrezco cuarenta en efectivo.", en: "I'll offer you forty in cash." },
+            { tone: "soft", es: "Me encanta, pero está fuera de mi presupuesto. ¿Algo más cerca de treinta?", en: "I love it, but it's outside my budget. Anything closer to thirty?" },
+          ]},
+          { speaker: "them", es: "Es lo mejor que puedo hacer. Cuarenta y cinco, último precio.", en: "That's the best I can do. Forty-five, final price." },
+          { speaker: "you", options: [
+            { tone: "accept", es: "Cerramos. Cuarenta y cinco está bien.", en: "Done. Forty-five works." },
+            { tone: "walk", es: "Lo voy a pensar y te aviso. Gracias igual.", en: "I'll think about it and let you know. Thanks anyway." },
+          ]},
         ], bucket: 0, lastSeen: null },
       ],
       // Verbs: yo form across past (pretérito indefinido), present, future.

@@ -8,40 +8,66 @@ const TENSES = [
 ];
 const RULE_MASTERY_THRESHOLD = 2;
 
-function SubTabs({ tab, setTab }) {
+function SubTabs({ tab, setTab, progress }) {
   const tabs = [
-    { id: "verbs", label: "Verbs" },
-    { id: "chunks", label: "Conversations" },
-    { id: "phrase", label: "Phrase" },
+    { id: "verbs", label: "Verbs", ...progress.verbs },
+    { id: "chunks", label: "Conversations", ...progress.chunks },
+    { id: "phrase", label: "Phrase", ...progress.phrase },
   ];
   return (
     <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => setTab(t.id)}
-          style={{
-            flex: 1,
-            background: tab === t.id ? C.accentLight : "transparent",
-            color: tab === t.id ? C.accentDark : C.textSecondary,
-            border: `0.5px solid ${tab === t.id ? C.accent : C.border}`,
-            borderRadius: 6,
-            padding: "6px 8px",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
+      {tabs.map((t) => {
+        const active = tab === t.id;
+        const complete = t.done === t.total && t.total > 0;
+        return (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              flex: 1,
+              background: active ? C.accentLight : "transparent",
+              color: active ? C.accentDark : C.textSecondary,
+              border: `0.5px solid ${active ? C.accent : C.border}`,
+              borderRadius: 6,
+              padding: "6px 8px",
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <span>{t.label}</span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 400,
+                color: complete ? C.success : active ? C.accentDark : C.textTertiary,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {t.done} / {t.total} {t.metric}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function PhraseView({ phrases, index, onCycle }) {
+function PhraseView({ phrases, index, onCycle, onMarkSeen }) {
   const phrase = phrases[index % phrases.length];
+  // Mark the currently displayed phrase as seen whenever it changes — including
+  // the first render — so the Phrase tab counter advances naturally.
+  // onMarkSeen is excluded from deps because it's a fresh handler on every
+  // Dashboard render; the underlying setState is idempotent regardless.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onMarkSeen(phrase.id);
+  }, [phrase.id]);
   return (
     <div>
       <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 6 }}>
@@ -620,56 +646,89 @@ function normalize(s) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb }) {
+export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb, onMarkPhraseSeen }) {
   const [tab, setTab] = useState("verbs");
   const [collapsed, setCollapsed] = useState(false);
 
-  const masteredCount = data.verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
+  const verbsMastered = data.verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
+  const chunksMastered = data.chunks.filter((c) => (c.bucket || 0) >= 1).length;
+  const phrasesSeen = (data.phrasesSeen || []).length;
+
+  const progress = {
+    verbs: { done: verbsMastered, total: data.verbs.length, metric: "mastered" },
+    chunks: { done: chunksMastered, total: data.chunks.length, metric: "reviewed" },
+    phrase: { done: phrasesSeen, total: data.phrases.length, metric: "seen" },
+  };
+
+  // Pill summary when collapsed — shows progress at a glance so the user
+  // knows where they are without having to expand. Single tap reopens.
+  if (collapsed) {
+    return (
+      <div
+        onClick={() => setCollapsed(false)}
+        style={{
+          background: C.bgSecondary,
+          border: `0.5px solid ${C.border}`,
+          borderRadius: 999,
+          padding: "8px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+          fontSize: 12,
+          color: C.textSecondary,
+          userSelect: "none",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontWeight: 500, color: C.text }}>Spanish</span>
+          <span style={{ color: C.textTertiary }}>
+            verbs {verbsMastered}/{data.verbs.length} · conv {chunksMastered}/{data.chunks.length} · phr {phrasesSeen}/{data.phrases.length}
+          </span>
+        </span>
+        <span style={{ fontSize: 11, color: C.accent }}>open ▸</span>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.card}>
-      <div
-        style={{
-          ...styles.sectionH,
-          marginBottom: collapsed ? 0 : 12,
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-        onClick={() => setCollapsed((c) => !c)}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
+      <div style={{ ...styles.sectionH, marginBottom: 12 }}>
+        <span style={{ fontWeight: 500 }}>Spanish</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={styles.sectionSub}>B1 → B2 · vos</span>
+          <button
+            onClick={() => setCollapsed(true)}
+            aria-label="Collapse Spanish section"
+            title="Collapse"
             style={{
-              fontSize: 10,
-              color: C.textTertiary,
-              transition: "transform 0.15s ease",
-              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-              display: "inline-block",
-              width: 10,
+              background: "transparent",
+              border: `0.5px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "3px 9px",
+              fontSize: 11,
+              color: C.textSecondary,
+              cursor: "pointer",
+              fontFamily: "inherit",
             }}
           >
-            ▾
-          </span>
-          Spanish
-        </span>
-        <span style={styles.sectionSub}>
-          {collapsed
-            ? `${masteredCount} / ${data.verbs.length} mastered · tap to expand`
-            : "B1 → B2 · vos · yo across past/present/future"}
+            minimise ▾
+          </button>
         </span>
       </div>
-      {!collapsed && (
-        <>
-          <SubTabs tab={tab} setTab={setTab} />
-          {tab === "phrase" && (
-            <PhraseView phrases={data.phrases} index={data.phraseIndex} onCycle={onCyclePhrase} />
-          )}
-          {tab === "chunks" && (
-            <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
-          )}
-          {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
-        </>
+      <SubTabs tab={tab} setTab={setTab} progress={progress} />
+      {tab === "phrase" && (
+        <PhraseView
+          phrases={data.phrases}
+          index={data.phraseIndex}
+          onCycle={onCyclePhrase}
+          onMarkSeen={onMarkPhraseSeen}
+        />
       )}
+      {tab === "chunks" && (
+        <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
+      )}
+      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
     </div>
   );
 }

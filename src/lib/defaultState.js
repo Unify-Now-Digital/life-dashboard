@@ -219,6 +219,10 @@ export const defaultState = {
       // UI cursors so we resume where we left off
       phraseIndex: 0,
       chunkIndex: 0,
+      // Phrase IDs the user has cycled through this session — drives the
+      // "seen" completion metric on the Phrase tab. Resets on reload (until
+      // localStorage persistence lands).
+      phrasesSeen: [],
     },
   },
 };

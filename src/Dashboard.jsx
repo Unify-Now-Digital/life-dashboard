@@ -352,6 +352,19 @@ export default function Dashboard() {
             },
           },
         })),
+      // Mark a phrase ID as seen this session. Idempotent — adds only if not already present.
+      onMarkPhraseSeen: (phraseId) =>
+        setState((s) => {
+          const seen = s.drilldowns.spanish.phrasesSeen || [];
+          if (seen.includes(phraseId)) return s;
+          return {
+            ...s,
+            drilldowns: {
+              ...s.drilldowns,
+              spanish: { ...s.drilldowns.spanish, phrasesSeen: [...seen, phraseId] },
+            },
+          };
+        }),
       // Leitner: "good" promotes the bucket and advances; "hard" stays; "again" resets to 0.
       // The chunk index always advances so you don't see the same one twice.
       onRateChunk: (id, rating) =>

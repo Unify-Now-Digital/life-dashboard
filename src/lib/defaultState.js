@@ -44,6 +44,13 @@ export const defaultState = {
     spanishMinutes: [40, 55, 30, 70, 60, 80, 90],
     bodyweight: [83.0, 83.2, 82.8, 82.7, 82.5, 82.5, 82.4],
   },
+  // Food diary — fast end time + per-meal log.
+  // fastEndTime is stored as "HH:MM" (today implied; full ISO once persistence lands).
+  // foods: { id, time: "HH:MM", what, kcal, p (protein g), c (carbs g), f (fat g) }
+  foodDiary: {
+    fastEndTime: null,
+    foods: [],
+  },
   drilldowns: {
     businesses: [
       { id: 1, name: "Sears Melvin", color: "#E24B4A", value: "£3,240", meta: "2 orders · 5 enquiries" },
@@ -202,20 +209,27 @@ export const defaultState = {
       ],
       // Verbs: yo form across past (pretérito indefinido), present, future.
       // Show many at once so the user can recall translations and conjugations together.
+      // attempts/correct are lifetime row-level counters: incremented every time
+      // the user submits all three forms together. correctPasses is the current
+      // mastery streak (resets on any miss); attempts/correct are cumulative.
       verbs: [
-        { id: 1, infinitive: "tener", en: "to have", forms: { past: "tuve", present: "tengo", future: "tendré" }, rule: "yo stems: teng- · tuv- · tendr-", correctPasses: 0 },
-        { id: 2, infinitive: "hacer", en: "to do / make", forms: { past: "hice", present: "hago", future: "haré" }, rule: "yo stems: hag- · hic- · har-", correctPasses: 0 },
-        { id: 3, infinitive: "ir", en: "to go", forms: { past: "fui", present: "voy", future: "iré" }, rule: "fully irregular; preterite shared with ser (fui = was/went)", correctPasses: 0 },
-        { id: 4, infinitive: "ser", en: "to be (essential)", forms: { past: "fui", present: "soy", future: "seré" }, rule: "fully irregular; preterite shared with ir", correctPasses: 0 },
-        { id: 5, infinitive: "estar", en: "to be (state)", forms: { past: "estuve", present: "estoy", future: "estaré" }, rule: "preterite stem 'estuv-'; future regular", correctPasses: 0 },
-        { id: 6, infinitive: "poder", en: "can / to be able to", forms: { past: "pude", present: "puedo", future: "podré" }, rule: "stems: pued- (o→ue) · pud- · podr-", correctPasses: 0 },
-        { id: 7, infinitive: "querer", en: "to want / love", forms: { past: "quise", present: "quiero", future: "querré" }, rule: "stems: quier- (e→ie) · quis- · querr- (double r)", correctPasses: 0 },
-        { id: 8, infinitive: "decir", en: "to say / tell", forms: { past: "dije", present: "digo", future: "diré" }, rule: "stems: dig- · dij- · dir-", correctPasses: 0 },
-        { id: 9, infinitive: "ver", en: "to see", forms: { past: "vi", present: "veo", future: "veré" }, rule: "preterite no accent (vi); present 'veo' irregular", correctPasses: 0 },
-        { id: 10, infinitive: "saber", en: "to know (a fact)", forms: { past: "supe", present: "sé", future: "sabré" }, rule: "stems: sé · sup- · sabr-", correctPasses: 0 },
-        { id: 11, infinitive: "venir", en: "to come", forms: { past: "vine", present: "vengo", future: "vendré" }, rule: "stems: veng- · vin- · vendr-", correctPasses: 0 },
-        { id: 12, infinitive: "dar", en: "to give", forms: { past: "di", present: "doy", future: "daré" }, rule: "preterite no accent (di); present 'doy' irregular; future regular", correctPasses: 0 },
+        { id: 1, infinitive: "tener", en: "to have", forms: { past: "tuve", present: "tengo", future: "tendré" }, rule: "yo stems: teng- · tuv- · tendr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 2, infinitive: "hacer", en: "to do / make", forms: { past: "hice", present: "hago", future: "haré" }, rule: "yo stems: hag- · hic- · har-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 3, infinitive: "ir", en: "to go", forms: { past: "fui", present: "voy", future: "iré" }, rule: "fully irregular; preterite shared with ser (fui = was/went)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 4, infinitive: "ser", en: "to be (essential)", forms: { past: "fui", present: "soy", future: "seré" }, rule: "fully irregular; preterite shared with ir", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 5, infinitive: "estar", en: "to be (state)", forms: { past: "estuve", present: "estoy", future: "estaré" }, rule: "preterite stem 'estuv-'; future regular", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 6, infinitive: "poder", en: "can / to be able to", forms: { past: "pude", present: "puedo", future: "podré" }, rule: "stems: pued- (o→ue) · pud- · podr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 7, infinitive: "querer", en: "to want / love", forms: { past: "quise", present: "quiero", future: "querré" }, rule: "stems: quier- (e→ie) · quis- · querr- (double r)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 8, infinitive: "decir", en: "to say / tell", forms: { past: "dije", present: "digo", future: "diré" }, rule: "stems: dig- · dij- · dir-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 9, infinitive: "ver", en: "to see", forms: { past: "vi", present: "veo", future: "veré" }, rule: "preterite no accent (vi); present 'veo' irregular", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 10, infinitive: "saber", en: "to know (a fact)", forms: { past: "supe", present: "sé", future: "sabré" }, rule: "stems: sé · sup- · sabr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 11, infinitive: "venir", en: "to come", forms: { past: "vine", present: "vengo", future: "vendré" }, rule: "stems: veng- · vin- · vendr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 12, infinitive: "dar", en: "to give", forms: { past: "di", present: "doy", future: "daré" }, rule: "preterite no accent (di); present 'doy' irregular; future regular", correctPasses: 0, attempts: 0, correct: 0 },
       ],
+      // Rolling log of the last N row checks across all verbs — drives the
+      // "recent" accuracy %. Lifetime accuracy is computed from per-verb
+      // attempts/correct totals. Capped on insertion to keep state small.
+      verbHistory: [],
       // UI cursors so we resume where we left off
       phraseIndex: 0,
       chunkIndex: 0,

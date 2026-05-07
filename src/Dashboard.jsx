@@ -13,6 +13,7 @@ import Upcoming from "./components/Upcoming.jsx";
 import Metrics from "./components/Metrics.jsx";
 import Drilldowns from "./components/Drilldowns.jsx";
 import Reflection from "./components/Reflection.jsx";
+import FoodDiary from "./components/FoodDiary.jsx";
 import UndoToast from "./components/UndoToast.jsx";
 
 // Track viewport so we can switch to two-column layout above ~860px wide
@@ -153,6 +154,32 @@ export default function Dashboard() {
 
   const updateMetric = (key, value) =>
     setState((s) => ({ ...s, metrics: { ...s.metrics, [key]: value } }));
+
+  const foodHandlers = {
+    onSetFastEnd: (time) =>
+      setState((s) => ({ ...s, foodDiary: { ...s.foodDiary, fastEndTime: time } })),
+    onAddFood: () =>
+      setState((s) => {
+        const now = new Date();
+        const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        return {
+          ...s,
+          foodDiary: {
+            ...s.foodDiary,
+            foods: [
+              ...s.foodDiary.foods,
+              { id: nextId(s.foodDiary.foods), time, what: "", kcal: 0, p: 0, c: 0, f: 0 },
+            ],
+          },
+        };
+      }),
+    onUpdateFood: (id, field, value) => updateItemInList(["foodDiary", "foods"], id, field, value),
+    onRemoveFood: removeWithUndo(
+      (s) => s.foodDiary.foods,
+      (s, foods) => ({ ...s, foodDiary: { ...s.foodDiary, foods } }),
+      "Food entry removed"
+    ),
+  };
 
   const drilldownHandlers = {
     businesses: {
@@ -387,15 +414,29 @@ export default function Dashboard() {
       // Per-row check. allFilledAndRight=true bumps correctPasses; any mistake resets to 0.
       // Partial rows (allFilledAndRight=false from missing cells) also reset since user
       // didn't fully demonstrate mastery — matches the "all 3 forms or no point" rule.
+      // Also bump lifetime attempts/correct on the verb and append to the rolling
+      // history log (capped) so we can show recent vs lifetime accuracy.
       onCheckVerb: (id, allFilledAndRight) =>
         setState((s) => {
           const sp = s.drilldowns.spanish;
           const verbs = sp.verbs.map((v) =>
             v.id === id
-              ? { ...v, correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0 }
+              ? {
+                  ...v,
+                  correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0,
+                  attempts: (v.attempts || 0) + 1,
+                  correct: (v.correct || 0) + (allFilledAndRight ? 1 : 0),
+                }
               : v
           );
-          return { ...s, drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs } } };
+          const history = [
+            ...(sp.verbHistory || []),
+            { id, right: !!allFilledAndRight, ts: Date.now() },
+          ].slice(-20);
+          return {
+            ...s,
+            drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs, verbHistory: history } },
+          };
         }),
     },
   };
@@ -425,12 +466,13 @@ export default function Dashboard() {
   );
 
   // Full-width sections that pin to the top of the page on every viewport.
-  // Order: Spanish (active drill), North Star (vision), Habits (status).
+  // Order: Spanish (active drill), North Star (vision), Habits + FoodDiary (today's status).
   const topStack = (
     <div style={{ ...styles.stack, marginBottom: 20 }}>
       <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
       <NorthStar value={state.northStar} onChange={setNorthStar} />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <FoodDiary data={state.foodDiary} {...foodHandlers} />
     </div>
   );
 

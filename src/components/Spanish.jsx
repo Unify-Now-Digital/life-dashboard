@@ -346,12 +346,44 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
 //   editing a cell clears its eval and revealed flags
 const GRID_COLS = "minmax(96px, 1.4fr) repeat(3, minmax(56px, 78px)) 26px 38px";
 
-function VerbsView({ verbs, onCheckVerb }) {
+// Fisher-Yates — used to randomise verb display order so a different set
+// surfaces at the top each time the Verbs tab is opened.
+function shuffled(arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+// Stable order: not-yet-mastered verbs first (so they bubble to the top),
+// mastered verbs at the bottom — both groups shuffled independently.
+function shuffleByMastery(verbs) {
+  const learning = verbs.filter((v) => v.correctPasses < RULE_MASTERY_THRESHOLD);
+  const mastered = verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD);
+  return [...shuffled(learning), ...shuffled(mastered)];
+}
+
+function VerbsView({ verbs, history, onCheckVerb }) {
   const blankDrafts = () =>
     verbs.reduce((acc, v) => {
       acc[v.id] = { past: "", present: "", future: "" };
       return acc;
     }, {});
+
+  // Display order is local UI state — re-shuffles on tab remount and via the
+  // shuffle button. We track verb IDs (not objects) so updates from props flow
+  // through cleanly when correctPasses/attempts change.
+  const [order, setOrder] = useState(() => shuffleByMastery(verbs).map((v) => v.id));
+  const reshuffle = () => setOrder(shuffleByMastery(verbs).map((v) => v.id));
+  const verbById = verbs.reduce((acc, v) => ((acc[v.id] = v), acc), {});
+  // Append any verbs that arrived via state edits (rare — defensive) so we
+  // don't silently drop rows.
+  const orderedVerbs = [
+    ...order.map((id) => verbById[id]).filter(Boolean),
+    ...verbs.filter((v) => !order.includes(v.id)),
+  ];
 
   const [drafts, setDrafts] = useState(blankDrafts);
   const [evals, setEvals] = useState({});
@@ -433,6 +465,16 @@ function VerbsView({ verbs, onCheckVerb }) {
 
   const masteredCount = verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
 
+  // Lifetime accuracy across all verbs and all row submissions.
+  const lifetimeAttempts = verbs.reduce((s, v) => s + (v.attempts || 0), 0);
+  const lifetimeCorrect = verbs.reduce((s, v) => s + (v.correct || 0), 0);
+  const lifetimePct =
+    lifetimeAttempts > 0 ? Math.round((lifetimeCorrect / lifetimeAttempts) * 100) : null;
+  // Recent accuracy uses the rolling history log (last ~20 row checks).
+  const recentCorrect = (history || []).filter((h) => h.right).length;
+  const recentPct =
+    (history || []).length > 0 ? Math.round((recentCorrect / history.length) * 100) : null;
+
   return (
     <div style={{ maxWidth: 560 }}>
       <div
@@ -444,11 +486,53 @@ function VerbsView({ verbs, onCheckVerb }) {
           justifyContent: "space-between",
           alignItems: "center",
           gap: 8,
+          flexWrap: "wrap",
         }}
       >
         <span>Type the yo form. Enter (or ↩) to check, show to reveal.</span>
-        <span style={{ color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
-          {masteredCount} / {verbs.length} mastered
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            color: C.textSecondary,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <span>
+            {masteredCount} / {verbs.length} mastered
+          </span>
+          {recentPct !== null && (
+            <span title={`${recentCorrect}/${history.length} of last attempts correct`}>
+              recent {recentPct}%
+            </span>
+          )}
+          {lifetimePct !== null && (
+            <span
+              title={`${lifetimeCorrect}/${lifetimeAttempts} lifetime`}
+              style={{ color: C.textTertiary }}
+            >
+              lifetime {lifetimePct}%
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={reshuffle}
+            title="Shuffle verb order"
+            aria-label="Shuffle verb order"
+            style={{
+              background: "transparent",
+              border: `0.5px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "3px 9px",
+              fontSize: 11,
+              color: C.accent,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            ↻ shuffle
+          </button>
         </span>
       </div>
 
@@ -473,7 +557,7 @@ function VerbsView({ verbs, onCheckVerb }) {
         <div></div>
       </div>
 
-      {verbs.map((v) => {
+      {orderedVerbs.map((v) => {
         const rowEvals = evals[v.id] || {};
         const rowRev = revealed[v.id] || {};
         const checkedAny = TENSES.some((t) => rowEvals[t.key] !== undefined);
@@ -482,6 +566,8 @@ function VerbsView({ verbs, onCheckVerb }) {
         const showRule = (checkedAny && anyWrong) || masteredEnough;
         const masteryFilled = Math.min(v.correctPasses, RULE_MASTERY_THRESHOLD);
         const anyRevealed = TENSES.some((t) => rowRev[t.key]);
+        const verbPct =
+          v.attempts > 0 ? Math.round((v.correct / v.attempts) * 100) : null;
 
         const onKey = (e) => {
           if (e.key === "Enter") {
@@ -528,18 +614,32 @@ function VerbsView({ verbs, onCheckVerb }) {
               >
                 {v.en}
               </div>
-              <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
-                {Array.from({ length: RULE_MASTERY_THRESHOLD }).map((_, i) => (
-                  <div
-                    key={i}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 3 }}>
+                  {Array.from({ length: RULE_MASTERY_THRESHOLD }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: 3,
+                        background: i < masteryFilled ? C.accent : C.bgTertiary,
+                      }}
+                    />
+                  ))}
+                </div>
+                {verbPct !== null && (
+                  <span
+                    title={`${v.correct}/${v.attempts} attempts correct`}
                     style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 3,
-                      background: i < masteryFilled ? C.accent : C.bgTertiary,
+                      fontSize: 9,
+                      color: C.textTertiary,
+                      fontVariantNumeric: "tabular-nums",
                     }}
-                  />
-                ))}
+                  >
+                    {verbPct}%
+                  </span>
+                )}
               </div>
             </div>
             {TENSES.map((t) => (
@@ -728,7 +828,9 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
       {tab === "chunks" && (
         <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
       )}
-      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
+      {tab === "verbs" && (
+        <VerbsView verbs={data.verbs} history={data.verbHistory} onCheckVerb={onCheckVerb} />
+      )}
     </div>
   );
 }

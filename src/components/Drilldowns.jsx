@@ -4,7 +4,7 @@ import BusinessesPanel from "./drilldowns/BusinessesPanel.jsx";
 import RelationshipsPanel from "./drilldowns/RelationshipsPanel.jsx";
 import ReadingPanel from "./drilldowns/ReadingPanel.jsx";
 
-function Tile({ label, value, sub, onClick, fullWidth, active }) {
+function Tile({ label, value, sub, onClick, active }) {
   return (
     <button
       onClick={onClick}
@@ -16,7 +16,6 @@ function Tile({ label, value, sub, onClick, fullWidth, active }) {
         cursor: "pointer",
         textAlign: "left",
         fontFamily: "inherit",
-        gridColumn: fullWidth ? "1 / -1" : "auto",
         transition: "all 0.15s",
       }}
     >
@@ -51,7 +50,6 @@ export default function Drilldowns({ data, handlers }) {
         data.reading.filter((r) => r.progress === null).length
       } podcast`,
       sub: "in progress",
-      fullWidth: true,
     },
   ];
 
@@ -61,7 +59,7 @@ export default function Drilldowns({ data, handlers }) {
         Drill-downs
         <span style={styles.sectionSub}>tap to expand</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {tiles.map((t) => (
           <Tile key={t.id} {...t} active={open === t.id} onClick={() => toggle(t.id)} />
         ))}

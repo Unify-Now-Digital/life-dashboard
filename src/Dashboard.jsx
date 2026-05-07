@@ -449,6 +449,7 @@ export default function Dashboard() {
     <div style={styles.stack}>
       <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
       <Goals goals={state.goals} {...goalHandlers} />
+      <Reflection value={state.journal} onChange={setJournal} />
     </div>
   );
 
@@ -461,17 +462,34 @@ export default function Dashboard() {
         drilldowns={state.drilldowns}
         handlers={drilldownHandlers}
       />
-      <Reflection value={state.journal} onChange={setJournal} />
     </div>
   );
 
-  // Full-width sections that pin to the top of the page on every viewport.
-  // Order: Spanish (active drill), North Star (vision), Habits + FoodDiary (today's status).
+  // Full-width sections that pin to the top of the page.
+  // Spanish stays full-width (drill needs the room); on desktop North Star + Habits
+  // sit side-by-side since both are short and waste a full row each when stacked.
+  // FoodDiary stays full-width below — daily logging needs the row width.
   const topStack = (
     <div style={{ ...styles.stack, marginBottom: 20 }}>
       <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
-      <NorthStar value={state.northStar} onChange={setNorthStar} />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      {isDesktop ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.4fr 1fr",
+            gap: 16,
+            alignItems: "start",
+          }}
+        >
+          <NorthStar value={state.northStar} onChange={setNorthStar} />
+          <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        </div>
+      ) : (
+        <>
+          <NorthStar value={state.northStar} onChange={setNorthStar} />
+          <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        </>
+      )}
       <FoodDiary data={state.foodDiary} {...foodHandlers} />
     </div>
   );

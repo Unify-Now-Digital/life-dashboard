@@ -3,7 +3,7 @@ import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
 import { defaultState, nextId } from "./lib/defaultState";
 
 import Header from "./components/Header.jsx";
-import Spanish from "./components/Spanish.jsx";
+import LanguagePractice from "./components/LanguagePractice.jsx";
 import NorthStar from "./components/NorthStar.jsx";
 import Habits from "./components/Habits.jsx";
 import Priorities from "./components/Priorities.jsx";
@@ -32,6 +32,11 @@ function useIsDesktop(breakpoint = 860) {
 export default function Dashboard() {
   const [state, setState] = useState(defaultState);
   const isDesktop = useIsDesktop();
+  // Single collapse flag controls both language practice cards together so
+  // toggling either one minimises both. Sits in Dashboard so it survives
+  // remounts of either card.
+  const [langCollapsed, setLangCollapsed] = useState(false);
+  const toggleLangCollapsed = () => setLangCollapsed((c) => !c);
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
@@ -367,59 +372,42 @@ export default function Dashboard() {
         "Reading item removed"
       ),
     },
-    spanish: {
+    spanish: makeLanguageHandlers("spanish"),
+    turkish: makeLanguageHandlers("turkish"),
+  };
+
+  // Reusable handler factory — same shape used for any language stored under
+  // state.drilldowns[key]. Keeps Spanish and Turkish wiring strictly parallel.
+  function makeLanguageHandlers(key) {
+    const update = (mutate) =>
+      setState((s) => {
+        const cur = s.drilldowns[key];
+        const next = mutate(cur);
+        if (next === cur) return s;
+        return { ...s, drilldowns: { ...s.drilldowns, [key]: next } };
+      });
+    return {
       onCyclePhrase: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            spanish: {
-              ...s.drilldowns.spanish,
-              phraseIndex: (s.drilldowns.spanish.phraseIndex + 1) % s.drilldowns.spanish.phrases.length,
-            },
-          },
-        })),
-      // Mark a phrase ID as seen this session. Idempotent — adds only if not already present.
+        update((d) => ({ ...d, phraseIndex: (d.phraseIndex + 1) % d.phrases.length })),
       onMarkPhraseSeen: (phraseId) =>
-        setState((s) => {
-          const seen = s.drilldowns.spanish.phrasesSeen || [];
-          if (seen.includes(phraseId)) return s;
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              spanish: { ...s.drilldowns.spanish, phrasesSeen: [...seen, phraseId] },
-            },
-          };
+        update((d) => {
+          const seen = d.phrasesSeen || [];
+          if (seen.includes(phraseId)) return d;
+          return { ...d, phrasesSeen: [...seen, phraseId] };
         }),
-      // Leitner: "good" promotes the bucket and advances; "hard" stays; "again" resets to 0.
-      // The chunk index always advances so you don't see the same one twice.
       onRateChunk: (id, rating) =>
-        setState((s) => {
-          const sp = s.drilldowns.spanish;
-          const chunks = sp.chunks.map((c) => {
+        update((d) => {
+          const chunks = d.chunks.map((c) => {
             if (c.id !== id) return c;
             if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
             if (rating === "hard") return { ...c, lastSeen: Date.now() };
             return { ...c, bucket: 0, lastSeen: Date.now() };
           });
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              spanish: { ...sp, chunks, chunkIndex: (sp.chunkIndex + 1) % sp.chunks.length },
-            },
-          };
+          return { ...d, chunks, chunkIndex: (d.chunkIndex + 1) % d.chunks.length };
         }),
-      // Per-row check. allFilledAndRight=true bumps correctPasses; any mistake resets to 0.
-      // Partial rows (allFilledAndRight=false from missing cells) also reset since user
-      // didn't fully demonstrate mastery — matches the "all 3 forms or no point" rule.
-      // Also bump lifetime attempts/correct on the verb and append to the rolling
-      // history log (capped) so we can show recent vs lifetime accuracy.
       onCheckVerb: (id, allFilledAndRight) =>
-        setState((s) => {
-          const sp = s.drilldowns.spanish;
-          const verbs = sp.verbs.map((v) =>
+        update((d) => {
+          const verbs = d.verbs.map((v) =>
             v.id === id
               ? {
                   ...v,
@@ -429,17 +417,14 @@ export default function Dashboard() {
                 }
               : v
           );
-          const history = [
-            ...(sp.verbHistory || []),
+          const verbHistory = [
+            ...(d.verbHistory || []),
             { id, right: !!allFilledAndRight, ts: Date.now() },
           ].slice(-20);
-          return {
-            ...s,
-            drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs, verbHistory: history } },
-          };
+          return { ...d, verbs, verbHistory };
         }),
-    },
-  };
+    };
+  }
 
   // ---- Render -----------------------------------------------------------
   // On mobile: single column, sections stack in order.
@@ -466,12 +451,37 @@ export default function Dashboard() {
   );
 
   // Full-width sections that pin to the top of the page.
-  // Spanish stays full-width (drill needs the room); on desktop North Star + Habits
-  // sit side-by-side since both are short and waste a full row each when stacked.
-  // FoodDiary stays full-width below — daily logging needs the row width.
+  // Spanish + Turkish sit side-by-side on desktop (two-column language drill);
+  // both collapse together via the lifted langCollapsed flag. North Star + Habits
+  // pair below them on desktop. FoodDiary stays full-width — daily logging needs
+  // the row width.
   const topStack = (
     <div style={{ ...styles.stack, marginBottom: 20 }}>
-      <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+          gap: 12,
+          alignItems: "start",
+        }}
+      >
+        <LanguagePractice
+          name="Spanish"
+          subtitle="B1 → B2 · vos"
+          data={state.drilldowns.spanish}
+          collapsed={langCollapsed}
+          onToggleCollapse={toggleLangCollapsed}
+          {...drilldownHandlers.spanish}
+        />
+        <LanguagePractice
+          name="Turkish"
+          subtitle="B1 → B2 · ben form"
+          data={state.drilldowns.turkish}
+          collapsed={langCollapsed}
+          onToggleCollapse={toggleLangCollapsed}
+          {...drilldownHandlers.turkish}
+        />
+      </div>
       {isDesktop ? (
         <div
           style={{

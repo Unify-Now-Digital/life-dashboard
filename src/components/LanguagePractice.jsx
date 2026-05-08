@@ -290,12 +290,10 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
   const borderColor =
     status === true ? C.success : status === false ? C.accent : C.borderStrong;
   const bg = status === false ? C.accentLight : C.bgSecondary;
-  const color = revealed ? C.textTertiary : C.text;
-  const fontStyle = revealed ? "italic" : "normal";
-  // After a check, show the canonical answer beneath every typed cell so the
-  // user can compare against what they typed — even when correct (useful when
-  // accent-insensitive matching forgave a missing accent).
-  const showAnswerBeneath = status !== undefined && !revealed;
+  // Revealed cells show the answer as the input's placeholder, never as the
+  // value. So the moment the user types, the placeholder hides and only the
+  // typed character is in the field — no need to clear or select first.
+  const showAnswerBeneath = status !== undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <input
@@ -303,11 +301,7 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
         value={value}
         onChange={onChange}
         onKeyDown={onKeyDown}
-        onFocus={(e) => {
-          // Auto-select revealed answers so the first keystroke replaces them
-          // and the user can practise typing over the prompt.
-          if (revealed) e.target.select();
-        }}
+        placeholder={revealed && !value ? correct : ""}
         autoComplete="off"
         autoCapitalize="none"
         spellCheck={false}
@@ -321,8 +315,8 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
           fontSize: 12,
           fontFamily: "inherit",
           outline: "none",
-          color,
-          fontStyle,
+          color: C.text,
+          fontStyle: "normal",
         }}
       />
       {showAnswerBeneath && (
@@ -428,31 +422,20 @@ function VerbsView({ verbs, history, onCheckVerb }) {
     if (allFilled) onCheckVerb(verbId, allRight);
   };
 
+  // Reveal flips a per-cell flag so the answer appears as the input's
+  // placeholder. Drafts stay empty, so typing immediately replaces the ghost
+  // text with the user's input — no select-and-overwrite trick required.
   const toggleRowReveal = (verbId) => {
-    const v = verbs.find((x) => x.id === verbId);
     const cur = revealed[verbId] || {};
     const anyRevealed = TENSES.some((t) => cur[t.key]);
     if (anyRevealed) {
-      // Hide: clear revealed cells and their drafts
-      setDrafts((d) => {
-        const row = { ...d[verbId] };
-        for (const t of TENSES) if (cur[t.key]) row[t.key] = "";
-        return { ...d, [verbId]: row };
-      });
       setRevealed((r) => ({ ...r, [verbId]: {} }));
     } else {
-      // Show: fill empty cells with correct answers
       const newRev = {};
-      setDrafts((d) => {
-        const row = { ...d[verbId] };
-        for (const t of TENSES) {
-          if (!(row[t.key] || "").trim()) {
-            row[t.key] = v.forms[t.key];
-            newRev[t.key] = true;
-          }
-        }
-        return { ...d, [verbId]: row };
-      });
+      const cells = drafts[verbId];
+      for (const t of TENSES) {
+        if (!(cells[t.key] || "").trim()) newRev[t.key] = true;
+      }
       setRevealed((r) => ({ ...r, [verbId]: newRev }));
     }
   };
@@ -738,17 +721,32 @@ function VerbsView({ verbs, history, onCheckVerb }) {
 }
 
 function normalize(s) {
-  // Strip accents so users typing "tendre" on mobile match "tendré"
+  // Strip diacritics so accent-less input matches accented answers.
+  //   Spanish: á→a, é→e, í→i, ó→o, ú→u, ñ→n  (NFD decomposes all of these)
+  //   Turkish: ç→c, ğ→g, ş→s, ö→o, ü→u  (NFD decomposes via combining marks)
+  // The dotless ı (U+0131) doesn't decompose under NFD, so map it explicitly.
   return (s || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ı/g, "i");
 }
 
-export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb, onMarkPhraseSeen }) {
+// Generic language practice card used for both Spanish and Turkish. Collapse
+// state is lifted to the parent so multiple cards can collapse together.
+export default function LanguagePractice({
+  name,
+  subtitle,
+  data,
+  collapsed,
+  onToggleCollapse,
+  onCyclePhrase,
+  onRateChunk,
+  onCheckVerb,
+  onMarkPhraseSeen,
+}) {
   const [tab, setTab] = useState("verbs");
-  const [collapsed, setCollapsed] = useState(false);
 
   const verbsMastered = data.verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
   const chunksMastered = data.chunks.filter((c) => (c.bucket || 0) >= 1).length;
@@ -760,12 +758,10 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
     phrase: { done: phrasesSeen, total: data.phrases.length, metric: "seen" },
   };
 
-  // Pill summary when collapsed — shows progress at a glance so the user
-  // knows where they are without having to expand. Single tap reopens.
   if (collapsed) {
     return (
       <div
-        onClick={() => setCollapsed(false)}
+        onClick={onToggleCollapse}
         style={{
           background: C.bgSecondary,
           border: `0.5px solid ${C.border}`,
@@ -778,15 +774,26 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
           fontSize: 12,
           color: C.textSecondary,
           userSelect: "none",
+          minWidth: 0,
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontWeight: 500, color: C.text }}>Spanish</span>
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontWeight: 500, color: C.text }}>{name}</span>
           <span style={{ color: C.textTertiary }}>
-            verbs {verbsMastered}/{data.verbs.length} · conv {chunksMastered}/{data.chunks.length} · phr {phrasesSeen}/{data.phrases.length}
+            v {verbsMastered}/{data.verbs.length} · c {chunksMastered}/{data.chunks.length} · p {phrasesSeen}/{data.phrases.length}
           </span>
         </span>
-        <span style={{ fontSize: 11, color: C.accent }}>open ▸</span>
+        <span style={{ fontSize: 11, color: C.accent, marginLeft: 8, flexShrink: 0 }}>open ▸</span>
       </div>
     );
   }
@@ -794,12 +801,12 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
   return (
     <div style={styles.card}>
       <div style={{ ...styles.sectionH, marginBottom: 12 }}>
-        <span style={{ fontWeight: 500 }}>Spanish</span>
+        <span style={{ fontWeight: 500 }}>{name}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={styles.sectionSub}>B1 → B2 · vos</span>
+          <span style={styles.sectionSub}>{subtitle}</span>
           <button
-            onClick={() => setCollapsed(true)}
-            aria-label="Collapse Spanish section"
+            onClick={onToggleCollapse}
+            aria-label={`Collapse ${name} section`}
             title="Collapse"
             style={{
               background: "transparent",

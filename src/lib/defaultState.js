@@ -225,6 +225,14 @@ export const defaultState = {
         { id: 10, infinitive: "saber", en: "to know (a fact)", forms: { past: "supe", present: "sé", future: "sabré" }, rule: "stems: sé · sup- · sabr-", correctPasses: 0, attempts: 0, correct: 0 },
         { id: 11, infinitive: "venir", en: "to come", forms: { past: "vine", present: "vengo", future: "vendré" }, rule: "stems: veng- · vin- · vendr-", correctPasses: 0, attempts: 0, correct: 0 },
         { id: 12, infinitive: "dar", en: "to give", forms: { past: "di", present: "doy", future: "daré" }, rule: "preterite no accent (di); present 'doy' irregular; future regular", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 13, infinitive: "salir", en: "to go out / leave", forms: { past: "salí", present: "salgo", future: "saldré" }, rule: "stems: salg- · sal- · saldr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 14, infinitive: "poner", en: "to put", forms: { past: "puse", present: "pongo", future: "pondré" }, rule: "stems: pong- · pus- · pondr-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 15, infinitive: "traer", en: "to bring", forms: { past: "traje", present: "traigo", future: "traeré" }, rule: "stems: traig- · traj- · traer-", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 16, infinitive: "comer", en: "to eat", forms: { past: "comí", present: "como", future: "comeré" }, rule: "regular -er; preterite stress on i (comí)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 17, infinitive: "hablar", en: "to speak", forms: { past: "hablé", present: "hablo", future: "hablaré" }, rule: "regular -ar (hablé · hablo · hablaré)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 18, infinitive: "llegar", en: "to arrive", forms: { past: "llegué", present: "llego", future: "llegaré" }, rule: "spelling: -gar → -gué in preterite yo (llegué)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 19, infinitive: "leer", en: "to read", forms: { past: "leí", present: "leo", future: "leeré" }, rule: "regular -er; preterite leí keeps stress on i", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 20, infinitive: "vivir", en: "to live", forms: { past: "viví", present: "vivo", future: "viviré" }, rule: "regular -ir (viví · vivo · viviré)", correctPasses: 0, attempts: 0, correct: 0 },
       ],
       // Rolling log of the last N row checks across all verbs — drives the
       // "recent" accuracy %. Lifetime accuracy is computed from per-verb
@@ -236,6 +244,141 @@ export const defaultState = {
       // Phrase IDs the user has cycled through this session — drives the
       // "seen" completion metric on the Phrase tab. Resets on reload (until
       // localStorage persistence lands).
+      phrasesSeen: [],
+    },
+    // Turkish micro-learning. Same shape as spanish; ben (I) form across
+    // past (di-past), present continuous (-yor), future (-ecek).
+    // NOTE: content drafted by AI — should be reviewed by a native speaker
+    // before serious practice.
+    turkish: {
+      phrases: [
+        { id: 1, es: "Acaba müsait misiniz?", en: "Are you available?", note: "polite question with mi-/mı-" },
+        { id: 2, es: "Bunu beraber inceleyelim mi?", en: "Shall we look at this together?", note: "first-person plural suggestion -elim" },
+        { id: 3, es: "Maalesef şu an gelemem.", en: "Unfortunately I can't come right now.", note: "negative ability -emem (can't)" },
+        { id: 4, es: "Sizin için ne yapabilirim?", en: "What can I do for you?", note: "ability suffix -abil-" },
+        { id: 5, es: "Bir saniye lütfen, hemen dönüyorum.", en: "One second please, I'll be right back.", note: "continuous as near future" },
+        { id: 6, es: "Çok teşekkür ederim, bunu unutmayacağım.", en: "Thank you so much, I won't forget this.", note: "negative future -mayacak" },
+        { id: 7, es: "Sanırım yanlış anladım.", en: "I think I misunderstood.", note: "softener 'sanırım' (I think)" },
+        { id: 8, es: "Ne olursa olsun yanındayım.", en: "Whatever happens, I'm with you.", note: "fixed expression 'ne olursa olsun'" },
+        { id: 9, es: "Bunu daha sonra konuşabilir miyiz?", en: "Can we talk about this later?", note: "ability + question form" },
+        { id: 10, es: "Açıkçası, pek emin değilim.", en: "Honestly, I'm not very sure.", note: "softener 'açıkçası'" },
+        { id: 11, es: "Belki başka bir gün görüşürüz.", en: "Maybe we'll see each other another day.", note: "aorist tense for general future" },
+        { id: 12, es: "Senin için bir şey yapmamı ister misin?", en: "Do you want me to do something for you?", note: "embedded request structure" },
+      ],
+      chunks: [
+        { id: 1, situation: "Asking directions in Istanbul", turns: [
+          { speaker: "them", es: "Pardon, Galata Kulesi'ne nasıl gidebilirim?", en: "Excuse me, how can I get to Galata Tower?" },
+          { speaker: "you", options: [
+            { tone: "helpful", es: "Şu sokağı düz gidin, sonra sağa dönün.", en: "Go straight down that street, then turn right." },
+            { tone: "friendly", es: "Buradan beş dakika yürürseniz görürsünüz.", en: "If you walk five minutes from here, you'll see it." },
+            { tone: "apologetic", es: "Maalesef ben de buralı değilim.", en: "Unfortunately I'm not from here either." },
+          ]},
+          { speaker: "them", es: "Anladım, çok teşekkür ederim.", en: "Got it, thank you very much." },
+          { speaker: "you", options: [
+            { tone: "warm", es: "Rica ederim, kolay gelsin.", en: "You're welcome, take it easy." },
+            { tone: "polite", es: "Bir şey değil, yolunuz açık olsun.", en: "It's nothing, may your road be open." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 2, situation: "Ordering at a kebab shop", turns: [
+          { speaker: "them", es: "Ne istersiniz?", en: "What would you like?" },
+          { speaker: "you", options: [
+            { tone: "direct", es: "Bir adana kebap, az acılı lütfen.", en: "One Adana kebab, mildly spicy please." },
+            { tone: "asking", es: "Bugün ne tavsiye edersiniz?", en: "What would you recommend today?" },
+            { tone: "careful", es: "Sebzeli bir şey var mı?", en: "Is there something with vegetables?" },
+          ]},
+          { speaker: "them", es: "Yanında ayran ister misiniz?", en: "Would you like ayran with that?" },
+          { speaker: "you", options: [
+            { tone: "yes", es: "Evet, ayran çok iyi olur.", en: "Yes, an ayran would be great." },
+            { tone: "no", es: "Hayır, sadece su yeter, teşekkürler.", en: "No, just water is enough, thanks." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 3, situation: "Polite refusal of an invitation", turns: [
+          { speaker: "them", es: "Bu akşam bize gelmek ister misin?", en: "Want to come over tonight?" },
+          { speaker: "you", options: [
+            { tone: "warm", es: "Çok sağ ol ama bu akşam müsait değilim.", en: "Thank you so much but I'm not available tonight." },
+            { tone: "alternative", es: "Bu akşam zor, başka gün olabilir mi?", en: "Tonight is hard, could it be another day?" },
+            { tone: "honest", es: "Aslında çok yorgunum, başka zaman yapalım.", en: "Honestly I'm really tired, let's do it another time." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 4, situation: "Apologising for being late", turns: [
+          { speaker: "them", es: "Geciktin biraz.", en: "You're a bit late." },
+          { speaker: "you", options: [
+            { tone: "honest", es: "Çok özür dilerim, trafik berbattı.", en: "I'm so sorry, the traffic was awful." },
+            { tone: "explaining", es: "Pardon, bir işim çıktı, hemen geldim.", en: "Sorry, something came up, I came as fast as I could." },
+            { tone: "owning", es: "Haklısın, daha erken çıkmam gerekiyordu.", en: "You're right, I should have left earlier." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 5, situation: "Asking for help at work", turns: [
+          { speaker: "them", es: "Yardıma ihtiyacın var mı?", en: "Do you need help?" },
+          { speaker: "you", options: [
+            { tone: "direct", es: "Evet aslında, bir konuda fikrini almak istiyorum.", en: "Yes actually, I'd like your opinion on something." },
+            { tone: "polite", es: "Müsait olduğunda kısaca konuşabilir miyiz?", en: "When you're free, can we talk briefly?" },
+            { tone: "self-reliant", es: "Şimdilik iyiyim, takılırsam söylerim.", en: "I'm fine for now, I'll say if I get stuck." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 6, situation: "Catching up with a friend", turns: [
+          { speaker: "them", es: "Uzun zamandır görüşemedik, nasılsın?", en: "We haven't seen each other in a long time, how are you?" },
+          { speaker: "you", options: [
+            { tone: "honest", es: "İyiyim, biraz yoğunum ama her şey yolunda. Sen nasılsın?", en: "I'm good, a bit busy but everything's fine. You?" },
+            { tone: "brief", es: "İyi, çalışıyorum işte. Senden ne haber?", en: "Good, working as usual. What's new with you?" },
+            { tone: "deflect", es: "Anlatması uzun sürer. Önce sen anlat.", en: "It's a long story. You go first." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 7, situation: "Disagreeing politely with a colleague", turns: [
+          { speaker: "them", es: "Bence bu plan en iyisi.", en: "I think this plan is the best one." },
+          { speaker: "you", options: [
+            { tone: "respectful", es: "Anlıyorum, ama bence farklı bir açıdan bakmaya değer.", en: "I get it, but I think it's worth looking from another angle." },
+            { tone: "questioning", es: "Şu noktayı tekrar düşünebilir miyiz?", en: "Can we rethink that point?" },
+            { tone: "alternative", es: "Mutlaka değil. Belki başka bir yol da işe yarayabilir.", en: "Not necessarily. Maybe another way could also work." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+
+        { id: 8, situation: "Negotiating at the bazaar", turns: [
+          { speaker: "them", es: "Bu yüz lira, son fiyat.", en: "This is one hundred lira, final price." },
+          { speaker: "you", options: [
+            { tone: "polite", es: "Biraz indirim mümkün mü?", en: "Is a small discount possible?" },
+            { tone: "direct", es: "Seksen lira ne dersiniz?", en: "How about eighty lira?" },
+            { tone: "soft", es: "Çok beğendim ama bütçemi aşıyor.", en: "I really like it but it's over my budget." },
+          ]},
+          { speaker: "them", es: "En fazla doksan lira yapabilirim.", en: "I can do ninety lira at most." },
+          { speaker: "you", options: [
+            { tone: "accept", es: "Tamam, anlaştık. Doksan lira olsun.", en: "Okay, deal. Ninety lira it is." },
+            { tone: "walk", es: "Düşüneyim, sonra döneceğim. Yine de teşekkürler.", en: "Let me think about it, I'll come back. Thanks anyway." },
+          ]},
+        ], bucket: 0, lastSeen: null },
+      ],
+      // Verbs: ben (I) form across past (di-past), present continuous (-yor), future (-ecek).
+      verbs: [
+        { id: 1, infinitive: "olmak", en: "to be / become", forms: { past: "oldum", present: "oluyorum", future: "olacağım" }, rule: "olmak is irregular as helping verb; -yor present", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 2, infinitive: "yapmak", en: "to do / make", forms: { past: "yaptım", present: "yapıyorum", future: "yapacağım" }, rule: "regular -mak; vowel harmony -acak", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 3, infinitive: "gelmek", en: "to come", forms: { past: "geldim", present: "geliyorum", future: "geleceğim" }, rule: "regular -mek; future -ecek (front vowel harmony)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 4, infinitive: "gitmek", en: "to go", forms: { past: "gittim", present: "gidiyorum", future: "gideceğim" }, rule: "consonant softening: t→d before vowels (gid-iyor)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 5, infinitive: "görmek", en: "to see", forms: { past: "gördüm", present: "görüyorum", future: "göreceğim" }, rule: "vowel harmony with ö → ü in past, -üyor in present", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 6, infinitive: "bilmek", en: "to know", forms: { past: "bildim", present: "biliyorum", future: "bileceğim" }, rule: "regular -mek; e→i not happening here", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 7, infinitive: "istemek", en: "to want", forms: { past: "istedim", present: "istiyorum", future: "isteyeceğim" }, rule: "future buffer -y- (iste-y-eceğim)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 8, infinitive: "demek", en: "to say", forms: { past: "dedim", present: "diyorum", future: "diyeceğim" }, rule: "irregular: e→i in present and future (di-)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 9, infinitive: "almak", en: "to take / buy", forms: { past: "aldım", present: "alıyorum", future: "alacağım" }, rule: "regular -mak; back vowel harmony", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 10, infinitive: "vermek", en: "to give", forms: { past: "verdim", present: "veriyorum", future: "vereceğim" }, rule: "regular -mek; front vowel harmony", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 11, infinitive: "sevmek", en: "to love / like", forms: { past: "sevdim", present: "seviyorum", future: "seveceğim" }, rule: "regular -mek", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 12, infinitive: "anlamak", en: "to understand", forms: { past: "anladım", present: "anlıyorum", future: "anlayacağım" }, rule: "future buffer -y- (anla-y-acağım)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 13, infinitive: "konuşmak", en: "to speak", forms: { past: "konuştum", present: "konuşuyorum", future: "konuşacağım" }, rule: "regular -mak with ş kept; o → u harmony", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 14, infinitive: "düşünmek", en: "to think", forms: { past: "düşündüm", present: "düşünüyorum", future: "düşüneceğim" }, rule: "vowel harmony: ü throughout", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 15, infinitive: "yemek", en: "to eat", forms: { past: "yedim", present: "yiyorum", future: "yiyeceğim" }, rule: "irregular: e→i in present and future (yi-)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 16, infinitive: "içmek", en: "to drink", forms: { past: "içtim", present: "içiyorum", future: "içeceğim" }, rule: "regular -mek with ç kept", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 17, infinitive: "okumak", en: "to read", forms: { past: "okudum", present: "okuyorum", future: "okuyacağım" }, rule: "regular -mak; future buffer -y- (oku-y-acağım)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 18, infinitive: "yazmak", en: "to write", forms: { past: "yazdım", present: "yazıyorum", future: "yazacağım" }, rule: "regular -mak; ı in -ıyor (back vowel harmony)", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 19, infinitive: "çalışmak", en: "to work / study", forms: { past: "çalıştım", present: "çalışıyorum", future: "çalışacağım" }, rule: "regular -mak; ş + ı harmony", correctPasses: 0, attempts: 0, correct: 0 },
+        { id: 20, infinitive: "kalmak", en: "to stay", forms: { past: "kaldım", present: "kalıyorum", future: "kalacağım" }, rule: "regular -mak; back vowel harmony", correctPasses: 0, attempts: 0, correct: 0 },
+      ],
+      verbHistory: [],
+      phraseIndex: 0,
+      chunkIndex: 0,
       phrasesSeen: [],
     },
   },

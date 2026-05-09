@@ -6,7 +6,7 @@ import { fmt, toMoneySync } from "../../lib/money";
 
 const CHECK_KEYS = ["flights", "accommodation", "activities", "gym", "coworking", "eSIM", "insurance"];
 
-export default function TravelProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function TravelProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.travel;
 
   const updateTravel = (updater) =>
@@ -35,7 +35,7 @@ export default function TravelProject({ state, setState, meta, onClose, goalHand
     updateTravel((t) => ({ ...t, points: { ...t.points, [key]: parseFloat(value) || 0, lastUpdated: new Date().toISOString().slice(0, 10) } }));
 
   return (
-    <Project title="Travel" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers}>
+    <Project title="Travel" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers} hideHeader={hideHeader}>
       {/* Trips */}
       <SectionHeader>Trips</SectionHeader>
       {(data.trips || []).map((trip) => (

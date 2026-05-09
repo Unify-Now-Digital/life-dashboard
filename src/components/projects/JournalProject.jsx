@@ -14,7 +14,7 @@ const weekISO = (d = new Date()) => {
 };
 const monthISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
-export default function JournalProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function JournalProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.journal;
   const [tab, setTab] = useState("entries");
 
@@ -84,7 +84,7 @@ export default function JournalProject({ state, setState, meta, onClose, goalHan
     }));
 
   return (
-    <Project title="Journal" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers}>
+    <Project title="Journal" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers} hideHeader={hideHeader}>
       <Tabs tab={tab} onChange={setTab} />
 
       {tab === "entries" && (

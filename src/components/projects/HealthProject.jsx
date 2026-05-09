@@ -63,7 +63,7 @@ function MarkerLog({ title, unit, rows, onAdd, onUpdate, onRemove, editing }) {
   );
 }
 
-export default function HealthProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function HealthProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.health;
   const [editing] = useState(false);
   void editing; // editing toggle lives inside Project shell; markers respect that via prop drilling — kept simple here
@@ -111,7 +111,7 @@ export default function HealthProject({ state, setState, meta, onClose, goalHand
   const rowsFor = (key, field) => (data.markers?.[key] || []).map((r) => ({ date: r.date, value: r[field] }));
 
   return (
-    <Project title="Health" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers}>
+    <Project title="Health" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers} hideHeader={hideHeader}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
         <div>
           <MarkerLog

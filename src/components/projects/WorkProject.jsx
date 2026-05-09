@@ -269,7 +269,7 @@ function TodoList({ business, setState }) {
   );
 }
 
-export default function WorkProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function WorkProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.work;
   // Default the expanded business to the first one (Unify Digital).
   const [expandedId, setExpandedId] = useState(
@@ -308,6 +308,7 @@ export default function WorkProject({ state, setState, meta, onClose, goalHandle
       onClose={onClose}
       goals={data.goals}
       goalHandlers={goalHandlers}
+      hideHeader={hideHeader}
     >
       <div
         style={{

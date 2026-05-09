@@ -120,30 +120,39 @@ function GoalBlock({ goal, onUpdateGoal, onRemoveGoal, onAddPriority, onUpdatePr
 //   - title + close + edit toggle
 //   - goals + priorities (the standard hierarchy)
 //   - children (project-specific specialised content)
-export default function Project({ title, color, onClose, goals, goalHandlers, children, headerExtras }) {
+export default function Project({ title, color, onClose, goals, goalHandlers, children, headerExtras, hideHeader = false }) {
   const [editing, setEditing] = useState(false);
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {color && (
-            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: color }} />
-          )}
-          <div style={{ fontSize: 15, fontWeight: 500 }}>{title}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {hideHeader ? (
+        // Embedded mode: parent provides the title, we still need an Edit
+        // toggle so the goals block becomes addable. Sit it flush-right.
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           {headerExtras}
           <EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />
-          {onClose && (
-            <div
-              onClick={onClose}
-              style={{ fontSize: 12, color: C.textTertiary, cursor: "pointer", padding: "4px 8px", borderRadius: 4 }}
-            >
-              close
-            </div>
-          )}
         </div>
-      </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {color && (
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: color }} />
+            )}
+            <div style={{ fontSize: 15, fontWeight: 500 }}>{title}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {headerExtras}
+            <EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />
+            {onClose && (
+              <div
+                onClick={onClose}
+                style={{ fontSize: 12, color: C.textTertiary, cursor: "pointer", padding: "4px 8px", borderRadius: 4 }}
+              >
+                close
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Goals + priorities */}
       {(goals && goals.length > 0) || editing ? (

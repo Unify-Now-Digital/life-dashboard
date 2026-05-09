@@ -4,7 +4,7 @@ import { EditableText, IconBtn, EditModeToggle } from "../Editable.jsx";
 import Project from "./Project.jsx";
 import { nextId } from "../../lib/defaultState";
 
-export default function RelationshipsProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function RelationshipsProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.relationships;
   const [editing, setEditing] = useState(false);
 
@@ -39,6 +39,7 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
       goals={data.goals}
       goalHandlers={goalHandlers}
       headerExtras={<EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />}
+      hideHeader={hideHeader}
     >
       {data.contacts.map((r, i) => {
         const av = AVATAR_STYLES[r.color] || AVATAR_STYLES.blue;

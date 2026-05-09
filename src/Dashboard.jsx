@@ -20,15 +20,39 @@ import JumpNav from "./components/JumpNav.jsx";
 // in display order (beneath Habits). Tapping their rail card / floating pill
 // expands the corresponding section; everything else uses the on-demand
 // drilldown panel.
-const SECTION_KEYS = ["work", "finance", "health"];
+//
+// Each entry sets the section's default open/closed state independently —
+// Work and Finance start expanded so the subcards show without an extra tap.
+const SECTIONS = [
+  { key: "work", defaultOpen: true },
+  { key: "finance", defaultOpen: true },
+  { key: "health", defaultOpen: false },
+];
+const SECTION_KEYS = SECTIONS.map((s) => s.key);
 
-function MainSection({ projectKey, openProject, setOpenProject, state, setState }) {
+function MainSection({ projectKey, defaultOpen, openProject, setOpenProject, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
-  const isOpen = openProject === projectKey;
+  // Local open state (so each section has its own life) seeded by defaultOpen.
+  // Tapping a rail card / floating pill sets openProject = projectKey, which
+  // is treated as a force-open signal — but local toggle remains the source
+  // of truth thereafter so users can collapse expanded-by-default sections.
+  const [localOpen, setLocalOpen] = React.useState(defaultOpen);
+  const railSignal = openProject === projectKey;
+  // Sync: when the rail flips this section to open, mirror that locally.
+  React.useEffect(() => {
+    if (railSignal) setLocalOpen(true);
+  }, [railSignal]);
+
+  const isOpen = localOpen;
+  const toggle = () => {
+    setLocalOpen((v) => !v);
+    if (openProject === projectKey) setOpenProject(null);
+  };
+
   return (
     <div style={styles.card}>
       <button
-        onClick={() => setOpenProject(isOpen ? null : projectKey)}
+        onClick={toggle}
         aria-expanded={isOpen}
         style={{
           ...styles.sectionH,
@@ -74,7 +98,7 @@ function MainSection({ projectKey, openProject, setOpenProject, state, setState 
             projectKey={projectKey}
             state={state}
             setState={setState}
-            onClose={() => setOpenProject(null)}
+            onClose={() => setLocalOpen(false)}
             embedded
           />
         </div>
@@ -223,10 +247,11 @@ export default function Dashboard() {
       </div>
     ) : null;
 
-  const mainSections = SECTION_KEYS.map((key) => (
+  const mainSections = SECTIONS.map((s) => (
     <MainSection
-      key={key}
-      projectKey={key}
+      key={s.key}
+      projectKey={s.key}
+      defaultOpen={s.defaultOpen}
       openProject={openProject}
       setOpenProject={setOpenProject}
       state={state}

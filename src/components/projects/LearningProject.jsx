@@ -45,7 +45,7 @@ function makeDeckHandlers(setState, langSlot) {
   };
 }
 
-export default function LearningProject({ state, setState, meta, onClose, goalHandlers }) {
+export default function LearningProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.learning;
   const [tab, setTab] = useState("spanish");
 
@@ -71,7 +71,7 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
   };
 
   return (
-    <Project title="Learning" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers}>
+    <Project title="Learning" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers} hideHeader={hideHeader}>
       <Tabs tab={tab} onChange={setTab} />
 
       {tab === "spanish" && (

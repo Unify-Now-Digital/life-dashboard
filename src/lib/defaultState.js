@@ -26,7 +26,7 @@ export const defaultState = {
   todayDate: null,
 
   northStar:
-    "Build Sears Melvin into the UK's most trusted memorial mason while running a healthy, multilingual, well-travelled life from Barcelona.",
+    "Sears Melvin — the UK's most trusted memorial mason brand by 2027.",
 
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },

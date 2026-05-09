@@ -34,6 +34,14 @@ export function migrate(raw) {
   s = mergeDefaults(s, defaultState);
   s.schemaVersion = SCHEMA_VERSION;
 
+  // One-time refresh: replace the legacy north-star copy if it still matches
+  // the pre-2027 default. Editable by user, so any custom value is preserved.
+  const LEGACY_NORTH_STAR =
+    "Build Sears Melvin into the UK's most trusted memorial mason while running a healthy, multilingual, well-travelled life from Barcelona.";
+  if (s.northStar === LEGACY_NORTH_STAR) {
+    s.northStar = defaultState.northStar;
+  }
+
   // Run regardless of source version: drop food images older than 30 days so
   // localStorage stays under quota. Macros + text + date all stay forever;
   // only the base64 image data gets cleared.

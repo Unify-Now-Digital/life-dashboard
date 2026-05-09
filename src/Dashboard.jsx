@@ -9,6 +9,8 @@ import Habits from "./components/Habits.jsx";
 import StickyHabits from "./components/StickyHabits.jsx";
 import UndoToast from "./components/UndoToast.jsx";
 import AuthGate from "./components/AuthGate.jsx";
+import LocalLock from "./components/LocalLock.jsx";
+import PhotoQuickAdd from "./components/PhotoQuickAdd.jsx";
 import TopThree from "./components/TopThree.jsx";
 import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
@@ -150,21 +152,30 @@ function MainSection({ projectKey, expanded, onToggle, state, setState }) {
   );
 }
 
-function useIsDesktop(breakpoint = 860) {
-  const [isDesktop, setIsDesktop] = useState(
-    typeof window !== "undefined" ? window.innerWidth >= breakpoint : false
+function useViewport() {
+  const [width, setWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024
   );
   useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= breakpoint);
+    const onResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [breakpoint]);
-  return isDesktop;
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  return {
+    width,
+    isDesktop: width >= 860,
+    isWide: width >= 1100,
+    isCompact: width < 380,
+  };
 }
 
 export default function Dashboard() {
   const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
-  const isDesktop = useIsDesktop();
+  const { isDesktop, isWide } = useViewport();
   // On-demand drilldown for projects without a permanent MainSection (Travel).
   const [openProject, setOpenProjectRaw] = useState(null);
   // Per-section expanded state for the always-visible MainSections, keyed by
@@ -337,6 +348,7 @@ export default function Dashboard() {
   );
 
   return (
+    <LocalLock>
     <AuthGate>
       <div style={styles.page}>
         <Header today={today} dayOfYear={dayOfYear} quote={quote} />
@@ -345,8 +357,8 @@ export default function Dashboard() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) 280px",
-              gap: 20,
+              gridTemplateColumns: `minmax(0, 1fr) ${isWide ? 300 : 260}px`,
+              gap: isWide ? 24 : 16,
               alignItems: "start",
             }}
           >
@@ -358,9 +370,14 @@ export default function Dashboard() {
         )}
 
         <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        <PhotoQuickAdd
+          setState={setState}
+          onCreated={() => setOpenProject("journal")}
+        />
         {isDesktop && <JumpNav />}
         {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </div>
     </AuthGate>
+    </LocalLock>
   );
 }

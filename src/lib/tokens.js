@@ -83,7 +83,9 @@ export const styles = {
     background: C.bg,
     color: C.text,
     minHeight: "100vh",
-    padding: "12px 14px 96px", // bottom padding clears floating habit bar
+    // Horizontal padding respects iOS safe-area; bottom clears the floating
+    // habits bar plus the home-indicator strip.
+    padding: "12px max(14px, env(safe-area-inset-right)) calc(120px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))",
     maxWidth: 1080,
     margin: "0 auto",
     fontSize: 14,

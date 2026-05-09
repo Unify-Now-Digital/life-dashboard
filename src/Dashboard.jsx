@@ -14,6 +14,7 @@ import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
 import Projects from "./components/Projects.jsx";
 import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
+import JumpNav from "./components/JumpNav.jsx";
 
 function useIsDesktop(breakpoint = 860) {
   const [isDesktop, setIsDesktop] = useState(
@@ -30,7 +31,10 @@ function useIsDesktop(breakpoint = 860) {
 export default function Dashboard() {
   const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
   const isDesktop = useIsDesktop();
-  const [openProject, setOpenProject] = useState(null);
+  // Default the open drilldown to Work so the most-used project is visible
+  // immediately under Top 3 on first paint. Click another card to swap; only
+  // one drilldown can be expanded at a time.
+  const [openProject, setOpenProject] = useState("work");
 
   // Hydrate from cloud once on mount, reconcile if newer.
   useEffect(() => {
@@ -139,6 +143,15 @@ export default function Dashboard() {
 
   const closeDrilldown = () => setOpenProject(null);
 
+  const drilldownPanel = openProject ? (
+    <ProjectDrilldown
+      state={state}
+      setState={setState}
+      projectKey={openProject}
+      onClose={closeDrilldown}
+    />
+  ) : null;
+
   const mainColumn = (
     <div style={styles.stack}>
       <TopThree
@@ -147,6 +160,7 @@ export default function Dashboard() {
         onTogglePriority={togglePriorityDone}
         onUnstar={unstar}
       />
+      {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <GoalsRollup state={state} onOpenProject={setOpenProject} />
@@ -194,6 +208,7 @@ export default function Dashboard() {
         onTogglePriority={togglePriorityDone}
         onUnstar={unstar}
       />
+      {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <GoalsRollup state={state} onOpenProject={setOpenProject} />
@@ -221,18 +236,8 @@ export default function Dashboard() {
           mobileLayout
         )}
 
-        {openProject && (
-          <div style={{ marginTop: 20 }}>
-            <ProjectDrilldown
-              state={state}
-              setState={setState}
-              projectKey={openProject}
-              onClose={closeDrilldown}
-            />
-          </div>
-        )}
-
         <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        <JumpNav />
         {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </div>
     </AuthGate>

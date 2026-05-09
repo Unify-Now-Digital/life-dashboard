@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { C, CHIP_STYLES, styles } from "../lib/tokens";
 
 // Today at local midnight, returned as a Date object.
@@ -60,6 +60,7 @@ function isoFromWeekISO(weekISO) {
 }
 
 export default function Calendar({ state, onOpenProject }) {
+  const [open, setOpen] = useState(true);
   const today = startOfToday();
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
   const events = collectEvents(state);
@@ -93,11 +94,47 @@ export default function Calendar({ state, onOpenProject }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.sectionH}>
-        Calendar
-        <span style={styles.sectionSub}>next 2 weeks</span>
-      </div>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          ...styles.sectionH,
+          margin: open ? "0 0 12px 0" : 0,
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "inherit",
+          textAlign: "left",
+        }}
+      >
+        <span>
+          Calendar <span style={styles.sectionSub}>next 2 weeks</span>
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 11,
+            color: C.textTertiary,
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.15s",
+            display: "inline-block",
+          }}
+        >
+          ▾
+        </span>
+      </button>
 
+      {!open ? null : <CalendarBody state={state} onOpenProject={onOpenProject} today={today} days={days} byDate={byDate} datedAgenda={datedAgenda} upcomingItems={upcomingItems} />}
+    </div>
+  );
+}
+
+function CalendarBody({ state, onOpenProject, today, days, byDate, datedAgenda, upcomingItems }) {
+  return (
+    <>
       {/* Strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(14, 1fr)", gap: 4, marginBottom: 14 }}>
         {days.map((d, i) => {
@@ -257,6 +294,6 @@ export default function Calendar({ state, onOpenProject }) {
           })}
         </div>
       )}
-    </div>
+    </>
   );
 }

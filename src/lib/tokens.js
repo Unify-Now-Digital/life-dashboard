@@ -57,6 +57,16 @@ export const CHIP_STYLES = {
   personal: { bg: "#EEEDFE", color: "#3C3489" }, // purple
 };
 
+// Convert a #rrggbb to rgba(r,g,b,a). Used for soft per-project tints
+// so card backgrounds carry the project hue without dominating.
+export const tint = (hex, alpha) => {
+  const h = (hex || "#000000").replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export const QUOTES = [
   '"Discipline equals freedom."',
   '"What gets measured gets managed."',

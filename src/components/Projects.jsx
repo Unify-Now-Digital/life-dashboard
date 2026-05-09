@@ -1,11 +1,11 @@
 import React from "react";
-import { C } from "../lib/tokens";
+import { C, tint } from "../lib/tokens";
 
 const PROJECT_META = [
+  { key: "work", label: "Work", color: "#534AB7" },
   { key: "health", label: "Health", color: "#3B6D11" },
   { key: "finance", label: "Finance", color: "#185FA5" },
   { key: "travel", label: "Travel", color: "#0F6E56" },
-  { key: "work", label: "Work", color: "#534AB7" },
   { key: "learning", label: "Learning", color: "#854F0B" },
   { key: "journal", label: "Journal", color: "#791F1F" },
   { key: "relationships", label: "Relationships", color: "#3C3489" },
@@ -256,13 +256,20 @@ const DELTA_BY_KEY = {
 // ---- card -----------------------------------------------------------------
 
 function Card({ meta, onClick, children, isOpen }) {
+  // Soft per-project tint. Slightly stronger when the card is the open one.
+  const bgRest = tint(meta.color, 0.04);
+  const bgHover = tint(meta.color, 0.08);
+  const bgOpen = tint(meta.color, 0.10);
+  const borderRest = tint(meta.color, 0.22);
+  const borderOpen = tint(meta.color, 0.55);
   return (
     <button
       onClick={onClick}
       aria-pressed={isOpen}
       style={{
-        background: C.bg,
-        border: `0.5px solid ${isOpen ? C.accent : C.border}`,
+        background: isOpen ? bgOpen : bgRest,
+        border: `0.5px solid ${isOpen ? borderOpen : borderRest}`,
+        borderLeft: `2px solid ${meta.color}`,
         borderRadius: 8,
         padding: "12px 14px",
         cursor: "pointer",
@@ -273,10 +280,10 @@ function Card({ meta, onClick, children, isOpen }) {
         width: "100%",
       }}
       onMouseEnter={(e) => {
-        if (!isOpen) e.currentTarget.style.background = C.bgSecondary;
+        if (!isOpen) e.currentTarget.style.background = bgHover;
       }}
       onMouseLeave={(e) => {
-        if (!isOpen) e.currentTarget.style.background = C.bg;
+        if (!isOpen) e.currentTarget.style.background = bgRest;
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

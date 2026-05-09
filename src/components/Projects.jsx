@@ -399,7 +399,7 @@ export default function Projects({ state, openOverride, setOpenOverride, layout 
         style={{
           position: "fixed",
           right: 8,
-          bottom: 84, // above StickyHabits
+          bottom: 120, // sits clear of StickyHabits and home-indicator safe area
           display: "flex",
           flexDirection: "column-reverse",
           gap: 5,

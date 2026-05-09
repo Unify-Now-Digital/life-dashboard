@@ -108,6 +108,33 @@ export default function JournalProject({ state, setState, meta, onClose, goalHan
                   <IconBtn onClick={() => removeEntry(e.id)} danger label="Remove">×</IconBtn>
                 </div>
               </div>
+              {e.label && (
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 6 }}>
+                  <EditableText
+                    value={e.label}
+                    onChange={(v) => updateEntry(e.id, { label: v })}
+                    style={{ fontSize: 13, fontWeight: 500 }}
+                  />
+                </div>
+              )}
+              {Array.isArray(e.images) && e.images.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {e.images.map((img) => (
+                    <img
+                      key={img.id}
+                      src={img.dataUrl}
+                      alt={e.label || "diary photo"}
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: 240,
+                        borderRadius: 6,
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
               <textarea
                 value={e.text}
                 onChange={(ev) => updateEntry(e.id, { text: ev.target.value })}

@@ -17,13 +17,17 @@ import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
 import JumpNav from "./components/JumpNav.jsx";
 
 // Projects that get always-rendered sections in the main column, in display
-// order beneath Habits. Each section is a colour-tinted card with a
-// prominent collapse/expand button. When expanded, the project's subcards
-// show; tap a subcard to expand its details inline.
+// order beneath the Calendar. Outer card is white with a coloured
+// left-border; inner subcards carry the project tint. Travel is the only
+// project still rendered as an on-demand drilldown.
 const SECTIONS = [
   { key: "work", defaultOpen: true },
+  { key: "health", defaultOpen: true },
   { key: "finance", defaultOpen: true },
-  { key: "health", defaultOpen: false },
+  { key: "learning", defaultOpen: false },
+  { key: "journal", defaultOpen: false },
+  { key: "relationships", defaultOpen: false },
+  { key: "charity", defaultOpen: false },
 ];
 const SECTION_KEYS = SECTIONS.map((s) => s.key);
 
@@ -163,20 +167,18 @@ function ProjectIcon({ projectKey, color, size = 18 }) {
   }
 }
 
-function MainSection({ projectKey, defaultOpen, state, setState }) {
+function MainSection({ projectKey, expanded, onToggle, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   const color = meta?.color || C.accent;
-  const [expanded, setExpanded] = React.useState(defaultOpen);
-
   return (
     <div
       id={`section-${projectKey}`}
       style={{
-        background: tint(color, 0.04),
-        border: `0.5px solid ${tint(color, 0.22)}`,
+        background: C.bg, // outer is white; subcards inside carry the tint
+        border: `0.5px solid ${C.border}`,
         borderLeft: `3px solid ${color}`,
         borderRadius: 10,
-        padding: "8px 12px",
+        padding: "10px 12px",
       }}
     >
       <div
@@ -188,19 +190,27 @@ function MainSection({ projectKey, defaultOpen, state, setState }) {
           marginBottom: expanded ? 8 : 0,
         }}
       >
-        <ProjectIcon projectKey={projectKey} color={color} size={18} />
-        <SectionToggle
-          expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
-          color={color}
-        />
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ProjectIcon projectKey={projectKey} color={color} size={18} />
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color,
+              letterSpacing: "0.01em",
+            }}
+          >
+            {meta?.label || projectKey}
+          </span>
+        </span>
+        <SectionToggle expanded={expanded} onClick={onToggle} color={color} />
       </div>
       {expanded && (
         <ProjectDrilldown
           projectKey={projectKey}
           state={state}
           setState={setState}
-          onClose={() => setExpanded(false)}
+          onClose={onToggle}
           embedded
         />
       )}
@@ -223,9 +233,34 @@ function useIsDesktop(breakpoint = 860) {
 export default function Dashboard() {
   const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
   const isDesktop = useIsDesktop();
-  // Drilldown closed by default so the dashboard fits one viewport. Tap any
-  // project card to expand it beneath Top 3; only one can be open at a time.
-  const [openProject, setOpenProject] = useState(null);
+  // On-demand drilldown for projects without a permanent MainSection (Travel).
+  const [openProject, setOpenProjectRaw] = useState(null);
+  // Per-section expanded state for the always-visible MainSections, keyed by
+  // project key. Initialised from each section's defaultOpen flag.
+  const [sectionOpen, setSectionOpen] = useState(() =>
+    SECTIONS.reduce((acc, s) => {
+      acc[s.key] = !!s.defaultOpen;
+      return acc;
+    }, {})
+  );
+
+  // Project navigation: tapping a rail card or floating pill should expand
+  // the matching MainSection (if it has one) and scroll to it; otherwise it
+  // opens the on-demand drilldown.
+  const setOpenProject = (key) => {
+    if (key && SECTION_KEYS.includes(key)) {
+      setSectionOpen((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        const el = document.getElementById(`section-${key}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 30);
+    } else {
+      setOpenProjectRaw(key);
+    }
+  };
+
+  const toggleSection = (key) =>
+    setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Hydrate from cloud once on mount, reconcile if newer.
   useEffect(() => {
@@ -283,10 +318,10 @@ export default function Dashboard() {
 
   // ---- Render -------------------------------------------------------------
 
-  const closeDrilldown = () => setOpenProject(null);
+  const closeDrilldown = () => setOpenProjectRaw(null);
 
   // Only render the on-demand drilldown for projects that DON'T have a
-  // permanent collapsible section in the main column.
+  // permanent collapsible MainSection. Travel is the lone holdout.
   const drilldownPanel =
     openProject && !SECTION_KEYS.includes(openProject) ? (
       <div id="project-drilldown-anchor">
@@ -303,7 +338,8 @@ export default function Dashboard() {
     <MainSection
       key={s.key}
       projectKey={s.key}
-      defaultOpen={s.defaultOpen}
+      expanded={!!sectionOpen[s.key]}
+      onToggle={() => toggleSection(s.key)}
       state={state}
       setState={setState}
     />
@@ -317,9 +353,9 @@ export default function Dashboard() {
         onOpenProject={setOpenProject}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Calendar state={state} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
-      <Calendar state={state} onOpenProject={setOpenProject} />
     </div>
   );
 
@@ -356,9 +392,9 @@ export default function Dashboard() {
         onOpenProject={setOpenProject}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Calendar state={state} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
-      <Calendar state={state} onOpenProject={setOpenProject} />
       <Projects
         state={state}
         openOverride={openProject}

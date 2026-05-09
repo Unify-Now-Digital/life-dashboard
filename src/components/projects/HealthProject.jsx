@@ -83,11 +83,9 @@ async function estimateMacros({ text, image }) {
 
 function Sparkline({ data, valueKey, goodDirection = "down", width = 200, height = 28 }) {
   if (!data || data.length < 2) {
-    return (
-      <div style={{ height, display: "flex", alignItems: "center", color: C.textTertiary, fontSize: 11 }}>
-        Need 2+ entries for trend
-      </div>
-    );
+    // No-trend hint kept inline in the meta row instead of reserving a full
+    // sparkline-height slot — saves ~28px of dead vertical space.
+    return null;
   }
   const values = data.map((d) => d[valueKey]);
   const min = Math.min(...values);
@@ -197,6 +195,7 @@ function MetricCard({ label, unit, valueKey, entries, target, goodDirection, onA
             {entries.length} {entries.length === 1 ? "entry" : "entries"}
             {target && ` · target ${target} ${unit}`}
             {entries.length >= 2 && ` · ${sortedAsc[0][valueKey]} → ${sortedAsc[sortedAsc.length - 1][valueKey]}`}
+            {entries.length < 2 && " · need 2+ for trend"}
           </div>
         </>
       ) : (

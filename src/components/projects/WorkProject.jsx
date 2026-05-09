@@ -271,10 +271,9 @@ function TodoList({ business, setState }) {
 
 export default function WorkProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.work;
-  // Default the expanded business to the first one (Unify Digital).
-  const [expandedId, setExpandedId] = useState(
-    data.businesses?.[0]?.id ?? null
-  );
+  // No business expanded by default — show only the row of subcards. Tap
+  // a tile to open its task list inline beneath.
+  const [expandedId, setExpandedId] = useState(null);
   const expanded = data.businesses.find((b) => b.id === expandedId) || null;
 
   const onAddBusiness = () =>

@@ -29,41 +29,47 @@ export default function GoalsRollup({ state, onOpenProject }) {
 
   return (
     <div style={styles.card}>
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        style={{
-          ...styles.sectionH,
-          margin: 0,
-          width: "100%",
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          color: "inherit",
-          textAlign: "left",
-        }}
-      >
+      <div style={{ ...styles.sectionH, margin: 0 }}>
         <span>
           Objectives{" "}
           <span style={styles.sectionSub}>
             {total === 0 ? "none yet" : `${completed}/${total} complete`}
           </span>
         </span>
-        <span
-          aria-hidden="true"
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
           style={{
+            background: open ? C.accent : "transparent",
+            color: open ? "#fff" : C.accent,
+            border: `1px solid ${C.accent}`,
+            borderRadius: 999,
+            padding: "4px 12px",
             fontSize: 11,
-            color: C.textTertiary,
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.15s",
-            display: "inline-block",
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            minHeight: 28,
           }}
         >
-          ▾
-        </span>
-      </button>
+          {open ? "Collapse" : "Expand"}
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: 10,
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.15s",
+              display: "inline-block",
+            }}
+          >
+            ▾
+          </span>
+        </button>
+      </div>
 
       {open && (
         <div style={{ marginTop: 12 }}>

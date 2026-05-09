@@ -17,14 +17,63 @@ import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
 import JumpNav from "./components/JumpNav.jsx";
 
 // Projects that get always-rendered sections in the main column, in display
-// order beneath Habits. Each section is just a colour-tinted card that wraps
-// the project's subcard layout — no title/chevron header (the colour is the
-// identifier). Subcards expand inline within the project body when tapped.
-const SECTION_KEYS = ["work", "finance", "health"];
+// order beneath Habits. Each section is a colour-tinted card with a
+// prominent collapse/expand button. When expanded, the project's subcards
+// show; tap a subcard to expand its details inline.
+const SECTIONS = [
+  { key: "work", defaultOpen: true },
+  { key: "finance", defaultOpen: true },
+  { key: "health", defaultOpen: false },
+];
+const SECTION_KEYS = SECTIONS.map((s) => s.key);
 
-function MainSection({ projectKey, state, setState }) {
+// Shared prominent toggle — a bordered chip with a chevron. Used by
+// MainSection (and similar styling lives in Calendar / Objectives so the
+// affordance feels consistent across the dashboard).
+function SectionToggle({ expanded, onClick, color }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={expanded}
+      title={expanded ? "Collapse" : "Expand"}
+      style={{
+        background: expanded ? color : "transparent",
+        color: expanded ? "#fff" : color,
+        border: `1px solid ${color}`,
+        borderRadius: 999,
+        padding: "4px 12px",
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        minHeight: 28,
+      }}
+    >
+      {expanded ? "Collapse" : "Expand"}
+      <span
+        aria-hidden="true"
+        style={{
+          fontSize: 10,
+          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.15s",
+          display: "inline-block",
+        }}
+      >
+        ▾
+      </span>
+    </button>
+  );
+}
+
+function MainSection({ projectKey, defaultOpen, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   const color = meta?.color || C.accent;
+  const [expanded, setExpanded] = React.useState(defaultOpen);
+
   return (
     <div
       id={`section-${projectKey}`}
@@ -36,13 +85,44 @@ function MainSection({ projectKey, state, setState }) {
         padding: "10px 12px",
       }}
     >
-      <ProjectDrilldown
-        projectKey={projectKey}
-        state={state}
-        setState={setState}
-        onClose={() => {}}
-        embedded
-      />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: expanded ? 10 : 0,
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: color,
+            }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+            {meta?.label || projectKey}
+          </span>
+        </span>
+        <SectionToggle
+          expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          color={color}
+        />
+      </div>
+      {expanded && (
+        <ProjectDrilldown
+          projectKey={projectKey}
+          state={state}
+          setState={setState}
+          onClose={() => setExpanded(false)}
+          embedded
+        />
+      )}
     </div>
   );
 }
@@ -187,8 +267,14 @@ export default function Dashboard() {
       </div>
     ) : null;
 
-  const mainSections = SECTION_KEYS.map((key) => (
-    <MainSection key={key} projectKey={key} state={state} setState={setState} />
+  const mainSections = SECTIONS.map((s) => (
+    <MainSection
+      key={s.key}
+      projectKey={s.key}
+      defaultOpen={s.defaultOpen}
+      state={state}
+      setState={setState}
+    />
   ));
 
   const mainColumn = (

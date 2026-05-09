@@ -181,7 +181,8 @@ function ItemList({ card, items, listHandlers }) {
 
 export default function FinanceProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.finance;
-  const [openKey, setOpenKey] = useState("debts"); // default expanded
+  // Subcards-only by default; tap one to expand its list inline beneath.
+  const [openKey, setOpenKey] = useState(null);
 
   const updateFinance = (updater) =>
     setState((s) => ({

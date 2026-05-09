@@ -37,6 +37,18 @@ export const AVATAR_KEYS = Object.keys(AVATAR_STYLES);
 
 export const BIZ_COLORS = ["#E24B4A", "#BA7517", "#185FA5", "#534AB7", "#0F6E56", "#993556"];
 
+// One accent per project — drawn from the existing palette, no new hexes.
+export const PROJECT_COLORS = {
+  health: "#3B6D11",
+  finance: "#185FA5",
+  travel: "#0F6E56",
+  work: "#534AB7",
+  learning: "#854F0B",
+  journal: "#791F1F",
+  relationships: "#3C3489",
+  charity: "#0C447C",
+};
+
 export const QUOTES = [
   '"Discipline equals freedom."',
   '"What gets measured gets managed."',

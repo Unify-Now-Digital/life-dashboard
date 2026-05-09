@@ -1,8 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { C, styles } from "../lib/tokens";
 import { EditableText } from "./Editable.jsx";
-import TravelPanel from "./drilldowns/TravelPanel.jsx";
-import FinancesPanel from "./drilldowns/FinancesPanel.jsx";
 
 function RevenueTile({ label, value, onChange, sub }) {
   return (
@@ -16,35 +14,19 @@ function RevenueTile({ label, value, onChange, sub }) {
   );
 }
 
-function ExpandableTile({ label, value, sub, expanded, onToggle }) {
+function ReadOnlyTile({ label, value, sub }) {
   return (
-    <button
-      onClick={onToggle}
-      style={{
-        background: expanded ? C.bg : C.bgSecondary,
-        border: `0.5px solid ${expanded ? C.borderStrong : "transparent"}`,
-        borderRadius: 8,
-        padding: "12px 14px",
-        cursor: "pointer",
-        textAlign: "left",
-        fontFamily: "inherit",
-        transition: "background 0.15s, border-color 0.15s",
-      }}
-    >
+    <div style={{ background: C.bgSecondary, borderRadius: 8, padding: "12px 14px" }}>
       <div style={{ fontSize: 12, color: C.textSecondary }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 500, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </div>
+      <div style={{ fontSize: 18, fontWeight: 500, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 2 }}>{sub}</div>}
-    </button>
+    </div>
   );
 }
 
-export default function Metrics({ m, onUpdate, drilldowns, handlers }) {
-  const [open, setOpen] = useState(null);
-  const toggle = (id) => setOpen(open === id ? null : id);
-
-  const upcomingTrip = [...drilldowns.travel.trips]
+export default function Metrics({ m, onUpdate, state }) {
+  const trips = state.projects?.travel?.trips || [];
+  const upcomingTrip = [...trips]
     .filter((t) => t.start)
     .sort((a, b) => a.start.localeCompare(b.start))
     .find((t) => new Date(t.start) >= new Date(new Date().toDateString()));
@@ -54,13 +36,13 @@ export default function Metrics({ m, onUpdate, drilldowns, handlers }) {
   const travelValue = upcomingTrip ? `${daysToNext}d` : "—";
   const travelSub = upcomingTrip ? `to ${upcomingTrip.name}` : "no trips planned";
 
-  const fin = drilldowns.finances;
-  const incomeTotal = (fin.incomeBreakdown || []).reduce((a, b) => a + (b.amount || 0), 0) || fin.income || 0;
-  const expenseTotal = (fin.expenseBreakdown || []).reduce((a, b) => a + (b.amount || 0), 0) || fin.spending || 0;
-  const savedTotal = Math.max(0, incomeTotal - expenseTotal);
-  const savingsRate = incomeTotal > 0 ? Math.round((savedTotal / incomeTotal) * 100) : 0;
-  const finValue = `${savingsRate}%`;
-  const finSub = `${fin.currency}${savedTotal.toLocaleString()} saved this month`;
+  const savings = state.projects?.finance?.savings || [];
+  const investments = state.projects?.finance?.investments || [];
+  const debts = state.projects?.finance?.debts || [];
+  const netEur =
+    savings.reduce((a, b) => a + (b.balance?.eur || 0), 0) +
+    investments.reduce((a, b) => a + (b.value?.eur || 0), 0) -
+    debts.reduce((a, b) => a + (b.amount?.eur || 0), 0);
 
   return (
     <div>
@@ -78,47 +60,9 @@ export default function Metrics({ m, onUpdate, drilldowns, handlers }) {
           onChange={(v) => onUpdate("smMTD", v)}
           sub="this month"
         />
-        <ExpandableTile
-          label="Travel"
-          value={travelValue}
-          sub={travelSub}
-          expanded={open === "travel"}
-          onToggle={() => toggle("travel")}
-        />
-        <ExpandableTile
-          label="Finances"
-          value={finValue}
-          sub={finSub}
-          expanded={open === "finances"}
-          onToggle={() => toggle("finances")}
-        />
+        <ReadOnlyTile label="Travel" value={travelValue} sub={travelSub} />
+        <ReadOnlyTile label="Net (EUR)" value={`€${netEur.toLocaleString()}`} sub="from Finance project" />
       </div>
-      {open === "travel" && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: 14,
-            background: C.bg,
-            border: `0.5px solid ${C.border}`,
-            borderRadius: 8,
-          }}
-        >
-          <TravelPanel data={drilldowns.travel} {...handlers.travel} onClose={() => setOpen(null)} />
-        </div>
-      )}
-      {open === "finances" && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: 14,
-            background: C.bg,
-            border: `0.5px solid ${C.border}`,
-            borderRadius: 8,
-          }}
-        >
-          <FinancesPanel data={drilldowns.finances} {...handlers.finances} onClose={() => setOpen(null)} />
-        </div>
-      )}
     </div>
   );
 }

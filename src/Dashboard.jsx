@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
-import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
+import { styles, QUOTES } from "./lib/tokens";
 import { defaultState, nextId } from "./lib/defaultState";
+import { loadFromCache, loadFromCloud, saveState, flushQueue } from "./lib/storage";
 
 import Header from "./components/Header.jsx";
-import Spanish from "./components/Spanish.jsx";
 import NorthStar from "./components/NorthStar.jsx";
 import Habits from "./components/Habits.jsx";
-import Priorities from "./components/Priorities.jsx";
 import StickyHabits from "./components/StickyHabits.jsx";
-import Goals from "./components/Goals.jsx";
 import Upcoming from "./components/Upcoming.jsx";
 import Metrics from "./components/Metrics.jsx";
-import Drilldowns from "./components/Drilldowns.jsx";
-import Reflection from "./components/Reflection.jsx";
 import UndoToast from "./components/UndoToast.jsx";
+import AuthGate from "./components/AuthGate.jsx";
+import TopThree from "./components/TopThree.jsx";
+import GoalsRollup from "./components/GoalsRollup.jsx";
+import Projects from "./components/Projects.jsx";
 
-// Track viewport so we can switch to two-column layout above ~860px wide
 function useIsDesktop(breakpoint = 860) {
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== "undefined" ? window.innerWidth >= breakpoint : false
@@ -29,8 +28,30 @@ function useIsDesktop(breakpoint = 860) {
 }
 
 export default function Dashboard() {
-  const [state, setState] = useState(defaultState);
+  const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
   const isDesktop = useIsDesktop();
+  const [openProject, setOpenProject] = useState(null);
+
+  // Hydrate from cloud once on mount, reconcile if newer.
+  useEffect(() => {
+    let alive = true;
+    loadFromCloud().then((cloud) => {
+      if (alive && cloud) setStateRaw(cloud);
+    });
+    flushQueue();
+    const onFocus = () => flushQueue();
+    window.addEventListener("focus", onFocus);
+    return () => { alive = false; window.removeEventListener("focus", onFocus); };
+  }, []);
+
+  // Wrap setState so every change persists.
+  const setState = (updater) => {
+    setStateRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveState(next);
+      return next;
+    });
+  };
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
@@ -40,9 +61,7 @@ export default function Dashboard() {
   const [undo, setUndo] = useState(null);
   const undoTimerRef = useRef(null);
   useEffect(
-    () => () => {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    },
+    () => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); },
     []
   );
 
@@ -71,7 +90,6 @@ export default function Dashboard() {
     });
   };
 
-  // Update an item by id within a nested list path
   const updateItemInList = (path, id, field, value) => {
     setState((s) => {
       const newState = JSON.parse(JSON.stringify(s));
@@ -84,21 +102,6 @@ export default function Dashboard() {
     });
   };
 
-  const togglePriority = (i) =>
-    setState((s) => {
-      const next = [...s.priorities];
-      next[i] = { ...next[i], done: !next[i].done };
-      return { ...s, priorities: next };
-    });
-
-  const changePriority = (i, text) =>
-    setState((s) => {
-      const next = [...s.priorities];
-      next[i] = { ...next[i], text };
-      return { ...s, priorities: next };
-    });
-
-  // Habit confirmation: answer is "yes" | "no" | "clear"
   const confirmHabit = (habit, dateISO, answer) =>
     setState((s) => {
       const yes = (s.habitLog[habit] || []).filter((d) => d !== dateISO);
@@ -112,30 +115,7 @@ export default function Dashboard() {
       };
     });
 
-  const setJournal = (text) => setState((s) => ({ ...s, journal: text }));
   const setNorthStar = (text) => setState((s) => ({ ...s, northStar: text }));
-
-  const goalHandlers = {
-    onUpdate: (id, field, value) => updateItemInList(["goals"], id, field, value),
-    onAdd: () =>
-      setState((s) => ({
-        ...s,
-        goals: [
-          ...s.goals,
-          {
-            id: `g${nextId(s.goals.map((g) => ({ id: typeof g.id === "string" ? parseInt(g.id.replace(/\D/g, "")) || 0 : g.id })))}`,
-            label: "New goal",
-            current: 0,
-            target: 100,
-          },
-        ],
-      })),
-    onRemove: removeWithUndo(
-      (s) => s.goals,
-      (s, g) => ({ ...s, goals: g }),
-      "Goal removed"
-    ),
-  };
 
   const upcomingHandlers = {
     onUpdate: (id, field, value) => updateItemInList(["upcoming"], id, field, value),
@@ -154,330 +134,132 @@ export default function Dashboard() {
   const updateMetric = (key, value) =>
     setState((s) => ({ ...s, metrics: { ...s.metrics, [key]: value } }));
 
-  const drilldownHandlers = {
-    businesses: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "businesses"], id, field, value),
-      onAdd: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            businesses: [
-              ...s.drilldowns.businesses,
-              {
-                id: nextId(s.drilldowns.businesses),
-                name: "New",
-                color: BIZ_COLORS[s.drilldowns.businesses.length % BIZ_COLORS.length],
-                value: "—",
-                meta: "—",
-              },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.businesses,
-        (s, b) => ({ ...s, drilldowns: { ...s.drilldowns, businesses: b } }),
-        "Business removed"
-      ),
-    },
-    finances: {
-      onUpdate: (key, value) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, finances: { ...s.drilldowns.finances, [key]: value } },
-        })),
-      onUpdateIncome: (id, field, value) =>
-        updateItemInList(["drilldowns", "finances", "incomeBreakdown"], id, field, value),
-      onAddIncome: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: {
-              ...s.drilldowns.finances,
-              incomeBreakdown: [
-                ...(s.drilldowns.finances.incomeBreakdown || []),
-                {
-                  id: nextId(s.drilldowns.finances.incomeBreakdown || []),
-                  label: "New income",
-                  amount: 0,
-                },
-              ],
-            },
-          },
-        })),
-      onRemoveIncome: removeWithUndo(
-        (s) => s.drilldowns.finances.incomeBreakdown || [],
-        (s, list) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: { ...s.drilldowns.finances, incomeBreakdown: list },
-          },
-        }),
-        "Income row removed"
-      ),
-      onUpdateExpense: (id, field, value) =>
-        updateItemInList(["drilldowns", "finances", "expenseBreakdown"], id, field, value),
-      onAddExpense: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: {
-              ...s.drilldowns.finances,
-              expenseBreakdown: [
-                ...(s.drilldowns.finances.expenseBreakdown || []),
-                {
-                  id: nextId(s.drilldowns.finances.expenseBreakdown || []),
-                  label: "New expense",
-                  amount: 0,
-                },
-              ],
-            },
-          },
-        })),
-      onRemoveExpense: removeWithUndo(
-        (s) => s.drilldowns.finances.expenseBreakdown || [],
-        (s, list) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: { ...s.drilldowns.finances, expenseBreakdown: list },
-          },
-        }),
-        "Expense row removed"
-      ),
-    },
-    travel: {
-      onUpdateStat: (key, value) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, travel: { ...s.drilldowns.travel, [key]: value } },
-        })),
-      onUpdateTrip: (id, field, value) => updateItemInList(["drilldowns", "travel", "trips"], id, field, value),
-      onAddTrip: () =>
-        setState((s) => {
-          const start = new Date();
-          start.setDate(start.getDate() + 30);
-          const end = new Date(start);
-          end.setDate(end.getDate() + 7);
-          const iso = (d) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              travel: {
-                ...s.drilldowns.travel,
-                trips: [
-                  ...s.drilldowns.travel.trips,
-                  {
-                    id: nextId(s.drilldowns.travel.trips),
-                    name: "New trip",
-                    start: iso(start),
-                    end: iso(end),
-                  },
-                ],
-              },
-            },
-          };
-        }),
-      onRemoveTrip: removeWithUndo(
-        (s) => s.drilldowns.travel.trips,
-        (s, t) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, travel: { ...s.drilldowns.travel, trips: t } },
-        }),
-        "Trip removed"
-      ),
-    },
-    relationships: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "relationships"], id, field, value),
-      onAdd: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            relationships: [
-              ...s.drilldowns.relationships,
-              {
-                id: nextId(s.drilldowns.relationships),
-                name: "New person",
-                initials: "NP",
-                color: AVATAR_KEYS[s.drilldowns.relationships.length % AVATAR_KEYS.length],
-                last: "—",
-                action: "tap to set",
-                stale: false,
-              },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.relationships,
-        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, relationships: r } }),
-        "Person removed"
-      ),
-    },
-    reading: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "reading"], id, field, value),
-      onAdd: (kind) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            reading: [
-              ...s.drilldowns.reading,
-              kind === "podcast"
-                ? { id: nextId(s.drilldowns.reading), title: "New podcast", author: "Podcast", progress: null, sub: "" }
-                : { id: nextId(s.drilldowns.reading), title: "New book", author: "Author", progress: 0, sub: "ch. 1" },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.reading,
-        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, reading: r } }),
-        "Reading item removed"
-      ),
-    },
-    spanish: {
-      onCyclePhrase: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            spanish: {
-              ...s.drilldowns.spanish,
-              phraseIndex: (s.drilldowns.spanish.phraseIndex + 1) % s.drilldowns.spanish.phrases.length,
-            },
-          },
-        })),
-      // Mark a phrase ID as seen this session. Idempotent — adds only if not already present.
-      onMarkPhraseSeen: (phraseId) =>
-        setState((s) => {
-          const seen = s.drilldowns.spanish.phrasesSeen || [];
-          if (seen.includes(phraseId)) return s;
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              spanish: { ...s.drilldowns.spanish, phrasesSeen: [...seen, phraseId] },
-            },
-          };
-        }),
-      // Leitner: "good" promotes the bucket and advances; "hard" stays; "again" resets to 0.
-      // The chunk index always advances so you don't see the same one twice.
-      onRateChunk: (id, rating) =>
-        setState((s) => {
-          const sp = s.drilldowns.spanish;
-          const chunks = sp.chunks.map((c) => {
-            if (c.id !== id) return c;
-            if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
-            if (rating === "hard") return { ...c, lastSeen: Date.now() };
-            return { ...c, bucket: 0, lastSeen: Date.now() };
-          });
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              spanish: { ...sp, chunks, chunkIndex: (sp.chunkIndex + 1) % sp.chunks.length },
-            },
-          };
-        }),
-      // Per-row check. allFilledAndRight=true bumps correctPasses; any mistake resets to 0.
-      // Partial rows (allFilledAndRight=false from missing cells) also reset since user
-      // didn't fully demonstrate mastery — matches the "all 3 forms or no point" rule.
-      onCheckVerb: (id, allFilledAndRight) =>
-        setState((s) => {
-          const sp = s.drilldowns.spanish;
-          const verbs = sp.verbs.map((v) =>
-            v.id === id
-              ? { ...v, correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0 }
-              : v
-          );
-          return { ...s, drilldowns: { ...s.drilldowns, spanish: { ...sp, verbs } } };
-        }),
-    },
+  // ---- Top 3 helpers ------------------------------------------------------
+  // Find a priority by (projectKey, priorityId) and apply a patch. projectKey
+  // may be "work:churchill" for nested-business priorities.
+  const patchPriority = (projectKey, priorityId, patch) => {
+    setState((s) => {
+      const next = JSON.parse(JSON.stringify(s));
+      if (projectKey.startsWith("work:")) {
+        const bizKey = projectKey.split(":")[1];
+        const biz = next.projects.work.businesses.find((b) => b.key === bizKey);
+        if (biz) {
+          for (const g of biz.goals || []) {
+            const pi = (g.priorities || []).findIndex((p) => p.id === priorityId);
+            if (pi >= 0) g.priorities[pi] = { ...g.priorities[pi], ...patch };
+          }
+        }
+      } else {
+        const proj = next.projects[projectKey];
+        if (proj) {
+          for (const g of proj.goals || []) {
+            const pi = (g.priorities || []).findIndex((p) => p.id === priorityId);
+            if (pi >= 0) g.priorities[pi] = { ...g.priorities[pi], ...patch };
+          }
+        }
+      }
+      return next;
+    });
   };
+  const togglePriorityDone = (projectKey, priorityId, today) =>
+    setState((s) => {
+      // Fresh read of current value
+      const cur = (function findCurrent() {
+        const route = projectKey.startsWith("work:")
+          ? s.projects.work.businesses.find((b) => b.key === projectKey.split(":")[1])?.goals || []
+          : (s.projects[projectKey]?.goals || []);
+        for (const g of route) for (const p of g.priorities || []) if (p.id === priorityId) return p;
+        return null;
+      })();
+      if (!cur) return s;
+      const willBeDone = !cur.done;
+      // Apply via patch; need synchronous-style return
+      const next = JSON.parse(JSON.stringify(s));
+      const arr = projectKey.startsWith("work:")
+        ? next.projects.work.businesses.find((b) => b.key === projectKey.split(":")[1])?.goals || []
+        : (next.projects[projectKey]?.goals || []);
+      for (const g of arr)
+        for (let i = 0; i < (g.priorities || []).length; i++)
+          if (g.priorities[i].id === priorityId) {
+            g.priorities[i] = { ...g.priorities[i], done: willBeDone, doneAt: willBeDone ? today : null, starred: willBeDone ? false : g.priorities[i].starred };
+          }
+      return next;
+    });
+  const unstar = (projectKey, priorityId) => patchPriority(projectKey, priorityId, { starred: false, starredAt: null });
 
-  // ---- Render -----------------------------------------------------------
-  // On mobile: single column, sections stack in order.
-  // On desktop: two columns side by side. Drill-downs + reflection span full width below.
+  // ---- Render -------------------------------------------------------------
+
+  const topStack = (
+    <div style={{ ...styles.stack, marginBottom: 20 }}>
+      <NorthStar value={state.northStar} onChange={setNorthStar} />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+    </div>
+  );
 
   const leftColumn = (
     <div style={styles.stack}>
-      <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
-      <Goals goals={state.goals} {...goalHandlers} />
+      <TopThree
+        state={state}
+        onOpenProject={setOpenProject}
+        onTogglePriority={togglePriorityDone}
+        onUnstar={unstar}
+      />
+      <GoalsRollup state={state} onOpenProject={setOpenProject} />
     </div>
   );
 
   const rightColumn = (
     <div style={styles.stack}>
       <Upcoming items={state.upcoming} {...upcomingHandlers} />
-      <Metrics
-        m={state.metrics}
-        onUpdate={updateMetric}
-        drilldowns={state.drilldowns}
-        handlers={drilldownHandlers}
-      />
-      <Reflection value={state.journal} onChange={setJournal} />
-    </div>
-  );
-
-  // Full-width sections that pin to the top of the page on every viewport.
-  // Order: Spanish (active drill), North Star (vision), Habits (status).
-  const topStack = (
-    <div style={{ ...styles.stack, marginBottom: 20 }}>
-      <Spanish data={state.drilldowns.spanish} {...drilldownHandlers.spanish} />
-      <NorthStar value={state.northStar} onChange={setNorthStar} />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Metrics m={state.metrics} onUpdate={updateMetric} state={state} />
     </div>
   );
 
   return (
-    <div style={styles.page}>
-      <Header today={today} dayOfYear={dayOfYear} quote={quote} />
+    <AuthGate>
+      <div style={styles.page}>
+        <Header today={today} dayOfYear={dayOfYear} quote={quote} />
 
-      {topStack}
+        {topStack}
 
-      {isDesktop ? (
-        <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 20,
-              alignItems: "start",
-            }}
-          >
-            {leftColumn}
-            {rightColumn}
+        {isDesktop ? (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+              {leftColumn}
+              {rightColumn}
+            </div>
+            <div style={{ marginTop: 20 }}>
+              <Projects
+                state={state}
+                setState={setState}
+                openOverride={openProject}
+                setOpenOverride={setOpenProject}
+              />
+            </div>
+          </>
+        ) : (
+          <div style={styles.stack}>
+            <TopThree
+              state={state}
+              onOpenProject={setOpenProject}
+              onTogglePriority={togglePriorityDone}
+              onUnstar={unstar}
+            />
+            <GoalsRollup state={state} onOpenProject={setOpenProject} />
+            <Upcoming items={state.upcoming} {...upcomingHandlers} />
+            <Metrics m={state.metrics} onUpdate={updateMetric} state={state} />
+            <Projects
+              state={state}
+              setState={setState}
+              openOverride={openProject}
+              setOpenOverride={setOpenProject}
+            />
           </div>
-          {/* Full-width drill-downs below */}
-          <div style={{ marginTop: 20 }}>
-            <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-          </div>
-        </>
-      ) : (
-        <div style={styles.stack}>
-          <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
-          <Goals goals={state.goals} {...goalHandlers} />
-          <Upcoming items={state.upcoming} {...upcomingHandlers} />
-          <Metrics
-            m={state.metrics}
-            onUpdate={updateMetric}
-            drilldowns={state.drilldowns}
-            handlers={drilldownHandlers}
-          />
-          <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-          <Reflection value={state.journal} onChange={setJournal} />
-        </div>
-      )}
+        )}
 
-      {/* Floating habit ring bar — fixed at bottom on all viewports */}
-      <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-
-      {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
-    </div>
+        <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
+      </div>
+    </AuthGate>
   );
 }

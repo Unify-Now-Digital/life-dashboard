@@ -51,20 +51,6 @@ export default function TravelProject({ state, setState, meta, onClose, goalHand
             </span>
             <IconBtn onClick={() => trips.onRemove(trip.id)} danger label="Remove">×</IconBtn>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 6 }}>
-            {CHECK_KEYS.map((k) => (
-              <label key={k} style={{ fontSize: 11, color: C.textSecondary, display: "flex", alignItems: "center", gap: 4 }}>
-                <input
-                  type="checkbox"
-                  checked={!!trip.checklist?.[k]}
-                  onChange={(e) =>
-                    trips.onUpdate(trip.id, { checklist: { ...(trip.checklist || {}), [k]: e.target.checked } })
-                  }
-                />
-                {k}
-              </label>
-            ))}
-          </div>
           {(trip.notes || true) && (
             <div style={{ marginTop: 4, fontSize: 11, color: C.textTertiary }}>
               <EditableText value={trip.notes || ""} onChange={(v) => trips.onUpdate(trip.id, { notes: v })} placeholder="notes…" style={{ fontSize: 11 }} />

@@ -165,13 +165,9 @@ function deltaTravel(state) {
     .find((t) => new Date(t.start) >= today);
   if (!next) return deltaBlock({ value: "—", sub: "no trips planned" });
   const days = Math.max(0, Math.ceil((new Date(next.start) - today) / 86400000));
-  const checklist = next.checklist || {};
-  const total = Object.keys(checklist).length;
-  const done = Object.values(checklist).filter(Boolean).length;
   return deltaBlock({
     value: `${days}d → ${next.name}`,
-    sub: total > 0 ? `checklist ${done}/${total}` : null,
-    accent: total > 0 && done < total ? C.danger : C.text,
+    sub: next.sub || null,
   });
 }
 

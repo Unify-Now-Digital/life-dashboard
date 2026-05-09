@@ -99,6 +99,16 @@ function BusinessTile({ business, isExpanded, onClick }) {
   );
 }
 
+// Pad topThree to exactly 3 slots — mirror of helper in TopThree.jsx so we
+// don't import across boundary.
+function ensureTopThreeLength(list) {
+  const out = [...(list || [])];
+  while (out.length < 3) {
+    out.push({ id: out.length + 1, title: "", projectKey: null, done: false });
+  }
+  return out.slice(0, 3);
+}
+
 function TodoList({ business, setState }) {
   const handlers = makeTodoHandlers(setState, business.id);
   const todos = business.todos || [];
@@ -117,6 +127,52 @@ function TodoList({ business, setState }) {
         },
       },
     }));
+
+  // Star toggle on a Work todo. Turning ON the star pushes the task into
+  // the next empty Top 3 slot (no-op if all 3 are full); turning it OFF
+  // removes any matching Top 3 row.
+  const toggleStar = (todo) => {
+    const willBeStarred = !todo.starred;
+    setState((s) => {
+      let topThree = ensureTopThreeLength(s.topThree);
+      if (willBeStarred && (todo.title || "").trim()) {
+        const empty = topThree.findIndex((it) => !(it.title || "").trim());
+        if (empty !== -1) {
+          topThree = topThree.map((it, i) =>
+            i === empty
+              ? { ...it, title: todo.title, projectKey: "work", done: false }
+              : it
+          );
+        }
+      } else if (!willBeStarred) {
+        topThree = topThree.map((it) =>
+          it.projectKey === "work" && it.title === todo.title
+            ? { ...it, title: "", projectKey: null, done: false }
+            : it
+        );
+      }
+      return {
+        ...s,
+        topThree,
+        projects: {
+          ...s.projects,
+          work: {
+            ...s.projects.work,
+            businesses: s.projects.work.businesses.map((b) =>
+              b.id === business.id
+                ? {
+                    ...b,
+                    todos: (b.todos || []).map((t) =>
+                      t.id === todo.id ? { ...t, starred: willBeStarred } : t
+                    ),
+                  }
+                : b
+            ),
+          },
+        },
+      };
+    });
+  };
   return (
     <div
       key={business.id}
@@ -210,6 +266,35 @@ function TodoList({ business, setState }) {
             padding: "6px 0",
           }}
         >
+          <button
+            onClick={() => toggleStar(t)}
+            title={t.starred ? "Unstar (removes from Top 3)" : "Star — add to Top 3"}
+            aria-label={t.starred ? "Unstar" : "Star"}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 2,
+              lineHeight: 0,
+              cursor: "pointer",
+              color: t.starred ? business.color : C.textTertiary,
+              fontFamily: "inherit",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill={t.starred ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="1.4"
+            >
+              <path
+                d="M8 1.5l1.9 4.1 4.5.5-3.4 3.1.9 4.4L8 11.5 4.1 13.6l.9-4.4L1.6 6.1l4.5-.5L8 1.5z"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <div
             onClick={() => handlers.onUpdate(t.id, { done: !t.done })}
             style={{

@@ -31,6 +31,15 @@ export const defaultState = {
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },
 
+  // Today's Top 3 — three ad-hoc priority slots, directly editable in the
+  // TopThree component. Auto-filled when a Work todo is starred. Always
+  // exactly three entries; an empty title means the slot is unused.
+  topThree: [
+    { id: 1, title: "", projectKey: null, done: false },
+    { id: 2, title: "", projectKey: null, done: false },
+    { id: 3, title: "", projectKey: null, done: false },
+  ],
+
   upcoming: [
     { id: 1, date: "Tue 5", text: "Aylin 1-1 — raise discussion", cat: "CM" },
     { id: 2, date: "Wed 6", text: "Push leg day", cat: "Fitness" },

@@ -200,55 +200,6 @@ export default function Dashboard() {
 
   const setNorthStar = (text) => setState((s) => ({ ...s, northStar: text }));
 
-  // ---- Top 3 helpers ------------------------------------------------------
-  const patchPriority = (projectKey, priorityId, patch) => {
-    setState((s) => {
-      const next = JSON.parse(JSON.stringify(s));
-      if (projectKey.startsWith("work:")) {
-        const bizKey = projectKey.split(":")[1];
-        const biz = next.projects.work.businesses.find((b) => b.key === bizKey);
-        if (biz) {
-          for (const g of biz.goals || []) {
-            const pi = (g.priorities || []).findIndex((p) => p.id === priorityId);
-            if (pi >= 0) g.priorities[pi] = { ...g.priorities[pi], ...patch };
-          }
-        }
-      } else {
-        const proj = next.projects[projectKey];
-        if (proj) {
-          for (const g of proj.goals || []) {
-            const pi = (g.priorities || []).findIndex((p) => p.id === priorityId);
-            if (pi >= 0) g.priorities[pi] = { ...g.priorities[pi], ...patch };
-          }
-        }
-      }
-      return next;
-    });
-  };
-  const togglePriorityDone = (projectKey, priorityId, today) =>
-    setState((s) => {
-      const cur = (function findCurrent() {
-        const route = projectKey.startsWith("work:")
-          ? s.projects.work.businesses.find((b) => b.key === projectKey.split(":")[1])?.goals || []
-          : (s.projects[projectKey]?.goals || []);
-        for (const g of route) for (const p of g.priorities || []) if (p.id === priorityId) return p;
-        return null;
-      })();
-      if (!cur) return s;
-      const willBeDone = !cur.done;
-      const next = JSON.parse(JSON.stringify(s));
-      const arr = projectKey.startsWith("work:")
-        ? next.projects.work.businesses.find((b) => b.key === projectKey.split(":")[1])?.goals || []
-        : (next.projects[projectKey]?.goals || []);
-      for (const g of arr)
-        for (let i = 0; i < (g.priorities || []).length; i++)
-          if (g.priorities[i].id === priorityId) {
-            g.priorities[i] = { ...g.priorities[i], done: willBeDone, doneAt: willBeDone ? today : null, starred: willBeDone ? false : g.priorities[i].starred };
-          }
-      return next;
-    });
-  const unstar = (projectKey, priorityId) => patchPriority(projectKey, priorityId, { starred: false, starredAt: null });
-
   // ---- Render -------------------------------------------------------------
 
   const closeDrilldown = () => setOpenProject(null);
@@ -281,9 +232,8 @@ export default function Dashboard() {
     <div style={styles.stack}>
       <TopThree
         state={state}
+        setState={setState}
         onOpenProject={setOpenProject}
-        onTogglePriority={togglePriorityDone}
-        onUnstar={unstar}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       {mainSections}
@@ -321,9 +271,8 @@ export default function Dashboard() {
       <GoalsRollup state={state} onOpenProject={setOpenProject} />
       <TopThree
         state={state}
+        setState={setState}
         onOpenProject={setOpenProject}
-        onTogglePriority={togglePriorityDone}
-        onUnstar={unstar}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       {mainSections}

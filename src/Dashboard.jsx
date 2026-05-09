@@ -69,6 +69,100 @@ function SectionToggle({ expanded, onClick, color }) {
   );
 }
 
+// Inline SVG icon per project. Used as the section identifier instead of a
+// text label so the MainSection header takes minimal vertical space.
+function ProjectIcon({ projectKey, color, size = 18 }) {
+  const stroke = color || C.text;
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke,
+    strokeWidth: 1.6,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
+    style: { display: "block", flexShrink: 0 },
+  };
+  switch (projectKey) {
+    case "work":
+      return (
+        <svg {...common}>
+          <rect x="3" y="7" width="18" height="13" rx="1.5" />
+          <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+          <path d="M3 12h18" />
+        </svg>
+      );
+    case "finance":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15 9.5c-.7-.9-1.8-1.4-3-1.4-2 0-3.5 1.4-3.5 3.5s1.5 3.5 3.5 3.5c1.2 0 2.3-.5 3-1.4" />
+          <path d="M8.5 11h5" />
+          <path d="M8.5 13h5" />
+        </svg>
+      );
+    case "health":
+      return (
+        <svg {...common}>
+          <path d="M12 21s-7-4.5-9-9a5.5 5.5 0 0 1 9.5-3.5A5.5 5.5 0 0 1 21 12c-2 4.5-9 9-9 9z" />
+        </svg>
+      );
+    case "travel":
+      return (
+        <svg {...common}>
+          <path d="M2 12l9 2 4 7 2-1-2-7 5-5a2 2 0 0 0-3-3l-5 5-7-2-1 2 7 4z" />
+        </svg>
+      );
+    case "learning":
+      return (
+        <svg {...common}>
+          <path d="M3 6a2 2 0 0 1 2-2h6v15H5a2 2 0 0 1-2-2z" />
+          <path d="M21 6a2 2 0 0 0-2-2h-6v15h6a2 2 0 0 0 2-2z" />
+        </svg>
+      );
+    case "journal":
+      return (
+        <svg {...common}>
+          <path d="M14 3l7 7-11 11H3v-7z" />
+          <path d="M13 4l7 7" />
+        </svg>
+      );
+    case "relationships":
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="9" r="3" />
+          <path d="M3 19a6 6 0 0 1 12 0" />
+          <circle cx="17" cy="8" r="2.5" />
+          <path d="M14.5 14a4.5 4.5 0 0 1 7 4" />
+        </svg>
+      );
+    case "charity":
+      return (
+        <svg {...common}>
+          <path d="M3 11h18v9H3z" />
+          <path d="M3 7h18v4H3z" />
+          <path d="M12 7v13" />
+          <path d="M8 7c0-2 1.5-3.5 4-3.5S16 5 16 7" />
+        </svg>
+      );
+    default:
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: color,
+          }}
+          aria-hidden="true"
+        />
+      );
+  }
+}
+
 function MainSection({ projectKey, defaultOpen, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   const color = meta?.color || C.accent;
@@ -82,7 +176,7 @@ function MainSection({ projectKey, defaultOpen, state, setState }) {
         border: `0.5px solid ${tint(color, 0.22)}`,
         borderLeft: `3px solid ${color}`,
         borderRadius: 10,
-        padding: "10px 12px",
+        padding: "8px 12px",
       }}
     >
       <div
@@ -91,23 +185,10 @@ function MainSection({ projectKey, defaultOpen, state, setState }) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
-          marginBottom: expanded ? 10 : 0,
+          marginBottom: expanded ? 8 : 0,
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: color,
-            }}
-          />
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
-            {meta?.label || projectKey}
-          </span>
-        </span>
+        <ProjectIcon projectKey={projectKey} color={color} size={18} />
         <SectionToggle
           expanded={expanded}
           onClick={() => setExpanded((v) => !v)}

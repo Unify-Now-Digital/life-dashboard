@@ -133,10 +133,25 @@ function MetricCard({ label, unit, valueKey, entries, target, goodDirection, onA
   const sortedAsc = useMemo(() => [...sortedDesc].reverse(), [sortedDesc]);
 
   const latest = sortedDesc[0];
-  const prev = sortedDesc[1];
+  // Reference for the delta = the entry closest to (but no later than) seven
+  // days ago. Falls back to the oldest entry if nothing is that old yet.
+  // Surfaces a meaningful weekly change rather than a noisy day-over-day one.
+  const weekAgoISO = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return isoDate(d);
+  }, [entries]);
+  const weekRef = useMemo(() => {
+    const older = sortedDesc.find((e) => e.date <= weekAgoISO);
+    return older || sortedDesc[sortedDesc.length - 1] || null;
+  }, [sortedDesc, weekAgoISO]);
+  const isWeekRef = weekRef && latest && weekRef.date !== latest.date;
 
   const value = latest ? latest[valueKey] : null;
-  const delta = latest && prev ? +(latest[valueKey] - prev[valueKey]).toFixed(1) : 0;
+  const delta =
+    latest && weekRef && isWeekRef
+      ? +(latest[valueKey] - weekRef[valueKey]).toFixed(1)
+      : 0;
 
   const deltaIsGood =
     (delta < 0 && goodDirection === "down") ||
@@ -167,9 +182,13 @@ function MetricCard({ label, unit, valueKey, entries, target, goodDirection, onA
           <div className="hl-metric-num">
             {value}
             <span className="hl-metric-unit"> {unit}</span>
-            {prev && (
-              <span className="hl-delta-pill" style={{ background: deltaIsGood ? "#EAF3DE" : "#FCEBEB", color: deltaColor }}>
-                {deltaArrow} {Math.abs(delta)}
+            {isWeekRef && (
+              <span
+                className="hl-delta-pill"
+                style={{ background: deltaIsGood ? "#EAF3DE" : "#FCEBEB", color: deltaColor }}
+                title={`vs ${weekRef.date}`}
+              >
+                {deltaArrow} {Math.abs(delta)} / wk
               </span>
             )}
           </div>

@@ -19,11 +19,12 @@ const eur = (n) =>
   `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
 
 // Subcard meta — one per finance area. Color used for tint + accent.
+// Order: Revenue · Savings · Investments · Debts (most-active inflow → debt).
 const CARDS = [
-  { key: "debts", label: "Debts", color: "#791F1F", listKey: "debts", addLabel: "+ Add debt", invert: true },
+  { key: "revenue", label: "Revenue", color: "#534AB7", listKey: "monthlyRevenue", addLabel: "+ Add line" },
   { key: "savings", label: "Savings", color: "#3B6D11", listKey: "savings", addLabel: "+ Add account" },
   { key: "investments", label: "Investments", color: "#185FA5", listKey: "investments", addLabel: "+ Add account" },
-  { key: "revenue", label: "Revenue", color: "#534AB7", listKey: "monthlyRevenue", addLabel: "+ Add line" },
+  { key: "debts", label: "Debts", color: "#791F1F", listKey: "debts", addLabel: "+ Add debt", invert: true },
 ];
 
 function Tile({ card, total, isOpen, onClick }) {

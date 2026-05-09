@@ -35,7 +35,8 @@ function makeTodoHandlers(setState, businessId) {
 
 // Single business tile. Compact horizontal card. Read-only display; tap to
 // expand. Editable name/value/meta lives in the expansion below — keeps the
-// tile click-target clean so the expansion always switches.
+// tile click-target clean so the expansion always switches. The financial
+// `value` field stays in state but isn't rendered here.
 function BusinessTile({ business, isExpanded, onClick }) {
   const bgRest = tint(business.color, 0.06);
   const bgOpen = tint(business.color, 0.12);
@@ -49,20 +50,20 @@ function BusinessTile({ business, isExpanded, onClick }) {
         border: `0.5px solid ${isExpanded ? borderOpen : borderRest}`,
         borderLeft: `2px solid ${business.color}`,
         borderRadius: 8,
-        padding: "8px 10px",
+        padding: "10px 12px",
         cursor: "pointer",
         textAlign: "left",
         fontFamily: "inherit",
         display: "flex",
         flexDirection: "column",
-        gap: 2,
-        minHeight: 64,
+        gap: 4,
+        minHeight: 56,
       }}
     >
       <div
         style={{
-          fontSize: 12,
-          fontWeight: 500,
+          fontSize: 13,
+          fontWeight: 600,
           color: C.text,
           whiteSpace: "nowrap",
           overflow: "hidden",
@@ -73,20 +74,7 @@ function BusinessTile({ business, isExpanded, onClick }) {
       </div>
       <div
         style={{
-          fontSize: 13,
-          fontWeight: 500,
-          color: C.text,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {business.value}
-      </div>
-      <div
-        style={{
-          fontSize: 10,
+          fontSize: 11,
           color: C.textTertiary,
           whiteSpace: "nowrap",
           overflow: "hidden",
@@ -130,7 +118,9 @@ function TodoList({ business, setState }) {
 
   // Star toggle on a Work todo. Turning ON the star pushes the task into
   // the next empty Top 3 slot (no-op if all 3 are full); turning it OFF
-  // removes any matching Top 3 row.
+  // removes any matching Top 3 row. The business name is stored on the
+  // topThree item so the chip on the dashboard can read "Sears Melvin"
+  // (specific work project) instead of just "Work".
   const toggleStar = (todo) => {
     const willBeStarred = !todo.starred;
     setState((s) => {
@@ -140,14 +130,20 @@ function TodoList({ business, setState }) {
         if (empty !== -1) {
           topThree = topThree.map((it, i) =>
             i === empty
-              ? { ...it, title: todo.title, projectKey: "work", done: false }
+              ? {
+                  ...it,
+                  title: todo.title,
+                  projectKey: "work",
+                  business: business.name,
+                  done: false,
+                }
               : it
           );
         }
       } else if (!willBeStarred) {
         topThree = topThree.map((it) =>
           it.projectKey === "work" && it.title === todo.title
-            ? { ...it, title: "", projectKey: null, done: false }
+            ? { ...it, title: "", projectKey: null, business: null, done: false }
             : it
         );
       }

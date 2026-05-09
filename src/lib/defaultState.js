@@ -3,7 +3,7 @@
 // Schema is the contract: additive changes only. Renames break things.
 // `migrate()` in storage.js upgrades older blobs in place.
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,
@@ -71,27 +71,29 @@ export const defaultState = {
           { label: "Bodyweight back under 82kg" },
         ]),
       ],
-      markers: {
-        weight: [
-          { date: "2026-05-03", kg: 80.8 },
-          { date: "2026-05-04", kg: 80.5 },
-          { date: "2026-05-05", kg: 80.2 },
-          { date: "2026-05-06", kg: 80.0 },
-          { date: "2026-05-07", kg: 79.6 },
-          { date: "2026-05-08", kg: 79.3 },
-          { date: "2026-05-09", kg: 79.1 },
-        ],
-        sleep: [],
-        training: [],
-        waist: [
-          { date: "2026-05-09", value: 90 },
-        ],
-      },
-      lifts: [
-        { name: "Squat", lastValue: 100, pr: 110, date: "2026-04-12" },
-        { name: "Bench", lastValue: 80, pr: 85, date: "2026-04-15" },
-        { name: "Deadlift", lastValue: 140, pr: 150, date: "2026-04-10" },
+      // Flat structure consumed by HealthProject. v3→v4 migration moves any
+      // legacy `markers.{weight,waist}` into here and converts waist's old
+      // `value` field to `cm`.
+      weight: [
+        { date: "2026-05-03", kg: 80.8 },
+        { date: "2026-05-04", kg: 80.5 },
+        { date: "2026-05-05", kg: 80.2 },
+        { date: "2026-05-06", kg: 80.0 },
+        { date: "2026-05-07", kg: 79.6 },
+        { date: "2026-05-08", kg: 79.3 },
+        { date: "2026-05-09", kg: 79.1 },
       ],
+      waist: [
+        { date: "2026-05-09", cm: 90 },
+      ],
+      food: [],
+      targets: {
+        weightKg: 78,
+        waistCm: 85,
+        calories: 2200,
+        proteinG: 160,
+        direction: "cut",
+      },
     },
 
     finance: {

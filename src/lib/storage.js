@@ -28,10 +28,26 @@ export function migrate(raw) {
 
   if (v < 2) s = migrateV1toV2(s);
   if (v < 3) s = migrateV2toV3(s);
+  if (v < 4) s = migrateV3toV4(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
   s.schemaVersion = SCHEMA_VERSION;
+
+  // Run regardless of source version: drop food images older than 30 days so
+  // localStorage stays under quota. Macros + text + date all stay forever;
+  // only the base64 image data gets cleared.
+  if (s.projects?.health?.food?.length) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffISO = cutoff.toISOString().slice(0, 10);
+    s.projects.health.food = s.projects.health.food.map((entry) =>
+      entry.images?.length && entry.date < cutoffISO
+        ? { ...entry, images: [] }
+        : entry
+    );
+  }
+
   return s;
 }
 
@@ -217,6 +233,56 @@ function migrateV2toV3(s) {
     const custom = updated.filter((b) => !order.includes(b.key));
     work.businesses = [...known, ...custom];
   }
+
+  return out;
+}
+
+// v3 → v4: Health redesign.
+// - Flatten `projects.health.markers.{weight,waist}` to top-level
+//   `projects.health.{weight,waist}`.
+// - Convert legacy waist `{date, value}` → `{date, cm}`.
+// - Drop the unused `markers.{sleep,training}` and `lifts` arrays.
+// - Ensure `food: []` and `targets: {...}` exist.
+function migrateV3toV4(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  const h = out.projects?.health;
+  if (!h) return out;
+
+  if (h.markers) {
+    if (!h.weight && Array.isArray(h.markers.weight)) {
+      h.weight = h.markers.weight;
+    }
+    if (!h.waist && Array.isArray(h.markers.waist)) {
+      h.waist = h.markers.waist.map((row) => ({
+        date: row.date,
+        cm: typeof row.cm === "number" ? row.cm : (row.value ?? 0),
+      }));
+    }
+    delete h.markers;
+  }
+
+  // Backfill any waist row that still uses {date, value} shape.
+  if (Array.isArray(h.waist)) {
+    h.waist = h.waist.map((row) =>
+      row.cm == null && row.value != null
+        ? { date: row.date, cm: row.value }
+        : row
+    );
+  }
+
+  if (!Array.isArray(h.food)) h.food = [];
+  if (!h.targets || typeof h.targets !== "object") {
+    h.targets = {
+      weightKg: 78,
+      waistCm: 85,
+      calories: 2200,
+      proteinG: 160,
+      direction: "cut",
+    };
+  }
+
+  // Drop fields the new component doesn't render. Schema cleanliness.
+  delete h.lifts;
 
   return out;
 }

@@ -185,6 +185,39 @@ function migrateV2toV3(s) {
   delete fin.taxTimeline;
   delete fin.displaySettings;
 
+  // Work businesses: reorder to (unify, searsMelvin, churchill, boddy) and
+  // refresh name/value/meta IF they still match the v2 defaults (i.e. user
+  // has not customised them). User-added businesses with non-standard keys
+  // are preserved at the end. Also ensures a `todos: []` array exists.
+  const work = out.projects?.work;
+  if (work?.businesses) {
+    const v2Defaults = {
+      searsMelvin: { name: "Sears Melvin", value: "£3,240", meta: "2 orders · 5 enquiries" },
+      churchill: { name: "Churchill", value: "£18,420", meta: "14 orders · 6 permits pending" },
+      boddy: { name: "BODDY", value: "CHF 84k", meta: "12 deals · 3 close this week" },
+      unify: { name: "Unify Digital", value: "Mason App", meta: "65% to launch" },
+    };
+    const v3Updates = {
+      unify: { name: "Unify Digital", value: "£8,343", meta: "Mason App · 65% to launch" },
+      searsMelvin: { name: "Sears Melvin", value: "0 orders", meta: "5 enquiries" },
+      churchill: { name: "Churchill Memorials", value: "£5,800", meta: "14 orders · 6 permits pending" },
+      boddy: { name: "BODDY", value: "Support team", meta: "12 deals · 3 close this week" },
+    };
+    const matchesOld = (b) => {
+      const old = v2Defaults[b.key];
+      return old && b.name === old.name && b.value === old.value && b.meta === old.meta;
+    };
+    const updated = work.businesses.map((b) => {
+      const next = v3Updates[b.key];
+      const refreshed = next && matchesOld(b) ? { ...b, ...next } : b;
+      return { ...refreshed, todos: refreshed.todos || [] };
+    });
+    const order = ["unify", "searsMelvin", "churchill", "boddy"];
+    const known = order.map((k) => updated.find((b) => b.key === k)).filter(Boolean);
+    const custom = updated.filter((b) => !order.includes(b.key));
+    work.businesses = [...known, ...custom];
+  }
+
   return out;
 }
 

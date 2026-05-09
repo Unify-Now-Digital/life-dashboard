@@ -33,31 +33,17 @@ function makeTodoHandlers(setState, businessId) {
   };
 }
 
-// Single business tile. Compact horizontal card. When expanded by the parent,
-// caller renders a TodoList directly underneath the row.
-function BusinessTile({ business, setState, isExpanded, onClick }) {
-  const update = (patch) =>
-    setState((s) => ({
-      ...s,
-      projects: {
-        ...s.projects,
-        work: {
-          ...s.projects.work,
-          businesses: s.projects.work.businesses.map((b) =>
-            b.id === business.id ? { ...b, ...patch } : b
-          ),
-        },
-      },
-    }));
+// Single business tile. Compact horizontal card. Read-only display; tap to
+// expand. Editable name/value/meta lives in the expansion below — keeps the
+// tile click-target clean so the expansion always switches.
+function BusinessTile({ business, isExpanded, onClick }) {
   const bgRest = tint(business.color, 0.06);
   const bgOpen = tint(business.color, 0.12);
   const borderRest = tint(business.color, 0.25);
   const borderOpen = tint(business.color, 0.6);
   return (
-    <div
+    <button
       onClick={onClick}
-      role="button"
-      tabIndex={0}
       style={{
         background: isExpanded ? bgOpen : bgRest,
         border: `0.5px solid ${isExpanded ? borderOpen : borderRest}`,
@@ -65,6 +51,8 @@ function BusinessTile({ business, setState, isExpanded, onClick }) {
         borderRadius: 8,
         padding: "8px 10px",
         cursor: "pointer",
+        textAlign: "left",
+        fontFamily: "inherit",
         display: "flex",
         flexDirection: "column",
         gap: 2,
@@ -80,43 +68,58 @@ function BusinessTile({ business, setState, isExpanded, onClick }) {
           overflow: "hidden",
           textOverflow: "ellipsis",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <EditableText
-          value={business.name}
-          onChange={(v) => update({ name: v })}
-          style={{ fontSize: 12, fontWeight: 500 }}
-        />
+        {business.name}
       </div>
       <div
-        style={{ fontSize: 13, fontWeight: 500, color: C.text, fontVariantNumeric: "tabular-nums" }}
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 13,
+          fontWeight: 500,
+          color: C.text,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
       >
-        <EditableText
-          value={business.value}
-          onChange={(v) => update({ value: v })}
-          style={{ fontSize: 13, fontWeight: 500 }}
-        />
+        {business.value}
       </div>
       <div
-        style={{ fontSize: 10, color: C.textTertiary }}
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 10,
+          color: C.textTertiary,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
       >
-        <EditableText
-          value={business.meta}
-          onChange={(v) => update({ meta: v })}
-          style={{ fontSize: 10 }}
-        />
+        {business.meta}
       </div>
-    </div>
+    </button>
   );
 }
 
 function TodoList({ business, setState }) {
   const handlers = makeTodoHandlers(setState, business.id);
   const todos = business.todos || [];
+  // Patch business meta (name/value/meta) directly from the expansion so
+  // the tile stays a clean click-target.
+  const updateBusiness = (patch) =>
+    setState((s) => ({
+      ...s,
+      projects: {
+        ...s.projects,
+        work: {
+          ...s.projects.work,
+          businesses: s.projects.work.businesses.map((b) =>
+            b.id === business.id ? { ...b, ...patch } : b
+          ),
+        },
+      },
+    }));
   return (
     <div
+      key={business.id}
       style={{
         background: tint(business.color, 0.04),
         border: `0.5px dashed ${tint(business.color, 0.35)}`,
@@ -132,10 +135,63 @@ function TodoList({ business, setState }) {
           color: C.textTertiary,
           letterSpacing: "0.05em",
           textTransform: "uppercase",
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
-        {business.name} · tasks
+        {business.name} · edit
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 4,
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 500, color: C.text, flex: 1 }}>
+          <EditableText
+            value={business.name}
+            onChange={(v) => updateBusiness({ name: v })}
+            style={{ fontSize: 14, fontWeight: 500 }}
+          />
+        </span>
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: C.text,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <EditableText
+            value={business.value}
+            onChange={(v) => updateBusiness({ value: v })}
+            style={{ fontSize: 14, fontWeight: 500 }}
+          />
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: C.textSecondary, marginBottom: 10 }}>
+        <EditableText
+          value={business.meta}
+          onChange={(v) => updateBusiness({ meta: v })}
+          placeholder="meta"
+          style={{ fontSize: 11 }}
+        />
+      </div>
+
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 500,
+          color: C.textTertiary,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          marginBottom: 6,
+          paddingTop: 6,
+          borderTop: `0.5px solid ${C.border}`,
+        }}
+      >
+        Tasks
       </div>
 
       {todos.length === 0 && (
@@ -277,7 +333,6 @@ export default function WorkProject({ state, setState, meta, onClose, goalHandle
           <BusinessTile
             key={b.id}
             business={b}
-            setState={setState}
             isExpanded={expandedId === b.id}
             onClick={() => setExpandedId(expandedId === b.id ? null : b.id)}
           />

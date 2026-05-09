@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { C, CHIP_STYLES, styles } from "../lib/tokens";
+import { C, CHIP_STYLES } from "../lib/tokens";
+import SectionShell, { SystemIcon } from "./SectionShell.jsx";
 import "./Calendar.css";
 
 // Calendar — three views (list / week / quarter) over a single event source.
@@ -525,69 +526,29 @@ export default function Calendar({ state, onOpenProject }) {
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState("fortnight");
   const { dated, free } = collectEvents(state);
+  const total = dated.length + free.length;
 
   return (
-    <div style={styles.card}>
-      <div
-        style={{
-          ...styles.sectionH,
-          margin: open ? "0 0 8px 0" : 0,
-        }}
-      >
-        <span>
-          Calendar <span style={styles.sectionSub}>· {dated.length + free.length} upcoming</span>
-        </span>
-        <button
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          style={{
-            background: open ? C.accent : "transparent",
-            color: open ? "#fff" : C.accent,
-            border: `1px solid ${C.accent}`,
-            borderRadius: 999,
-            padding: "4px 12px",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.02em",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            minHeight: 28,
-          }}
-        >
-          {open ? "Collapse" : "Expand"}
-          <span
-            aria-hidden="true"
-            style={{
-              fontSize: 10,
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.15s",
-              display: "inline-block",
-            }}
-          >
-            ▾
-          </span>
-        </button>
+    <SectionShell
+      icon={<SystemIcon kind="calendar" color={C.accent} size={18} />}
+      label="Calendar"
+      color={C.accent}
+      meta={`${total} upcoming`}
+      expanded={open}
+      onToggle={() => setOpen(!open)}
+    >
+      <div style={{ marginBottom: 8 }}>
+        <Tabs tab={tab} setTab={setTab} />
       </div>
-
-      {open && (
-        <>
-          <div style={{ marginBottom: 8 }}>
-            <Tabs tab={tab} setTab={setTab} />
-          </div>
-          {tab === "fortnight" && (
-            <FortnightView dated={dated} onOpenProject={onOpenProject} />
-          )}
-          {tab === "list" && (
-            <ListView dated={dated} free={free} onOpenProject={onOpenProject} />
-          )}
-          {tab === "quarter" && (
-            <QuarterView dated={dated} onOpenProject={onOpenProject} />
-          )}
-        </>
+      {tab === "fortnight" && (
+        <FortnightView dated={dated} onOpenProject={onOpenProject} />
       )}
-    </div>
+      {tab === "list" && (
+        <ListView dated={dated} free={free} onOpenProject={onOpenProject} />
+      )}
+      {tab === "quarter" && (
+        <QuarterView dated={dated} onOpenProject={onOpenProject} />
+      )}
+    </SectionShell>
   );
 }

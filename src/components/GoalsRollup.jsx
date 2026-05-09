@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { C, styles } from "../lib/tokens";
+import { C } from "../lib/tokens";
+import SectionShell, { SystemIcon } from "./SectionShell.jsx";
 
 // Read-only roll-up of every goal across every project. Derived from the
 // project structure — to change a goal, open the project page.
@@ -27,90 +28,54 @@ export default function GoalsRollup({ state, onOpenProject }) {
     return acc + (denom > 0 && done >= denom ? 1 : 0);
   }, 0);
 
-  return (
-    <div style={styles.card}>
-      <div style={{ ...styles.sectionH, margin: 0 }}>
-        <span>
-          Objectives{" "}
-          <span style={styles.sectionSub}>
-            {total === 0 ? "none yet" : `${completed}/${total} complete`}
-          </span>
-        </span>
-        <button
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          style={{
-            background: open ? C.accent : "transparent",
-            color: open ? "#fff" : C.accent,
-            border: `1px solid ${C.accent}`,
-            borderRadius: 999,
-            padding: "4px 12px",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.02em",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            minHeight: 28,
-          }}
-        >
-          {open ? "Collapse" : "Expand"}
-          <span
-            aria-hidden="true"
-            style={{
-              fontSize: 10,
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.15s",
-              display: "inline-block",
-            }}
-          >
-            ▾
-          </span>
-        </button>
-      </div>
+  const meta =
+    total === 0 ? "none yet" : `${completed}/${total} complete`;
 
-      {open && (
-        <div style={{ marginTop: 12 }}>
-          {all.length === 0 ? (
-            <div style={{ fontSize: 12, color: C.textTertiary, padding: "8px 0" }}>
-              No goals yet. Open a project to add one.
-            </div>
-          ) : (
-            all.map(({ projectKey, goal }, i) => {
-              const totalP = goal.priorities?.length || 0;
-              const done = goal.priorities?.filter((p) => p.done).length || 0;
-              const denominator = goal.target ?? totalP;
-              const pct = denominator > 0 ? Math.min(100, Math.round((done / denominator) * 100)) : 0;
-              return (
-                <div
-                  key={`${projectKey}-${goal.id}`}
-                  onClick={() => onOpenProject(projectKey.split(":")[0])}
-                  style={{
-                    padding: "10px 0",
-                    borderBottom: i < all.length - 1 ? `0.5px solid ${C.border}` : "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 13 }}>{goal.label}</span>
-                    <span style={{ fontSize: 12, color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
-                      {done}/{denominator || 0}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 2 }}>
-                    {projectKey.replace(":", " · ")}
-                  </div>
-                  <div style={{ height: 3, background: C.bgTertiary, borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: C.accent }} />
-                  </div>
-                </div>
-              );
-            })
-          )}
+  return (
+    <SectionShell
+      icon={<SystemIcon kind="objectives" color={C.accent} size={18} />}
+      label="Objectives"
+      color={C.accent}
+      meta={meta}
+      expanded={open}
+      onToggle={() => setOpen(!open)}
+    >
+      {all.length === 0 ? (
+        <div style={{ fontSize: 12, color: C.textTertiary, padding: "8px 0" }}>
+          No goals yet. Open a project to add one.
         </div>
+      ) : (
+        all.map(({ projectKey, goal }, i) => {
+          const totalP = goal.priorities?.length || 0;
+          const done = goal.priorities?.filter((p) => p.done).length || 0;
+          const denominator = goal.target ?? totalP;
+          const pct = denominator > 0 ? Math.min(100, Math.round((done / denominator) * 100)) : 0;
+          return (
+            <div
+              key={`${projectKey}-${goal.id}`}
+              onClick={() => onOpenProject(projectKey.split(":")[0])}
+              style={{
+                padding: "10px 0",
+                borderBottom: i < all.length - 1 ? `0.5px solid ${C.border}` : "none",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 13 }}>{goal.label}</span>
+                <span style={{ fontSize: 12, color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+                  {done}/{denominator || 0}
+                </span>
+              </div>
+              <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 2 }}>
+                {projectKey.replace(":", " · ")}
+              </div>
+              <div style={{ height: 3, background: C.bgTertiary, borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: C.accent }} />
+              </div>
+            </div>
+          );
+        })
       )}
-    </div>
+    </SectionShell>
   );
 }

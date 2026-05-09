@@ -117,17 +117,32 @@ function deltaBlock({ value, sub, accent, sparkline }) {
 }
 
 function deltaHealth(state, meta) {
-  const w = state.projects?.health?.markers?.weight || [];
+  const h = state.projects?.health || {};
+  // v4 stores weight at health.weight; older blobs may still have it under
+  // markers.weight before migration runs.
+  const w = h.weight || h.markers?.weight || [];
   if (w.length === 0) return deltaBlock({ value: "—", sub: "no weight logged" });
-  const last = w[w.length - 1].kg;
-  const prev = w.length > 1 ? w[w.length - 2].kg : null;
-  const diff = prev != null ? last - prev : null;
+  // Sort ascending by date to be safe — entries can land out of order.
+  const sorted = [...w].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const last = sorted[sorted.length - 1].kg;
+  // Weekly Δ — closest entry on or before 7 days ago.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 7);
+  const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  const ref = [...sorted].reverse().find((r) => (r.date || "") <= cutoffISO) || sorted[0];
+  const diff = ref && ref.date !== sorted[sorted.length - 1].date ? +(last - ref.kg).toFixed(1) : null;
   const arrow = diff == null ? "" : diff < 0 ? "↓" : diff > 0 ? "↑" : "·";
-  const diffStr = diff == null ? "" : `${arrow}${Math.abs(diff).toFixed(1)}`;
-  const series = w.slice(-7).map((r) => r.kg);
+  const diffStr = diff == null ? "" : `${arrow}${Math.abs(diff).toFixed(1)} / wk`;
+  const series = sorted.slice(-7).map((r) => r.kg);
+  // Optional waist line — show if available.
+  const waist = (h.waist || []).slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const waistLast = waist[waist.length - 1]?.cm;
+  const waistLine = waistLast != null ? ` · waist ${waistLast} cm` : "";
   return deltaBlock({
-    value: `${last.toFixed(1)} kg ${diffStr}`,
-    sub: `${w.length} entries · last 7d`,
+    value: `${last.toFixed(1)} kg ${diffStr}`.trim(),
+    sub: `${w.length} entries${waistLine}`,
     accent: diff == null ? C.text : diff < 0 ? C.success : C.danger,
     sparkline: <Sparkline values={series} color={meta.color} />,
   });

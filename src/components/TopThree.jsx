@@ -1,7 +1,10 @@
 import React from "react";
-import { C, styles, tint } from "../lib/tokens";
+import { C, tint } from "../lib/tokens";
 import { EditableText } from "./Editable.jsx";
 import { PROJECT_META } from "./Projects.jsx";
+import SectionShell, { SystemIcon } from "./SectionShell.jsx";
+
+const TOP3_COLOR = "#BA7517"; // amber — "top priority" accent.
 
 // Pad the topThree array to exactly 3 entries.
 function ensureLength3(list) {
@@ -123,18 +126,18 @@ export default function TopThree({ state, setState, onOpenProject }) {
     update(idx, { title: "", projectKey: null, business: null, done: false });
 
   const filledCount = slots.filter((s) => (s.title || "").trim()).length;
+  const meta =
+    filledCount === 0
+      ? "tap to type a priority, or star a Work task"
+      : `${slots.filter((s) => s.done).length} of ${filledCount} done`;
 
   return (
-    <div style={styles.card}>
-      <div style={styles.sectionH}>
-        Today's top 3
-        <span style={styles.sectionSub}>
-          {filledCount === 0
-            ? "tap to type a priority, or star a Work task"
-            : `${slots.filter((s) => s.done).length} of ${filledCount} done`}
-        </span>
-      </div>
-
+    <SectionShell
+      icon={<SystemIcon kind="top3" color={TOP3_COLOR} size={18} />}
+      label="Today's top 3"
+      color={TOP3_COLOR}
+      meta={meta}
+    >
       {slots.map((slot, i) => {
         const filled = (slot.title || "").trim().length > 0;
         const meta = slot.projectKey ? PROJECT_META.find((m) => m.key === slot.projectKey) : null;
@@ -241,6 +244,6 @@ export default function TopThree({ state, setState, onOpenProject }) {
           </div>
         );
       })}
-    </div>
+    </SectionShell>
   );
 }

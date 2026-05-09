@@ -15,6 +15,7 @@ import Calendar from "./components/Calendar.jsx";
 import Projects, { PROJECT_META } from "./components/Projects.jsx";
 import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
 import JumpNav from "./components/JumpNav.jsx";
+import SectionShell from "./components/SectionShell.jsx";
 
 // Projects that get always-rendered sections in the main column, in display
 // order beneath the Calendar. Outer card is white with a coloured
@@ -31,47 +32,6 @@ const SECTIONS = [
 ];
 const SECTION_KEYS = SECTIONS.map((s) => s.key);
 
-// Shared prominent toggle — a bordered chip with a chevron. Used by
-// MainSection (and similar styling lives in Calendar / Objectives so the
-// affordance feels consistent across the dashboard).
-function SectionToggle({ expanded, onClick, color }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-expanded={expanded}
-      title={expanded ? "Collapse" : "Expand"}
-      style={{
-        background: expanded ? color : "transparent",
-        color: expanded ? "#fff" : color,
-        border: `1px solid ${color}`,
-        borderRadius: 999,
-        padding: "4px 12px",
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "0.02em",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        minHeight: 28,
-      }}
-    >
-      {expanded ? "Collapse" : "Expand"}
-      <span
-        aria-hidden="true"
-        style={{
-          fontSize: 10,
-          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-          transition: "transform 0.15s",
-          display: "inline-block",
-        }}
-      >
-        ▾
-      </span>
-    </button>
-  );
-}
 
 // Inline SVG icon per project. Used as the section identifier instead of a
 // text label so the MainSection header takes minimal vertical space.
@@ -171,50 +131,22 @@ function MainSection({ projectKey, expanded, onToggle, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   const color = meta?.color || C.accent;
   return (
-    <div
+    <SectionShell
       id={`section-${projectKey}`}
-      style={{
-        background: C.bg, // outer is white; subcards inside carry the tint
-        border: `0.5px solid ${C.border}`,
-        borderLeft: `3px solid ${color}`,
-        borderRadius: 10,
-        padding: "10px 12px",
-      }}
+      icon={<ProjectIcon projectKey={projectKey} color={color} size={18} />}
+      label={meta?.label || projectKey}
+      color={color}
+      expanded={expanded}
+      onToggle={onToggle}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          marginBottom: expanded ? 8 : 0,
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ProjectIcon projectKey={projectKey} color={color} size={18} />
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color,
-              letterSpacing: "0.01em",
-            }}
-          >
-            {meta?.label || projectKey}
-          </span>
-        </span>
-        <SectionToggle expanded={expanded} onClick={onToggle} color={color} />
-      </div>
-      {expanded && (
-        <ProjectDrilldown
-          projectKey={projectKey}
-          state={state}
-          setState={setState}
-          onClose={onToggle}
-          embedded
-        />
-      )}
-    </div>
+      <ProjectDrilldown
+        projectKey={projectKey}
+        state={state}
+        setState={setState}
+        onClose={onToggle}
+        embedded
+      />
+    </SectionShell>
   );
 }
 

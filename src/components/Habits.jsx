@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { C, styles } from "../lib/tokens";
+import { C } from "../lib/tokens";
 import HabitRing from "./HabitRing.jsx";
 import HabitConfirm from "./HabitConfirm.jsx";
+import SectionShell, { SystemIcon } from "./SectionShell.jsx";
 import { isoYesterday, isoDate, statusFor, streakFor, hasUnanswered } from "../lib/habits";
 import "./Habits.css";
 
@@ -17,6 +18,7 @@ const HABITS = [
 
 const STRIP_DAYS = 21;
 const DOW_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
+const HABITS_COLOR = "#3B6D11"; // green — same family as Health, distinct row.
 
 // Today at local midnight.
 function startOfToday() {
@@ -51,37 +53,45 @@ function hitsInPeriod(habit, habitLog, days) {
 export default function Habits({ habitLog, habitNoLog, onConfirm }) {
   const [expanded, setExpanded] = useState(false);
   const [pop, setPop] = useState(null); // { habit, dateISO, x, y }
-  const [confirmOpen, setConfirmOpen] = useState(null); // habit key for big confirm modal
+  const [confirmOpen, setConfirmOpen] = useState(null);
   const yesISO = isoYesterday();
   const anyUnanswered = HABITS.some((h) => hasUnanswered(h.key, habitLog, habitNoLog));
+  const meta = expanded
+    ? "last 21 days"
+    : anyUnanswered
+    ? "tap a ring to confirm yesterday"
+    : "all caught up";
 
-  // ---- Compact (default) view --------------------------------------------
-  if (!expanded) {
-    return (
-      <div style={styles.card}>
-        <div style={styles.sectionH}>
-          <span>
-            Habits{" "}
-            <span style={styles.sectionSub}>
-              · {anyUnanswered ? "tap a ring to confirm yesterday" : "all caught up"}
-            </span>
-          </span>
-          <button
-            onClick={() => setExpanded(true)}
-            style={{
-              background: "transparent",
-              border: `0.5px solid ${C.border}`,
-              borderRadius: 4,
-              padding: "3px 8px",
-              fontSize: 10,
-              color: C.textSecondary,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            expand ▾
-          </button>
-        </div>
+  const dates = stripDates();
+
+  const openPop = (habitKey, date, evt) => {
+    const rect = evt.currentTarget.getBoundingClientRect();
+    setPop({
+      habit: habitKey,
+      dateISO: isoDate(date),
+      x: Math.min(window.innerWidth - 220, rect.left + rect.width / 2 - 100),
+      y: rect.bottom + 6,
+    });
+  };
+
+  const answer = (val) => {
+    if (!pop) return;
+    onConfirm(pop.habit, pop.dateISO, val);
+    setPop(null);
+  };
+
+  return (
+    <SectionShell
+      icon={<SystemIcon kind="habits" color={HABITS_COLOR} size={18} />}
+      label="Habits"
+      color={HABITS_COLOR}
+      meta={meta}
+      // Click row toggles between compact rings (collapsed) and the full
+      // 21-day grid view (expanded).
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+    >
+      {!expanded ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {HABITS.map((h) => {
             const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
@@ -106,196 +116,136 @@ export default function Habits({ habitLog, habitNoLog, onConfirm }) {
             );
           })}
         </div>
-
-        {confirmOpen && (
-          <HabitConfirm
-            label={HABITS.find((h) => h.key === confirmOpen).label}
-            status={statusFor(confirmOpen, yesISO, habitLog, habitNoLog)}
-            onAnswer={(answer) => {
-              onConfirm(confirmOpen, yesISO, answer);
-              setConfirmOpen(null);
-            }}
-            onClose={() => setConfirmOpen(null)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // ---- Expanded (row-based) view -----------------------------------------
-  const dates = stripDates();
-  const today = dates[dates.length - 1];
-
-  const openPop = (habitKey, date, evt) => {
-    const rect = evt.currentTarget.getBoundingClientRect();
-    setPop({
-      habit: habitKey,
-      dateISO: isoDate(date),
-      x: Math.min(window.innerWidth - 220, rect.left + rect.width / 2 - 100),
-      y: rect.bottom + 6,
-    });
-  };
-
-  const answer = (val) => {
-    if (!pop) return;
-    onConfirm(pop.habit, pop.dateISO, val); // val: "yes" | "no" | "clear"
-    setPop(null);
-  };
-
-  return (
-    <div className="habit-card">
-      <div className="habit-h">
-        <span className="habit-title">
-          Habits <span className="habit-sub">· last 21 days</span>
-        </span>
-        <button
-          onClick={() => setExpanded(false)}
-          style={{
-            background: "transparent",
-            border: `0.5px solid ${C.border}`,
-            borderRadius: 4,
-            padding: "3px 8px",
-            fontSize: 10,
-            color: C.textSecondary,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          collapse ▴
-        </button>
-      </div>
-
-      {/* Day-of-week header strip */}
-      <div className="habit-dow-strip">
-        <div /> {/* ring col */}
-        <div /> {/* name col */}
-        <div className="habit-dow-cells">
-          {dates.map((d, i) => (
-            <div key={i} className="habit-dow-mark">
-              {DOW_LETTERS[d.getDay()]}
-            </div>
-          ))}
-        </div>
-        <div className="habit-dow-rh">Streak</div>
-        <div className="habit-dow-rh">Goal</div>
-      </div>
-
-      {/* Rows */}
-      <div className="habit-rows">
-        {HABITS.map((h) => {
-          const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
-          const streak = streakFor(h.key, habitLog, habitNoLog);
-          const ringPulse = status === "unanswered";
-          const hits = hitsInPeriod(h.key, habitLog, h.period);
-          const delta = hits - h.target;
-          const goalCls =
-            delta > 0 ? "habit-goal-above" : delta < 0 ? "habit-goal-below" : "habit-goal-ontrack";
-          const deltaStr = delta > 0 ? `+${delta}` : `${delta}`;
-
-          return (
-            <div key={h.key} className="habit-row">
-              {/* Ring (uses HabitRing for the icon + progress arc) */}
-              <div className={ringPulse ? "habit-ring-pulse" : ""}>
-                <HabitRing
-                  habit={h.key}
-                  status={status}
-                  streak={streak}
-                  size={36}
-                  onClick={() => setConfirmOpen(h.key)}
-                />
-              </div>
-
-              {/* Name + sub */}
-              <div className="habit-name-col">
-                <div className="habit-name">{h.label}</div>
-                <div className="habit-name-sub">{h.sub}</div>
-              </div>
-
-              {/* 21-day strip */}
-              <div className="habit-strip-wrap">
-                {dates.map((d, i) => {
-                  const iso = isoDate(d);
-                  const s = statusFor(h.key, iso, habitLog, habitNoLog);
-                  const isToday = i === STRIP_DAYS - 1;
-                  const cls = [
-                    "habit-cell",
-                    s === "yes" ? "habit-cell-hit" : "",
-                    s === "no" ? "habit-cell-miss" : "",
-                    isToday ? "habit-cell-today" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
-                  return (
-                    <button
-                      key={iso}
-                      className={cls}
-                      title={`${iso} — ${s}`}
-                      onClick={(evt) => openPop(h.key, d, evt)}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Streak */}
-              <div className={`habit-streak${streak === 0 ? " habit-streak-zero" : ""}`}>
-                <div className="habit-streak-num">{streak}</div>
-                <div className="habit-streak-lbl">day streak</div>
-              </div>
-
-              {/* Goal delta */}
-              <div className="habit-goal">
-                <div className={`habit-goal-delta ${goalCls}`}>
-                  {hits}/{h.target} {delta !== 0 && `(${deltaStr})`}
-                </div>
-                <div className="habit-goal-target">last {h.period}d</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer */}
-      <div className="habit-footer">
-        <div className="habit-legend">
-          <span className="habit-legend-item">
-            <span className="habit-legend-sw" style={{ background: C.accent }} />
-            hit
-          </span>
-          <span className="habit-legend-item">
-            <span className="habit-legend-sw habit-legend-miss" />
-            miss
-          </span>
-          <span className="habit-legend-item">
-            <span className="habit-legend-sw habit-legend-today" />
-            today
-          </span>
-        </div>
-        <span className="habit-footer-hint">tap any cell to backfill</span>
-      </div>
-
-      {/* Backfill popover */}
-      {pop && (
+      ) : (
         <>
-          <div className="habit-pop-overlay" onClick={() => setPop(null)} />
-          <div className="habit-pop" style={{ left: pop.x, top: pop.y }}>
-            <div className="habit-pop-title">{HABITS.find((h) => h.key === pop.habit)?.label}</div>
-            <div className="habit-pop-sub">{pop.dateISO}</div>
-            <div className="habit-pop-row">
-              <button className="habit-pop-btn habit-pop-yes" onClick={() => answer("yes")}>
-                Yes
-              </button>
-              <button className="habit-pop-btn habit-pop-no" onClick={() => answer("no")}>
-                No
-              </button>
-              <button
-                className="habit-pop-btn habit-pop-clear"
-                onClick={() => answer("clear")}
-                title="Clear answer"
-              >
-                ×
-              </button>
+          {/* Day-of-week header strip */}
+          <div className="habit-dow-strip">
+            <div /> {/* ring col */}
+            <div /> {/* name col */}
+            <div className="habit-dow-cells">
+              {dates.map((d, i) => (
+                <div key={i} className="habit-dow-mark">
+                  {DOW_LETTERS[d.getDay()]}
+                </div>
+              ))}
             </div>
+            <div className="habit-dow-rh">Streak</div>
+            <div className="habit-dow-rh">Goal</div>
           </div>
+
+          {/* Rows */}
+          <div className="habit-rows">
+            {HABITS.map((h) => {
+              const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
+              const streak = streakFor(h.key, habitLog, habitNoLog);
+              const ringPulse = status === "unanswered";
+              const hits = hitsInPeriod(h.key, habitLog, h.period);
+              const delta = hits - h.target;
+              const goalCls =
+                delta > 0 ? "habit-goal-above" : delta < 0 ? "habit-goal-below" : "habit-goal-ontrack";
+              const deltaStr = delta > 0 ? `+${delta}` : `${delta}`;
+
+              return (
+                <div key={h.key} className="habit-row">
+                  <div className={ringPulse ? "habit-ring-pulse" : ""}>
+                    <HabitRing
+                      habit={h.key}
+                      status={status}
+                      streak={streak}
+                      size={36}
+                      onClick={() => setConfirmOpen(h.key)}
+                    />
+                  </div>
+
+                  <div className="habit-name-col">
+                    <div className="habit-name">{h.label}</div>
+                    <div className="habit-name-sub">{h.sub}</div>
+                  </div>
+
+                  <div className="habit-strip-wrap">
+                    {dates.map((d, i) => {
+                      const iso = isoDate(d);
+                      const s = statusFor(h.key, iso, habitLog, habitNoLog);
+                      const isToday = i === STRIP_DAYS - 1;
+                      const cls = [
+                        "habit-cell",
+                        s === "yes" ? "habit-cell-hit" : "",
+                        s === "no" ? "habit-cell-miss" : "",
+                        isToday ? "habit-cell-today" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+                      return (
+                        <button
+                          key={iso}
+                          className={cls}
+                          title={`${iso} — ${s}`}
+                          onClick={(evt) => openPop(h.key, d, evt)}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div className={`habit-streak${streak === 0 ? " habit-streak-zero" : ""}`}>
+                    <div className="habit-streak-num">{streak}</div>
+                    <div className="habit-streak-lbl">day streak</div>
+                  </div>
+
+                  <div className="habit-goal">
+                    <div className={`habit-goal-delta ${goalCls}`}>
+                      {hits}/{h.target} {delta !== 0 && `(${deltaStr})`}
+                    </div>
+                    <div className="habit-goal-target">last {h.period}d</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="habit-footer">
+            <div className="habit-legend">
+              <span className="habit-legend-item">
+                <span className="habit-legend-sw" style={{ background: C.accent }} />
+                hit
+              </span>
+              <span className="habit-legend-item">
+                <span className="habit-legend-sw habit-legend-miss" />
+                miss
+              </span>
+              <span className="habit-legend-item">
+                <span className="habit-legend-sw habit-legend-today" />
+                today
+              </span>
+            </div>
+            <span className="habit-footer-hint">tap any cell to backfill</span>
+          </div>
+
+          {/* Backfill popover */}
+          {pop && (
+            <>
+              <div className="habit-pop-overlay" onClick={() => setPop(null)} />
+              <div className="habit-pop" style={{ left: pop.x, top: pop.y }}>
+                <div className="habit-pop-title">{HABITS.find((h) => h.key === pop.habit)?.label}</div>
+                <div className="habit-pop-sub">{pop.dateISO}</div>
+                <div className="habit-pop-row">
+                  <button className="habit-pop-btn habit-pop-yes" onClick={() => answer("yes")}>
+                    Yes
+                  </button>
+                  <button className="habit-pop-btn habit-pop-no" onClick={() => answer("no")}>
+                    No
+                  </button>
+                  <button
+                    className="habit-pop-btn habit-pop-clear"
+                    onClick={() => answer("clear")}
+                    title="Clear answer"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -311,6 +261,6 @@ export default function Habits({ habitLog, habitNoLog, onConfirm }) {
           onClose={() => setConfirmOpen(null)}
         />
       )}
-    </div>
+    </SectionShell>
   );
 }

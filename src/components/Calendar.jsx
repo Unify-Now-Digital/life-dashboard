@@ -1,12 +1,25 @@
 import React, { useState } from "react";
 import { C, CHIP_STYLES, styles } from "../lib/tokens";
+import "./Calendar.css";
 
-// Today at local midnight, returned as a Date object.
+// Calendar — three views (list / week / quarter) over a single event source.
+// Inline styles use design tokens; pseudo-elements + grab cursor live in
+// Calendar.css.
+//
+// Event sources:
+//   - state.projects.travel.trips           → ISO start date, kind="trip"
+//   - state.projects.journal.weekly[].date  → kind="prompt"
+//   - state.upcoming                        → free-text date string, list-only
+
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SHORT_MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 const startOfToday = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 };
-const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const isoDate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (d, n) => {
   const out = new Date(d);
   out.setDate(out.getDate() + n);
@@ -14,44 +27,14 @@ const addDays = (d, n) => {
 };
 const sameYMD = (a, b) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const SHORT_MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-// Pull every dated item we know about into a flat list of { date, kind, label, projectKey }.
-function collectEvents(state) {
-  const out = [];
-  // Trips
-  for (const t of state.projects?.travel?.trips || []) {
-    if (!t.start) continue;
-    out.push({
-      date: t.start,
-      kind: "trip",
-      label: `✈ ${t.name}`,
-      projectKey: "travel",
-    });
-  }
-  // Weekly review prompts (one per recorded week)
-  for (const w of state.projects?.journal?.weekly || []) {
-    const date = isoFromWeekISO(w.weekISO);
-    if (!date) continue;
-    out.push({
-      date,
-      kind: "prompt",
-      label: "Weekly review",
-      projectKey: "journal",
-    });
-  }
-  return out;
-}
-
-// Convert "2026-W19" → ISO date string for the Monday of that week.
+// Convert "2026-W19" → ISO date for that week's Monday.
 function isoFromWeekISO(weekISO) {
   if (!weekISO || typeof weekISO !== "string") return null;
   const m = weekISO.match(/^(\d{4})-W(\d{2})$/);
   if (!m) return null;
   const year = Number(m[1]);
   const week = Number(m[2]);
-  // ISO 8601: week 1 is the week containing Jan 4.
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const jan4Day = jan4.getUTCDay() || 7;
   const monday = new Date(jan4);
@@ -59,108 +42,202 @@ function isoFromWeekISO(weekISO) {
   return isoDate(monday);
 }
 
-export default function Calendar({ state, onOpenProject }) {
-  const [open, setOpen] = useState(false);
-  const today = startOfToday();
-  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
-  const events = collectEvents(state);
+// Returns the ISO Monday for the week containing `d`.
+function mondayOf(d) {
+  const day = d.getDay() || 7;
+  const m = new Date(d);
+  m.setDate(d.getDate() - (day - 1));
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
 
-  // Group events by ISO date string, drop ones earlier than today.
-  const byDate = new Map();
-  for (const e of events) {
-    const d = new Date(e.date + "T00:00:00");
-    if (d < today) continue;
-    const key = e.date;
-    if (!byDate.has(key)) byDate.set(key, []);
-    byDate.get(key).push(e);
+function weekLabel(monday) {
+  const sunday = addDays(monday, 6);
+  const sameMonth = monday.getMonth() === sunday.getMonth();
+  const a = `${SHORT_MONTH[monday.getMonth()]} ${monday.getDate()}`;
+  const b = sameMonth ? `${sunday.getDate()}` : `${SHORT_MONTH[sunday.getMonth()]} ${sunday.getDate()}`;
+  return `Week of ${a}–${b}`;
+}
+
+// Pull every dated thing into a flat list. ISO date events first; free-text
+// upcoming items returned separately so the list view can show them inline.
+function collectEvents(state) {
+  const dated = [];
+  for (const t of state.projects?.travel?.trips || []) {
+    if (!t.start) continue;
+    dated.push({
+      isoDate: t.start,
+      kind: "trip",
+      label: t.name,
+      projectKey: "travel",
+      end: t.end || null,
+    });
   }
-
-  // Items shown in the agenda list — events from byDate sorted asc, then any
-  // entries from state.upcoming (ordered as authored, since their dates are free-text).
-  const stripIsoSet = new Set(days.map(isoDate));
-  const datedAgenda = [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .flatMap(([date, items]) =>
-      items.map((it) => ({ ...it, isoDate: date, inStrip: stripIsoSet.has(date) }))
-    );
-  const upcomingItems = (state.upcoming || []).map((u) => ({
+  for (const w of state.projects?.journal?.weekly || []) {
+    const date = isoFromWeekISO(w.weekISO);
+    if (!date) continue;
+    dated.push({
+      isoDate: date,
+      kind: "prompt",
+      label: "Weekly review",
+      projectKey: "journal",
+    });
+  }
+  const free = (state.upcoming || []).map((u) => ({
     date: u.date,
     label: u.text,
-    kind: u.cat?.toLowerCase() === "fitness" ? "personal" : "personal",
+    kind: "personal",
     projectKey: null,
-    free: true,
     cat: u.cat,
   }));
+  return { dated, free };
+}
 
+// ---- Tabs ------------------------------------------------------------------
+
+function Tabs({ tab, setTab }) {
+  const items = [
+    { id: "list", label: "List" },
+    { id: "week", label: "Week" },
+    { id: "quarter", label: "Quarter" },
+  ];
   return (
-    <div style={styles.card}>
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        style={{
-          ...styles.sectionH,
-          margin: open ? "0 0 12px 0" : 0,
-          width: "100%",
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          color: "inherit",
-          textAlign: "left",
-        }}
-      >
-        <span>
-          Calendar <span style={styles.sectionSub}>next 2 weeks</span>
-        </span>
-        <span
-          aria-hidden="true"
-          style={{
-            fontSize: 11,
-            color: C.textTertiary,
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.15s",
-            display: "inline-block",
-          }}
+    <div className="cal-tabs">
+      {items.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTab(t.id)}
+          className={`cal-tab${tab === t.id ? " cal-tab-active" : ""}`}
         >
-          ▾
-        </span>
-      </button>
-
-      {!open ? null : <CalendarBody state={state} onOpenProject={onOpenProject} today={today} days={days} byDate={byDate} datedAgenda={datedAgenda} upcomingItems={upcomingItems} />}
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-function CalendarBody({ state, onOpenProject, today, days, byDate, datedAgenda, upcomingItems }) {
+// ---- List view -------------------------------------------------------------
+
+function ListView({ dated, free, onOpenProject }) {
+  const today = startOfToday();
+  // Group dated events by Monday-of-week. Then append free-text items as a
+  // single trailing "Other" group so they're not lost.
+  const groups = new Map(); // Map<isoMonday, { label, items: [] }>
+  const futureDated = dated
+    .filter((e) => new Date(e.isoDate + "T00:00:00") >= today)
+    .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+  for (const e of futureDated) {
+    const d = new Date(e.isoDate + "T00:00:00");
+    const monday = mondayOf(d);
+    const key = isoDate(monday);
+    if (!groups.has(key)) groups.set(key, { label: weekLabel(monday), items: [] });
+    groups.get(key).items.push(e);
+  }
+
   return (
-    <>
-      {/* Strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(14, 1fr)", gap: 4, marginBottom: 14 }}>
-        {days.map((d, i) => {
+    <div className="cal-list-card">
+      <div className="cal-list-scroll">
+        {[...groups.entries()].map(([key, g]) => (
+          <React.Fragment key={key}>
+            <div className="cal-week-h">{g.label}</div>
+            {g.items.map((e, i) => {
+              const d = new Date(e.isoDate + "T00:00:00");
+              const dateLabel = sameYMD(d, today)
+                ? "Today"
+                : sameYMD(d, addDays(today, 1))
+                ? "Tomorrow"
+                : `${DOW[d.getDay()]} ${SHORT_MONTH[d.getMonth()]} ${d.getDate()}`;
+              const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
+              return (
+                <div
+                  key={`${key}-${i}`}
+                  className="cal-row"
+                  onClick={e.projectKey ? () => onOpenProject(e.projectKey) : undefined}
+                  style={{ cursor: e.projectKey ? "pointer" : "default" }}
+                >
+                  <span className="cal-date-col">{dateLabel}</span>
+                  <span className="cal-title-col">{e.label}</span>
+                  <span className="cal-dot" style={{ background: chip.color }} />
+                  <span className="cal-pill" style={{ background: chip.bg, color: chip.color }}>
+                    {e.kind}
+                  </span>
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+
+        {free.length > 0 && (
+          <>
+            <div className="cal-week-h">Other</div>
+            {free.map((e, i) => {
+              const chip = CHIP_STYLES.personal;
+              return (
+                <div key={`f-${i}`} className="cal-row">
+                  <span className="cal-date-col">{e.date}</span>
+                  <span className="cal-title-col">{e.label}</span>
+                  <span className="cal-dot" style={{ background: chip.color }} />
+                  <span className="cal-pill" style={{ background: chip.bg, color: chip.color }}>
+                    {e.cat || "personal"}
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {groups.size === 0 && free.length === 0 && (
+          <div style={{ fontSize: 12, color: C.textTertiary, padding: "8px 0" }}>
+            Nothing on the calendar yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Week view (14-day horizontal Gantt strip) -----------------------------
+
+function WeekView({ dated, onOpenProject }) {
+  const today = startOfToday();
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
+  const COL_W = 40;
+
+  // Map ISO date → first event for that day (chip rendered)
+  const byDate = new Map();
+  for (const e of dated) {
+    if (!byDate.has(e.isoDate)) byDate.set(e.isoDate, []);
+    byDate.get(e.isoDate).push(e);
+  }
+
+  return (
+    <div className="cal-scroll-x" style={{ paddingBottom: 6 }}>
+      <div style={{ display: "flex", gap: 4, minWidth: COL_W * days.length }}>
+        {days.map((d) => {
           const iso = isoDate(d);
-          const dayEvents = byDate.get(iso) || [];
+          const events = byDate.get(iso) || [];
           const isToday = sameYMD(d, today);
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          const primary = dayEvents[0];
+          const primary = events[0];
           const chip = primary ? CHIP_STYLES[primary.kind] : null;
           return (
             <button
               key={iso}
               onClick={primary?.projectKey ? () => onOpenProject(primary.projectKey) : undefined}
-              title={dayEvents.map((e) => e.label).join("\n") || ""}
+              title={events.map((e) => e.label).join("\n") || ""}
               style={{
+                width: COL_W,
                 background: isToday ? C.accentLight : isWeekend ? C.bgSecondary : C.bg,
                 border: `0.5px solid ${isToday ? C.accent : C.border}`,
                 borderRadius: 6,
-                padding: "6px 0 8px",
+                padding: "5px 0 6px",
                 cursor: primary?.projectKey ? "pointer" : "default",
                 fontFamily: "inherit",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
-                minHeight: 56,
+                gap: 3,
+                flexShrink: 0,
               }}
             >
               <span style={{ fontSize: 9, color: C.textTertiary, letterSpacing: "0.04em" }}>
@@ -176,124 +253,215 @@ function CalendarBody({ state, onOpenProject, today, days, byDate, datedAgenda, 
               >
                 {d.getDate()}
               </span>
-              {dayEvents.length > 0 && (
+              {events.length > 0 && (
                 <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: chip?.color || C.accent,
-                    marginTop: 1,
-                  }}
+                  className="cal-dot"
+                  style={{ background: chip?.color || C.accent }}
                 />
               )}
-              {dayEvents.length > 1 && (
+              {events.length > 1 && (
                 <span style={{ fontSize: 9, color: C.textTertiary, marginTop: -2 }}>
-                  +{dayEvents.length - 1}
+                  +{events.length - 1}
                 </span>
               )}
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      {/* Agenda */}
-      {datedAgenda.length === 0 && upcomingItems.length === 0 ? (
-        <div style={{ fontSize: 12, color: C.textTertiary, padding: "8px 0" }}>
-          Nothing on the calendar yet.
+// ---- Quarter view (12-week horizontal Gantt with swim-lanes) --------------
+
+function QuarterView({ dated, onOpenProject }) {
+  const today = startOfToday();
+  const WEEKS = 12;
+  const DAY_W = 14;
+  const totalDays = WEEKS * 7;
+  const totalW = totalDays * DAY_W;
+
+  // Lane assignment by kind
+  const lanes = [
+    { id: "trip", label: "Travel" },
+    { id: "prompt", label: "Journal" },
+  ];
+  const eventsByLane = new Map(lanes.map((l) => [l.id, []]));
+  for (const e of dated) {
+    const start = new Date(e.isoDate + "T00:00:00");
+    const offset = Math.floor((start - today) / 86400000);
+    if (offset < 0 || offset >= totalDays) continue;
+    const end = e.end ? new Date(e.end + "T00:00:00") : null;
+    const span = end ? Math.max(1, Math.ceil((end - start) / 86400000) + 1) : 1;
+    if (!eventsByLane.has(e.kind)) continue;
+    eventsByLane.get(e.kind).push({ ...e, offset, span });
+  }
+
+  // Week separators along the top
+  const weekTicks = Array.from({ length: WEEKS }, (_, i) => {
+    const d = addDays(today, i * 7);
+    return { x: i * 7 * DAY_W, label: `${SHORT_MONTH[d.getMonth()]} ${d.getDate()}` };
+  });
+
+  return (
+    <div className="cal-scroll-x" style={{ paddingBottom: 6 }}>
+      <div style={{ width: totalW, position: "relative" }}>
+        {/* Week ticks */}
+        <div style={{ display: "flex", height: 18, position: "relative", marginBottom: 4 }}>
+          {weekTicks.map((t, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: t.x,
+                fontSize: 9,
+                color: C.textTertiary,
+                fontVariantNumeric: "tabular-nums",
+                borderLeft: `0.5px solid ${C.border}`,
+                paddingLeft: 4,
+                lineHeight: "16px",
+              }}
+            >
+              {t.label}
+            </div>
+          ))}
         </div>
-      ) : (
-        <div>
-          {datedAgenda.map((item, i) => {
-            const d = new Date(item.isoDate + "T00:00:00");
-            const dateLabel = sameYMD(d, today)
-              ? "Today"
-              : sameYMD(d, addDays(today, 1))
-              ? "Tomorrow"
-              : `${SHORT_MONTH[d.getMonth()]} ${d.getDate()}`;
-            const chip = CHIP_STYLES[item.kind] || { bg: C.bgSecondary, color: C.textSecondary };
-            return (
-              <div
-                key={`${item.isoDate}-${i}`}
-                onClick={item.projectKey ? () => onOpenProject(item.projectKey) : undefined}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "8px 0",
-                  borderBottom: `0.5px solid ${C.border}`,
-                  cursor: item.projectKey ? "pointer" : "default",
-                }}
-              >
-                <span
+
+        {/* Lanes */}
+        {lanes.map((l) => (
+          <div
+            key={l.id}
+            style={{
+              position: "relative",
+              height: 24,
+              borderTop: `0.5px solid ${C.border}`,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                position: "sticky",
+                left: 0,
+                width: 50,
+                fontSize: 10,
+                color: C.textTertiary,
+                background: C.bg,
+                paddingLeft: 2,
+                zIndex: 1,
+              }}
+            >
+              {l.label}
+            </span>
+            {eventsByLane.get(l.id).map((e, i) => {
+              const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
+              return (
+                <div
+                  key={i}
+                  onClick={e.projectKey ? () => onOpenProject(e.projectKey) : undefined}
+                  title={e.label}
                   style={{
-                    fontSize: 11,
-                    color: C.textSecondary,
-                    minWidth: 64,
-                    fontWeight: 500,
-                  }}
-                >
-                  {dateLabel}
-                </span>
-                <span style={{ fontSize: 13, flex: 1, color: C.text }}>{item.label}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    padding: "2px 8px",
-                    borderRadius: 4,
-                    fontWeight: 500,
+                    position: "absolute",
+                    left: e.offset * DAY_W + 50,
+                    width: Math.max(28, e.span * DAY_W - 2),
+                    height: 16,
                     background: chip.bg,
-                    color: chip.color,
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {item.kind}
-                </span>
-              </div>
-            );
-          })}
-          {upcomingItems.map((item, i) => {
-            const chip = CHIP_STYLES.personal;
-            return (
-              <div
-                key={`u-${i}`}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "8px 0",
-                  borderBottom:
-                    i < upcomingItems.length - 1 ? `0.5px solid ${C.border}` : "none",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: C.textSecondary,
-                    minWidth: 64,
-                    fontWeight: 500,
-                  }}
-                >
-                  {item.date}
-                </span>
-                <span style={{ fontSize: 13, flex: 1, color: C.text }}>{item.label}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    padding: "2px 8px",
+                    border: `0.5px solid ${chip.color}`,
                     borderRadius: 4,
-                    fontWeight: 500,
-                    background: chip.bg,
+                    fontSize: 10,
                     color: chip.color,
+                    fontWeight: 500,
+                    padding: "0 6px",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                    cursor: e.projectKey ? "pointer" : "default",
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  {item.cat || "Personal"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                  {e.label}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+
+        {/* Today marker */}
+        <div
+          style={{
+            position: "absolute",
+            top: 22,
+            left: 50,
+            bottom: 0,
+            width: 1,
+            background: C.accent,
+            opacity: 0.6,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---- Calendar shell --------------------------------------------------------
+
+export default function Calendar({ state, onOpenProject }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("list");
+  const { dated, free } = collectEvents(state);
+
+  return (
+    <div style={styles.card}>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          ...styles.sectionH,
+          margin: open ? "0 0 8px 0" : 0,
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "inherit",
+          textAlign: "left",
+        }}
+      >
+        <span>
+          Calendar <span style={styles.sectionSub}>· {dated.length + free.length} upcoming</span>
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 11,
+            color: C.textTertiary,
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.15s",
+            display: "inline-block",
+          }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <div style={{ marginBottom: 8 }}>
+            <Tabs tab={tab} setTab={setTab} />
+          </div>
+          {tab === "list" && (
+            <ListView dated={dated} free={free} onOpenProject={onOpenProject} />
+          )}
+          {tab === "week" && (
+            <WeekView dated={dated} onOpenProject={onOpenProject} />
+          )}
+          {tab === "quarter" && (
+            <QuarterView dated={dated} onOpenProject={onOpenProject} />
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 }

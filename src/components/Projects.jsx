@@ -139,10 +139,20 @@ function deltaFinance(state, meta) {
   const inv = (f.investments || []).reduce((a, b) => a + (b.value?.eur || 0), 0);
   const debt = (f.debts || []).reduce((a, b) => a + (b.amount?.eur || 0), 0);
   const net = sav + inv - debt;
-  const fmt = (n) => `€${Math.round(n).toLocaleString()}`;
+  const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
+  // Sparkline of last 7 weekly net-worth snapshots. Falls back to flat-line
+  // of the current value when no history seeded.
+  const history = (f.netWorthHistory || []).slice(-7).map((p) => p.eur);
+  const series = history.length >= 2 ? history : [net, net];
+  const prev = series.length > 1 ? series[series.length - 2] : null;
+  const diff = prev != null ? net - prev : null;
+  const arrow = diff == null ? "" : diff > 0 ? "↑" : diff < 0 ? "↓" : "·";
+  const diffStr = diff == null ? null : `${arrow}${fmt(Math.abs(diff))} / wk`;
   return deltaBlock({
     value: fmt(net),
-    sub: `${fmt(sav + inv)} assets · ${fmt(debt)} debt`,
+    sub: diffStr || `${fmt(sav + inv)} assets · ${fmt(debt)} debt`,
+    accent: diff == null ? C.text : diff > 0 ? C.success : C.danger,
+    sparkline: <Sparkline values={series} color={meta.color} />,
   });
 }
 
@@ -271,7 +281,7 @@ function Card({ meta, onClick, children, isOpen }) {
         border: `0.5px solid ${isOpen ? borderOpen : borderRest}`,
         borderLeft: `2px solid ${meta.color}`,
         borderRadius: 8,
-        padding: "12px 14px",
+        padding: "8px 10px",
         cursor: "pointer",
         textAlign: "left",
         fontFamily: "inherit",

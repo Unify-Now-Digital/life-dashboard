@@ -31,10 +31,9 @@ function useIsDesktop(breakpoint = 860) {
 export default function Dashboard() {
   const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
   const isDesktop = useIsDesktop();
-  // Default the open drilldown to Work so the most-used project is visible
-  // immediately under Top 3 on first paint. Click another card to swap; only
-  // one drilldown can be expanded at a time.
-  const [openProject, setOpenProject] = useState("work");
+  // Drilldown closed by default so the dashboard fits one viewport. Tap any
+  // project card to expand it beneath Top 3; only one can be open at a time.
+  const [openProject, setOpenProject] = useState(null);
 
   // Hydrate from cloud once on mount, reconcile if newer.
   useEffect(() => {

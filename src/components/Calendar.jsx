@@ -60,7 +60,7 @@ function isoFromWeekISO(weekISO) {
 }
 
 export default function Calendar({ state, onOpenProject }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const today = startOfToday();
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
   const events = collectEvents(state);

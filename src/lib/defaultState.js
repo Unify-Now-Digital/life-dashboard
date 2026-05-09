@@ -64,17 +64,19 @@ export const defaultState = {
       ],
       markers: {
         weight: [
-          { date: "2026-05-03", kg: 83.0 },
-          { date: "2026-05-04", kg: 83.2 },
-          { date: "2026-05-05", kg: 82.8 },
-          { date: "2026-05-06", kg: 82.7 },
-          { date: "2026-05-07", kg: 82.5 },
-          { date: "2026-05-08", kg: 82.5 },
-          { date: "2026-05-09", kg: 82.4 },
+          { date: "2026-05-03", kg: 80.8 },
+          { date: "2026-05-04", kg: 80.5 },
+          { date: "2026-05-05", kg: 80.2 },
+          { date: "2026-05-06", kg: 80.0 },
+          { date: "2026-05-07", kg: 79.6 },
+          { date: "2026-05-08", kg: 79.3 },
+          { date: "2026-05-09", kg: 79.1 },
         ],
         sleep: [],
         training: [],
-        waist: [],
+        waist: [
+          { date: "2026-05-09", value: 90 },
+        ],
       },
       lifts: [
         { name: "Squat", lastValue: 100, pr: 110, date: "2026-04-12" },
@@ -86,6 +88,17 @@ export const defaultState = {
     finance: {
       goals: [],
       displaySettings: { period: "lastMonth", chart: "table", hiddenRows: [] },
+      // Weekly net-worth snapshots in EUR. Powers the sparkline on the
+      // Finance dashboard card. Dashboard reads the last 7 entries.
+      netWorthHistory: [
+        { date: "2026-03-29", eur: -8200 },
+        { date: "2026-04-05", eur: -7600 },
+        { date: "2026-04-12", eur: -6900 },
+        { date: "2026-04-19", eur: -6100 },
+        { date: "2026-04-26", eur: -5700 },
+        { date: "2026-05-03", eur: -5300 },
+        { date: "2026-05-09", eur: -4806 },
+      ],
       debts: [
         { id: 1, name: "Student loan", amount: { amount: 22000, ccy: "GBP", eur: 25806, rate: 1.173, asOf: "2026-05-09" } },
         { id: 2, name: "Tax debt", amount: { amount: 5000, ccy: "EUR", eur: 5000, rate: 1, asOf: "2026-05-09" } },
@@ -181,6 +194,11 @@ export const defaultState = {
           value: "£8,343",
           meta: "Mason App · 65% to launch",
           goals: [],
+          todos: [
+            { id: 1, title: "Stripe production keys swapped in", done: false },
+            { id: 2, title: "Apple submission v1", done: false },
+            { id: 3, title: "Mason App TestFlight invites", done: true },
+          ],
         },
         {
           id: 2,
@@ -190,6 +208,10 @@ export const defaultState = {
           value: "0 orders",
           meta: "5 enquiries",
           goals: [],
+          todos: [
+            { id: 1, title: "Finalise pricing sheet", done: false },
+            { id: 2, title: "Reply to 5 enquiries", done: false },
+          ],
         },
         {
           id: 3,
@@ -199,6 +221,10 @@ export const defaultState = {
           value: "£5,800",
           meta: "14 orders · 6 permits pending",
           goals: [],
+          todos: [
+            { id: 1, title: "Chase 6 outstanding permits", done: false },
+            { id: 2, title: "Aylin 1-1 — raise discussion", done: false },
+          ],
         },
         {
           id: 4,
@@ -208,6 +234,10 @@ export const defaultState = {
           value: "Support team",
           meta: "12 deals · 3 close this week",
           goals: [],
+          todos: [
+            { id: 1, title: "Weekly status to founders", done: false },
+            { id: 2, title: "Onboarding doc for new SDR", done: false },
+          ],
         },
       ],
     },

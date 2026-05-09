@@ -148,18 +148,27 @@ function deltaFinance(state, meta) {
   const debt = (f.debts || []).reduce((a, b) => a + moneyEur(b), 0);
   const net = sav + inv - debt;
   const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
-  // Sparkline of last 7 weekly net-worth snapshots. Falls back to flat-line
-  // of the current value when no history seeded.
+
+  // Sparkline of last 7 weekly net-worth snapshots — visualises net position
+  // over time, per the "vs net position" requirement.
   const history = (f.netWorthHistory || []).slice(-7).map((p) => p.eur);
   const series = history.length >= 2 ? history : [net, net];
-  const prev = series.length > 1 ? series[series.length - 2] : null;
-  const diff = prev != null ? net - prev : null;
-  const arrow = diff == null ? "" : diff > 0 ? "↑" : diff < 0 ? "↓" : "·";
-  const diffStr = diff == null ? null : `${arrow}${fmt(Math.abs(diff))} / wk`;
+
+  // Revenue Δ vs last month from revenueHistory.
+  const rev = f.revenueHistory || [];
+  const cur = rev.length > 0 ? rev[rev.length - 1].eur : null;
+  const prev = rev.length > 1 ? rev[rev.length - 2].eur : null;
+  const revDelta = cur != null && prev != null ? cur - prev : null;
+  const arrow = revDelta == null ? "" : revDelta > 0 ? "↑" : revDelta < 0 ? "↓" : "·";
+  const revLine =
+    cur != null
+      ? `rev ${fmt(cur)}/mo${revDelta != null ? ` ${arrow}${fmt(Math.abs(revDelta))}` : ""}`
+      : `${fmt(sav + inv)} assets · ${fmt(debt)} debt`;
+
   return deltaBlock({
     value: fmt(net),
-    sub: diffStr || `${fmt(sav + inv)} assets · ${fmt(debt)} debt`,
-    accent: diff == null ? C.text : diff > 0 ? C.success : C.danger,
+    sub: revLine,
+    accent: revDelta == null ? C.text : revDelta > 0 ? C.success : C.danger,
     sparkline: <Sparkline values={series} color={meta.color} />,
   });
 }
@@ -182,33 +191,21 @@ function deltaTravel(state) {
 function deltaWork(state) {
   const biz = state.projects?.work?.businesses || [];
   if (biz.length === 0) return deltaBlock({ value: "—", sub: "no businesses" });
-  return (
-    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-      {biz.map((b) => {
-        const goals = b.goals || [];
-        const totalP = goals.reduce((acc, g) => acc + (g.priorities?.length || 0), 0);
-        const doneP = goals.reduce(
-          (acc, g) => acc + (g.priorities?.filter((p) => p.done).length || 0),
-          0
-        );
-        const denominator = goals.reduce((acc, g) => acc + (g.target ?? (g.priorities?.length || 0)), 0) || totalP;
-        const pct = denominator > 0 ? Math.min(100, Math.round((doneP / denominator) * 100)) : null;
-        return (
-          <div
-            key={b.id}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
-          >
-            <span style={{ fontSize: 12, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {b.name}
-            </span>
-            <span style={{ fontSize: 12, color: C.textSecondary, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-              {pct != null ? `${pct}%` : b.value}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  // First incomplete todo across businesses, in business order. No financial
+  // figures — we surface the top actionable task instead.
+  for (const b of biz) {
+    const todo = (b.todos || []).find((t) => !t.done);
+    if (todo && (todo.title || "").trim()) {
+      return deltaBlock({
+        value: todo.title,
+        sub: b.name,
+      });
+    }
+  }
+  return deltaBlock({
+    value: `${biz.length} businesses`,
+    sub: "all tasks done",
+  });
 }
 
 function deltaLearning(state) {

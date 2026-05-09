@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { styles, QUOTES } from "./lib/tokens";
+import { C, styles, QUOTES } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue } from "./lib/storage";
 
@@ -12,9 +12,76 @@ import AuthGate from "./components/AuthGate.jsx";
 import TopThree from "./components/TopThree.jsx";
 import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
-import Projects from "./components/Projects.jsx";
+import Projects, { PROJECT_META } from "./components/Projects.jsx";
 import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
 import JumpNav from "./components/JumpNav.jsx";
+
+// Projects that get always-rendered collapsible sections in the main column,
+// in display order (beneath Habits). Tapping their rail card / floating pill
+// expands the corresponding section; everything else uses the on-demand
+// drilldown panel.
+const SECTION_KEYS = ["work", "finance", "health"];
+
+function MainSection({ projectKey, openProject, setOpenProject, state, setState }) {
+  const meta = PROJECT_META.find((m) => m.key === projectKey);
+  const isOpen = openProject === projectKey;
+  return (
+    <div style={styles.card}>
+      <button
+        onClick={() => setOpenProject(isOpen ? null : projectKey)}
+        aria-expanded={isOpen}
+        style={{
+          ...styles.sectionH,
+          margin: 0,
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "inherit",
+          textAlign: "left",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: meta?.color || C.accent,
+            }}
+          />
+          {meta?.label || projectKey}
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 11,
+            color: C.textTertiary,
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.15s",
+            display: "inline-block",
+          }}
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `0.5px solid ${C.border}` }}>
+          <ProjectDrilldown
+            projectKey={projectKey}
+            state={state}
+            setState={setState}
+            onClose={() => setOpenProject(null)}
+            embedded
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function useIsDesktop(breakpoint = 860) {
   const [isDesktop, setIsDesktop] = useState(
@@ -142,16 +209,30 @@ export default function Dashboard() {
 
   const closeDrilldown = () => setOpenProject(null);
 
-  const drilldownPanel = openProject ? (
-    <div id="project-drilldown-anchor">
-      <ProjectDrilldown
-        state={state}
-        setState={setState}
-        projectKey={openProject}
-        onClose={closeDrilldown}
-      />
-    </div>
-  ) : null;
+  // Only render the on-demand drilldown for projects that DON'T have a
+  // permanent collapsible section in the main column.
+  const drilldownPanel =
+    openProject && !SECTION_KEYS.includes(openProject) ? (
+      <div id="project-drilldown-anchor">
+        <ProjectDrilldown
+          state={state}
+          setState={setState}
+          projectKey={openProject}
+          onClose={closeDrilldown}
+        />
+      </div>
+    ) : null;
+
+  const mainSections = SECTION_KEYS.map((key) => (
+    <MainSection
+      key={key}
+      projectKey={key}
+      openProject={openProject}
+      setOpenProject={setOpenProject}
+      state={state}
+      setState={setState}
+    />
+  ));
 
   const mainColumn = (
     <div style={styles.stack}>
@@ -162,6 +243,7 @@ export default function Dashboard() {
         onUnstar={unstar}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      {mainSections}
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
     </div>
@@ -201,6 +283,7 @@ export default function Dashboard() {
         onUnstar={unstar}
       />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      {mainSections}
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
       <Projects

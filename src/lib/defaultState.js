@@ -98,6 +98,12 @@ export const defaultState = {
         { date: "2026-05-03", eur: -5300 },
         { date: "2026-05-09", eur: -4806 },
       ],
+      // Monthly revenue snapshots in EUR — sum of all monthlyRevenue lines for
+      // that month. Powers the Δ-vs-last-month figure on the Finance rail card.
+      revenueHistory: [
+        { month: "2026-04", eur: 10500 },
+        { month: "2026-05", eur: 10833 },
+      ],
       // EUR-only after the simplification. Tax timeline merged in here.
       debts: [
         { id: 1, name: "Student loan", amount: 25806 },

@@ -14,7 +14,10 @@ import { PROJECT_META, makeGoalHandlers } from "./Projects.jsx";
 // Renders the open project's full drilldown panel. Pulled out of Projects.jsx
 // so the sticky right-rail of cards stays narrow while the drilldown can take
 // the full width of the main column.
-export default function ProjectDrilldown({ state, setState, projectKey, onClose }) {
+//
+// `embedded`: when true, skip the outer card chrome and the project's own
+// title/close header — the parent (e.g. MainSection) provides those.
+export default function ProjectDrilldown({ state, setState, projectKey, onClose, embedded = false }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   if (!meta) return null;
   const baseGoalHandlers = makeGoalHandlers(setState, ["projects", projectKey, "goals"]);
@@ -22,10 +25,13 @@ export default function ProjectDrilldown({ state, setState, projectKey, onClose 
     state,
     setState,
     meta,
-    onClose,
+    // In embedded mode the section header IS the close target, so suppress
+    // the duplicate "close" affordance inside <Project>.
+    onClose: embedded ? null : onClose,
     goalHandlers: baseGoalHandlers,
     makeGoalHandlers: (path) => makeGoalHandlers(setState, path),
     nextId,
+    hideHeader: embedded,
   };
 
   let body = null;
@@ -41,6 +47,7 @@ export default function ProjectDrilldown({ state, setState, projectKey, onClose 
     default:              body = null;
   }
 
+  if (embedded) return body;
   return (
     <div
       style={{

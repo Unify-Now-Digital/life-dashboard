@@ -302,14 +302,17 @@ function FortnightView({ dated, onOpenProject }) {
 function QuarterView({ dated, onOpenProject }) {
   const today = startOfToday();
   const WEEKS = 12;
-  const DAY_W = 14;
+  const DAY_W = 16;
+  const LANE_LABEL_W = 64;
   const totalDays = WEEKS * 7;
-  const totalW = totalDays * DAY_W;
+  const totalW = totalDays * DAY_W + LANE_LABEL_W;
 
-  // Lane assignment by kind
+  // Lane assignment by kind. Order matters — first lane renders on top.
   const lanes = [
     { id: "trip", label: "Travel" },
     { id: "prompt", label: "Journal" },
+    { id: "personal", label: "Personal" },
+    { id: "deadline", label: "Deadlines" },
   ];
   const eventsByLane = new Map(lanes.map((l) => [l.id, []]));
   for (const e of dated) {
@@ -322,110 +325,197 @@ function QuarterView({ dated, onOpenProject }) {
     eventsByLane.get(e.kind).push({ ...e, offset, span });
   }
 
-  // Week separators along the top
+  // Month boundaries — show month names along the top so the eye can locate
+  // events without counting weeks.
+  const months = [];
+  let cursor = today;
+  for (let i = 0; i < totalDays; i++) {
+    if (i === 0 || cursor.getDate() === 1) {
+      months.push({
+        x: i * DAY_W + LANE_LABEL_W,
+        label: cursor.toLocaleString("en-GB", { month: "short", year: "2-digit" }),
+      });
+    }
+    cursor = addDays(cursor, 1);
+  }
+  // Week ticks (every 7 days), light vertical lines.
   const weekTicks = Array.from({ length: WEEKS }, (_, i) => {
     const d = addDays(today, i * 7);
-    return { x: i * 7 * DAY_W, label: `${SHORT_MONTH[d.getMonth()]} ${d.getDate()}` };
+    return { x: i * 7 * DAY_W + LANE_LABEL_W, dateLabel: `${SHORT_MONTH[d.getMonth()]} ${d.getDate()}` };
   });
 
-  return (
-    <div className="cal-scroll-x" style={{ paddingBottom: 6 }}>
-      <div style={{ width: totalW, position: "relative" }}>
-        {/* Week ticks */}
-        <div style={{ display: "flex", height: 18, position: "relative", marginBottom: 4 }}>
-          {weekTicks.map((t, i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                left: t.x,
-                fontSize: 9,
-                color: C.textTertiary,
-                fontVariantNumeric: "tabular-nums",
-                borderLeft: `0.5px solid ${C.border}`,
-                paddingLeft: 4,
-                lineHeight: "16px",
-              }}
-            >
-              {t.label}
-            </div>
-          ))}
-        </div>
+  const totalEvents = lanes.reduce((acc, l) => acc + eventsByLane.get(l.id).length, 0);
 
-        {/* Lanes */}
-        {lanes.map((l) => (
-          <div
-            key={l.id}
-            style={{
-              position: "relative",
-              height: 24,
-              borderTop: `0.5px solid ${C.border}`,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <span
+  return (
+    <>
+      <div
+        style={{
+          fontSize: 10,
+          color: C.textTertiary,
+          marginBottom: 4,
+          padding: "0 2px",
+        }}
+      >
+        Next 12 weeks · {totalEvents} {totalEvents === 1 ? "event" : "events"} across {lanes.length} lanes
+      </div>
+      <div className="cal-scroll-x" style={{ paddingBottom: 8 }}>
+        <div style={{ width: totalW, position: "relative" }}>
+          {/* Month labels */}
+          <div style={{ position: "relative", height: 14, marginBottom: 2 }}>
+            {months.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: m.x,
+                  fontSize: 10,
+                  color: C.textSecondary,
+                  fontWeight: 500,
+                  borderLeft: `0.5px solid ${C.borderStrong}`,
+                  paddingLeft: 4,
+                  lineHeight: "12px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {m.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Week ticks */}
+          <div style={{ position: "relative", height: 14, marginBottom: 4 }}>
+            {weekTicks.map((t, i) => (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: t.x,
+                  fontSize: 9,
+                  color: C.textTertiary,
+                  fontVariantNumeric: "tabular-nums",
+                  borderLeft: `0.5px solid ${C.border}`,
+                  paddingLeft: 3,
+                  lineHeight: "12px",
+                }}
+              >
+                {t.dateLabel}
+              </div>
+            ))}
+          </div>
+
+          {/* Lanes */}
+          {lanes.map((l) => (
+            <div
+              key={l.id}
               style={{
-                position: "sticky",
-                left: 0,
-                width: 50,
-                fontSize: 10,
-                color: C.textTertiary,
-                background: C.bg,
-                paddingLeft: 2,
-                zIndex: 1,
+                position: "relative",
+                height: 28,
+                borderTop: `0.5px solid ${C.border}`,
+                display: "flex",
+                alignItems: "center",
               }}
             >
-              {l.label}
-            </span>
-            {eventsByLane.get(l.id).map((e, i) => {
-              const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
-              return (
-                <div
-                  key={i}
-                  onClick={e.projectKey ? () => onOpenProject(e.projectKey) : undefined}
-                  title={e.label}
+              <span
+                style={{
+                  position: "sticky",
+                  left: 0,
+                  width: LANE_LABEL_W,
+                  fontSize: 10,
+                  color: C.textTertiary,
+                  background: C.bg,
+                  paddingLeft: 2,
+                  zIndex: 1,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {l.label}
+              </span>
+              {eventsByLane.get(l.id).map((e, i) => {
+                const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
+                const dayLabel =
+                  e.offset === 0
+                    ? "today"
+                    : e.offset === 1
+                    ? "tomorrow"
+                    : `in ${e.offset}d`;
+                const richLabel = e.span > 1 ? `${e.label} · ${e.span}d` : `${e.label} · ${dayLabel}`;
+                return (
+                  <div
+                    key={i}
+                    onClick={e.projectKey ? () => onOpenProject(e.projectKey) : undefined}
+                    title={`${e.label} (${e.isoDate}${e.end ? ` → ${e.end}` : ""})`}
+                    style={{
+                      position: "absolute",
+                      left: e.offset * DAY_W + LANE_LABEL_W,
+                      width: Math.max(60, e.span * DAY_W - 2),
+                      height: 20,
+                      background: chip.bg,
+                      border: `0.5px solid ${chip.color}`,
+                      borderRadius: 4,
+                      fontSize: 10,
+                      color: chip.color,
+                      fontWeight: 500,
+                      padding: "0 6px",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                      cursor: e.projectKey ? "pointer" : "default",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {richLabel}
+                  </div>
+                );
+              })}
+              {eventsByLane.get(l.id).length === 0 && (
+                <span
                   style={{
                     position: "absolute",
-                    left: e.offset * DAY_W + 50,
-                    width: Math.max(28, e.span * DAY_W - 2),
-                    height: 16,
-                    background: chip.bg,
-                    border: `0.5px solid ${chip.color}`,
-                    borderRadius: 4,
-                    fontSize: 10,
-                    color: chip.color,
-                    fontWeight: 500,
-                    padding: "0 6px",
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
-                    cursor: e.projectKey ? "pointer" : "default",
-                    display: "flex",
-                    alignItems: "center",
+                    left: LANE_LABEL_W + 4,
+                    fontSize: 9,
+                    color: C.textTertiary,
+                    fontStyle: "italic",
                   }}
                 >
-                  {e.label}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                  nothing scheduled
+                </span>
+              )}
+            </div>
+          ))}
 
-        {/* Today marker */}
-        <div
-          style={{
-            position: "absolute",
-            top: 22,
-            left: 50,
-            bottom: 0,
-            width: 1,
-            background: C.accent,
-            opacity: 0.6,
-          }}
-        />
+          {/* Today marker */}
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              left: LANE_LABEL_W,
+              bottom: 0,
+              width: 2,
+              background: C.accent,
+              opacity: 0.7,
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              left: LANE_LABEL_W - 14,
+              fontSize: 9,
+              color: C.accent,
+              fontWeight: 500,
+              pointerEvents: "none",
+            }}
+          >
+            today
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

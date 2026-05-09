@@ -35,12 +35,13 @@ export function EditableText({ value, onChange, placeholder, style, multiline, t
         ...style,
         border: `1px solid ${C.accent}`,
         borderRadius: 4,
-        padding: "2px 6px",
+        padding: "8px 10px",
         background: C.bg,
         outline: "none",
         fontFamily: "inherit",
         boxSizing: "border-box",
         width: multiline ? "100%" : "auto",
+        minHeight: 36,
       },
     };
     if (multiline) return <textarea {...sharedProps} rows={3} />;
@@ -53,11 +54,13 @@ export function EditableText({ value, onChange, placeholder, style, multiline, t
       style={{
         ...style,
         cursor: "text",
-        padding: "2px 6px",
-        margin: "-2px -6px",
+        padding: "8px 10px",
+        margin: "-8px -10px",
         borderRadius: 4,
         display: "inline-block",
         transition: "background 0.1s",
+        minHeight: 32,
+        WebkitTapHighlightColor: "rgba(24,95,165,0.1)",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.background = C.bgSecondary)}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}

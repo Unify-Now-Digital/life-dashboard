@@ -1,22 +1,155 @@
 import React, { useState, useEffect, useRef } from "react";
-import { styles, QUOTES, C, BIZ_COLORS, AVATAR_KEYS } from "./lib/tokens";
-import { defaultState, nextId } from "./lib/defaultState";
+import { C, styles, QUOTES, tint } from "./lib/tokens";
+import { defaultState } from "./lib/defaultState";
+import { loadFromCache, loadFromCloud, saveState, flushQueue } from "./lib/storage";
 
 import Header from "./components/Header.jsx";
-import LanguagePractice from "./components/LanguagePractice.jsx";
 import NorthStar from "./components/NorthStar.jsx";
 import Habits from "./components/Habits.jsx";
-import Priorities from "./components/Priorities.jsx";
 import StickyHabits from "./components/StickyHabits.jsx";
-import Goals from "./components/Goals.jsx";
-import Upcoming from "./components/Upcoming.jsx";
-import Metrics from "./components/Metrics.jsx";
-import Drilldowns from "./components/Drilldowns.jsx";
-import Reflection from "./components/Reflection.jsx";
-import FoodDiary from "./components/FoodDiary.jsx";
 import UndoToast from "./components/UndoToast.jsx";
+import AuthGate from "./components/AuthGate.jsx";
+import TopThree from "./components/TopThree.jsx";
+import GoalsRollup from "./components/GoalsRollup.jsx";
+import Calendar from "./components/Calendar.jsx";
+import Projects, { PROJECT_META } from "./components/Projects.jsx";
+import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
+import JumpNav from "./components/JumpNav.jsx";
+import SectionShell from "./components/SectionShell.jsx";
 
-// Track viewport so we can switch to two-column layout above ~860px wide
+// Projects that get always-rendered sections in the main column, in display
+// order beneath the Calendar. Outer card is white with a coloured
+// left-border; inner subcards carry the project tint. Travel is the only
+// project still rendered as an on-demand drilldown.
+const SECTIONS = [
+  { key: "work", defaultOpen: true },
+  { key: "health", defaultOpen: true },
+  { key: "finance", defaultOpen: true },
+  { key: "learning", defaultOpen: false },
+  { key: "journal", defaultOpen: false },
+  { key: "relationships", defaultOpen: false },
+  { key: "charity", defaultOpen: false },
+];
+const SECTION_KEYS = SECTIONS.map((s) => s.key);
+
+
+// Inline SVG icon per project. Used as the section identifier instead of a
+// text label so the MainSection header takes minimal vertical space.
+function ProjectIcon({ projectKey, color, size = 18 }) {
+  const stroke = color || C.text;
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke,
+    strokeWidth: 1.6,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
+    style: { display: "block", flexShrink: 0 },
+  };
+  switch (projectKey) {
+    case "work":
+      return (
+        <svg {...common}>
+          <rect x="3" y="7" width="18" height="13" rx="1.5" />
+          <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+          <path d="M3 12h18" />
+        </svg>
+      );
+    case "finance":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15 9.5c-.7-.9-1.8-1.4-3-1.4-2 0-3.5 1.4-3.5 3.5s1.5 3.5 3.5 3.5c1.2 0 2.3-.5 3-1.4" />
+          <path d="M8.5 11h5" />
+          <path d="M8.5 13h5" />
+        </svg>
+      );
+    case "health":
+      return (
+        <svg {...common}>
+          <path d="M12 21s-7-4.5-9-9a5.5 5.5 0 0 1 9.5-3.5A5.5 5.5 0 0 1 21 12c-2 4.5-9 9-9 9z" />
+        </svg>
+      );
+    case "travel":
+      return (
+        <svg {...common}>
+          <path d="M2 12l9 2 4 7 2-1-2-7 5-5a2 2 0 0 0-3-3l-5 5-7-2-1 2 7 4z" />
+        </svg>
+      );
+    case "learning":
+      return (
+        <svg {...common}>
+          <path d="M3 6a2 2 0 0 1 2-2h6v15H5a2 2 0 0 1-2-2z" />
+          <path d="M21 6a2 2 0 0 0-2-2h-6v15h6a2 2 0 0 0 2-2z" />
+        </svg>
+      );
+    case "journal":
+      return (
+        <svg {...common}>
+          <path d="M14 3l7 7-11 11H3v-7z" />
+          <path d="M13 4l7 7" />
+        </svg>
+      );
+    case "relationships":
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="9" r="3" />
+          <path d="M3 19a6 6 0 0 1 12 0" />
+          <circle cx="17" cy="8" r="2.5" />
+          <path d="M14.5 14a4.5 4.5 0 0 1 7 4" />
+        </svg>
+      );
+    case "charity":
+      return (
+        <svg {...common}>
+          <path d="M3 11h18v9H3z" />
+          <path d="M3 7h18v4H3z" />
+          <path d="M12 7v13" />
+          <path d="M8 7c0-2 1.5-3.5 4-3.5S16 5 16 7" />
+        </svg>
+      );
+    default:
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: color,
+          }}
+          aria-hidden="true"
+        />
+      );
+  }
+}
+
+function MainSection({ projectKey, expanded, onToggle, state, setState }) {
+  const meta = PROJECT_META.find((m) => m.key === projectKey);
+  const color = meta?.color || C.accent;
+  return (
+    <SectionShell
+      id={`section-${projectKey}`}
+      icon={<ProjectIcon projectKey={projectKey} color={color} size={18} />}
+      label={meta?.label || projectKey}
+      color={color}
+      expanded={expanded}
+      onToggle={onToggle}
+    >
+      <ProjectDrilldown
+        projectKey={projectKey}
+        state={state}
+        setState={setState}
+        onClose={onToggle}
+        embedded
+      />
+    </SectionShell>
+  );
+}
+
 function useIsDesktop(breakpoint = 860) {
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== "undefined" ? window.innerWidth >= breakpoint : false
@@ -30,13 +163,57 @@ function useIsDesktop(breakpoint = 860) {
 }
 
 export default function Dashboard() {
-  const [state, setState] = useState(defaultState);
+  const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
   const isDesktop = useIsDesktop();
-  // Single collapse flag controls both language practice cards together so
-  // toggling either one minimises both. Sits in Dashboard so it survives
-  // remounts of either card.
-  const [langCollapsed, setLangCollapsed] = useState(false);
-  const toggleLangCollapsed = () => setLangCollapsed((c) => !c);
+  // On-demand drilldown for projects without a permanent MainSection (Travel).
+  const [openProject, setOpenProjectRaw] = useState(null);
+  // Per-section expanded state for the always-visible MainSections, keyed by
+  // project key. Initialised from each section's defaultOpen flag.
+  const [sectionOpen, setSectionOpen] = useState(() =>
+    SECTIONS.reduce((acc, s) => {
+      acc[s.key] = !!s.defaultOpen;
+      return acc;
+    }, {})
+  );
+
+  // Project navigation: tapping a rail card or floating pill should expand
+  // the matching MainSection (if it has one) and scroll to it; otherwise it
+  // opens the on-demand drilldown.
+  const setOpenProject = (key) => {
+    if (key && SECTION_KEYS.includes(key)) {
+      setSectionOpen((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        const el = document.getElementById(`section-${key}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 30);
+    } else {
+      setOpenProjectRaw(key);
+    }
+  };
+
+  const toggleSection = (key) =>
+    setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  // Hydrate from cloud once on mount, reconcile if newer.
+  useEffect(() => {
+    let alive = true;
+    loadFromCloud().then((cloud) => {
+      if (alive && cloud) setStateRaw(cloud);
+    });
+    flushQueue();
+    const onFocus = () => flushQueue();
+    window.addEventListener("focus", onFocus);
+    return () => { alive = false; window.removeEventListener("focus", onFocus); };
+  }, []);
+
+  // Wrap setState so every change persists.
+  const setState = (updater) => {
+    setStateRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveState(next);
+      return next;
+    });
+  };
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
@@ -46,9 +223,7 @@ export default function Dashboard() {
   const [undo, setUndo] = useState(null);
   const undoTimerRef = useRef(null);
   useEffect(
-    () => () => {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    },
+    () => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); },
     []
   );
 
@@ -58,53 +233,6 @@ export default function Dashboard() {
     setUndo(entry);
   };
 
-  const removeWithUndo = (getList, replaceList, label) => (id) => {
-    const list = getList(state);
-    const idx = list.findIndex((it) => it.id === id);
-    if (idx < 0) return;
-    const item = list[idx];
-    setState((s) => replaceList(s, getList(s).filter((it) => it.id !== id)));
-    enqueueUndo({
-      label,
-      onUndo: () => {
-        setState((s) => {
-          const cur = getList(s);
-          return replaceList(s, [...cur.slice(0, idx), item, ...cur.slice(idx)]);
-        });
-        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-        setUndo(null);
-      },
-    });
-  };
-
-  // Update an item by id within a nested list path
-  const updateItemInList = (path, id, field, value) => {
-    setState((s) => {
-      const newState = JSON.parse(JSON.stringify(s));
-      let target = newState;
-      for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
-      const list = target[path[path.length - 1]];
-      const idx = list.findIndex((it) => it.id === id);
-      if (idx >= 0) list[idx] = { ...list[idx], [field]: value };
-      return newState;
-    });
-  };
-
-  const togglePriority = (i) =>
-    setState((s) => {
-      const next = [...s.priorities];
-      next[i] = { ...next[i], done: !next[i].done };
-      return { ...s, priorities: next };
-    });
-
-  const changePriority = (i, text) =>
-    setState((s) => {
-      const next = [...s.priorities];
-      next[i] = { ...next[i], text };
-      return { ...s, priorities: next };
-    });
-
-  // Habit confirmation: answer is "yes" | "no" | "clear"
   const confirmHabit = (habit, dateISO, answer) =>
     setState((s) => {
       const yes = (s.habitLog[habit] || []).filter((d) => d !== dateISO);
@@ -118,436 +246,121 @@ export default function Dashboard() {
       };
     });
 
-  const setJournal = (text) => setState((s) => ({ ...s, journal: text }));
   const setNorthStar = (text) => setState((s) => ({ ...s, northStar: text }));
 
-  const goalHandlers = {
-    onUpdate: (id, field, value) => updateItemInList(["goals"], id, field, value),
-    onAdd: () =>
-      setState((s) => ({
-        ...s,
-        goals: [
-          ...s.goals,
-          {
-            id: `g${nextId(s.goals.map((g) => ({ id: typeof g.id === "string" ? parseInt(g.id.replace(/\D/g, "")) || 0 : g.id })))}`,
-            label: "New goal",
-            current: 0,
-            target: 100,
-          },
-        ],
-      })),
-    onRemove: removeWithUndo(
-      (s) => s.goals,
-      (s, g) => ({ ...s, goals: g }),
-      "Goal removed"
-    ),
-  };
+  // ---- Render -------------------------------------------------------------
 
-  const upcomingHandlers = {
-    onUpdate: (id, field, value) => updateItemInList(["upcoming"], id, field, value),
-    onAdd: () =>
-      setState((s) => ({
-        ...s,
-        upcoming: [...s.upcoming, { id: nextId(s.upcoming), date: "—", text: "New item", cat: "Personal" }],
-      })),
-    onRemove: removeWithUndo(
-      (s) => s.upcoming,
-      (s, u) => ({ ...s, upcoming: u }),
-      "Upcoming item removed"
-    ),
-  };
+  const closeDrilldown = () => setOpenProjectRaw(null);
 
-  const updateMetric = (key, value) =>
-    setState((s) => ({ ...s, metrics: { ...s.metrics, [key]: value } }));
+  // Only render the on-demand drilldown for projects that DON'T have a
+  // permanent collapsible MainSection. Travel is the lone holdout.
+  const drilldownPanel =
+    openProject && !SECTION_KEYS.includes(openProject) ? (
+      <div id="project-drilldown-anchor">
+        <ProjectDrilldown
+          state={state}
+          setState={setState}
+          projectKey={openProject}
+          onClose={closeDrilldown}
+        />
+      </div>
+    ) : null;
 
-  const foodHandlers = {
-    onSetFastEnd: (time) =>
-      setState((s) => ({ ...s, foodDiary: { ...s.foodDiary, fastEndTime: time } })),
-    onAddFood: () =>
-      setState((s) => {
-        const now = new Date();
-        const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-        return {
-          ...s,
-          foodDiary: {
-            ...s.foodDiary,
-            foods: [
-              ...s.foodDiary.foods,
-              { id: nextId(s.foodDiary.foods), time, what: "", kcal: 0, p: 0, c: 0, f: 0 },
-            ],
-          },
-        };
-      }),
-    onUpdateFood: (id, field, value) => updateItemInList(["foodDiary", "foods"], id, field, value),
-    onRemoveFood: removeWithUndo(
-      (s) => s.foodDiary.foods,
-      (s, foods) => ({ ...s, foodDiary: { ...s.foodDiary, foods } }),
-      "Food entry removed"
-    ),
-  };
+  const mainSections = SECTIONS.map((s) => (
+    <MainSection
+      key={s.key}
+      projectKey={s.key}
+      expanded={!!sectionOpen[s.key]}
+      onToggle={() => toggleSection(s.key)}
+      state={state}
+      setState={setState}
+    />
+  ));
 
-  const drilldownHandlers = {
-    businesses: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "businesses"], id, field, value),
-      onAdd: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            businesses: [
-              ...s.drilldowns.businesses,
-              {
-                id: nextId(s.drilldowns.businesses),
-                name: "New",
-                color: BIZ_COLORS[s.drilldowns.businesses.length % BIZ_COLORS.length],
-                value: "—",
-                meta: "—",
-              },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.businesses,
-        (s, b) => ({ ...s, drilldowns: { ...s.drilldowns, businesses: b } }),
-        "Business removed"
-      ),
-    },
-    finances: {
-      onUpdate: (key, value) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, finances: { ...s.drilldowns.finances, [key]: value } },
-        })),
-      onUpdateIncome: (id, field, value) =>
-        updateItemInList(["drilldowns", "finances", "incomeBreakdown"], id, field, value),
-      onAddIncome: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: {
-              ...s.drilldowns.finances,
-              incomeBreakdown: [
-                ...(s.drilldowns.finances.incomeBreakdown || []),
-                {
-                  id: nextId(s.drilldowns.finances.incomeBreakdown || []),
-                  label: "New income",
-                  amount: 0,
-                },
-              ],
-            },
-          },
-        })),
-      onRemoveIncome: removeWithUndo(
-        (s) => s.drilldowns.finances.incomeBreakdown || [],
-        (s, list) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: { ...s.drilldowns.finances, incomeBreakdown: list },
-          },
-        }),
-        "Income row removed"
-      ),
-      onUpdateExpense: (id, field, value) =>
-        updateItemInList(["drilldowns", "finances", "expenseBreakdown"], id, field, value),
-      onAddExpense: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: {
-              ...s.drilldowns.finances,
-              expenseBreakdown: [
-                ...(s.drilldowns.finances.expenseBreakdown || []),
-                {
-                  id: nextId(s.drilldowns.finances.expenseBreakdown || []),
-                  label: "New expense",
-                  amount: 0,
-                },
-              ],
-            },
-          },
-        })),
-      onRemoveExpense: removeWithUndo(
-        (s) => s.drilldowns.finances.expenseBreakdown || [],
-        (s, list) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            finances: { ...s.drilldowns.finances, expenseBreakdown: list },
-          },
-        }),
-        "Expense row removed"
-      ),
-    },
-    travel: {
-      onUpdateStat: (key, value) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, travel: { ...s.drilldowns.travel, [key]: value } },
-        })),
-      onUpdateTrip: (id, field, value) => updateItemInList(["drilldowns", "travel", "trips"], id, field, value),
-      onAddTrip: () =>
-        setState((s) => {
-          const start = new Date();
-          start.setDate(start.getDate() + 30);
-          const end = new Date(start);
-          end.setDate(end.getDate() + 7);
-          const iso = (d) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return {
-            ...s,
-            drilldowns: {
-              ...s.drilldowns,
-              travel: {
-                ...s.drilldowns.travel,
-                trips: [
-                  ...s.drilldowns.travel.trips,
-                  {
-                    id: nextId(s.drilldowns.travel.trips),
-                    name: "New trip",
-                    start: iso(start),
-                    end: iso(end),
-                  },
-                ],
-              },
-            },
-          };
-        }),
-      onRemoveTrip: removeWithUndo(
-        (s) => s.drilldowns.travel.trips,
-        (s, t) => ({
-          ...s,
-          drilldowns: { ...s.drilldowns, travel: { ...s.drilldowns.travel, trips: t } },
-        }),
-        "Trip removed"
-      ),
-    },
-    relationships: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "relationships"], id, field, value),
-      onAdd: () =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            relationships: [
-              ...s.drilldowns.relationships,
-              {
-                id: nextId(s.drilldowns.relationships),
-                name: "New person",
-                initials: "NP",
-                color: AVATAR_KEYS[s.drilldowns.relationships.length % AVATAR_KEYS.length],
-                last: "—",
-                action: "tap to set",
-                stale: false,
-              },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.relationships,
-        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, relationships: r } }),
-        "Person removed"
-      ),
-    },
-    reading: {
-      onUpdate: (id, field, value) => updateItemInList(["drilldowns", "reading"], id, field, value),
-      onAdd: (kind) =>
-        setState((s) => ({
-          ...s,
-          drilldowns: {
-            ...s.drilldowns,
-            reading: [
-              ...s.drilldowns.reading,
-              kind === "podcast"
-                ? { id: nextId(s.drilldowns.reading), title: "New podcast", author: "Podcast", progress: null, sub: "" }
-                : { id: nextId(s.drilldowns.reading), title: "New book", author: "Author", progress: 0, sub: "ch. 1" },
-            ],
-          },
-        })),
-      onRemove: removeWithUndo(
-        (s) => s.drilldowns.reading,
-        (s, r) => ({ ...s, drilldowns: { ...s.drilldowns, reading: r } }),
-        "Reading item removed"
-      ),
-    },
-    spanish: makeLanguageHandlers("spanish"),
-    turkish: makeLanguageHandlers("turkish"),
-  };
-
-  // Reusable handler factory — same shape used for any language stored under
-  // state.drilldowns[key]. Keeps Spanish and Turkish wiring strictly parallel.
-  function makeLanguageHandlers(key) {
-    const update = (mutate) =>
-      setState((s) => {
-        const cur = s.drilldowns[key];
-        const next = mutate(cur);
-        if (next === cur) return s;
-        return { ...s, drilldowns: { ...s.drilldowns, [key]: next } };
-      });
-    return {
-      onCyclePhrase: () =>
-        update((d) => ({ ...d, phraseIndex: (d.phraseIndex + 1) % d.phrases.length })),
-      onMarkPhraseSeen: (phraseId) =>
-        update((d) => {
-          const seen = d.phrasesSeen || [];
-          if (seen.includes(phraseId)) return d;
-          return { ...d, phrasesSeen: [...seen, phraseId] };
-        }),
-      onRateChunk: (id, rating) =>
-        update((d) => {
-          const chunks = d.chunks.map((c) => {
-            if (c.id !== id) return c;
-            if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
-            if (rating === "hard") return { ...c, lastSeen: Date.now() };
-            return { ...c, bucket: 0, lastSeen: Date.now() };
-          });
-          return { ...d, chunks, chunkIndex: (d.chunkIndex + 1) % d.chunks.length };
-        }),
-      onCheckVerb: (id, allFilledAndRight) =>
-        update((d) => {
-          const verbs = d.verbs.map((v) =>
-            v.id === id
-              ? {
-                  ...v,
-                  correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0,
-                  attempts: (v.attempts || 0) + 1,
-                  correct: (v.correct || 0) + (allFilledAndRight ? 1 : 0),
-                }
-              : v
-          );
-          const verbHistory = [
-            ...(d.verbHistory || []),
-            { id, right: !!allFilledAndRight, ts: Date.now() },
-          ].slice(-20);
-          return { ...d, verbs, verbHistory };
-        }),
-    };
-  }
-
-  // ---- Render -----------------------------------------------------------
-  // On mobile: single column, sections stack in order.
-  // On desktop: two columns side by side. Drill-downs + reflection span full width below.
-
-  const leftColumn = (
+  const mainColumn = (
     <div style={styles.stack}>
-      <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
-      <Goals goals={state.goals} {...goalHandlers} />
-      <Reflection value={state.journal} onChange={setJournal} />
+      <TopThree
+        state={state}
+        setState={setState}
+        onOpenProject={setOpenProject}
+      />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Calendar state={state} onOpenProject={setOpenProject} />
+      {mainSections}
+      {drilldownPanel}
     </div>
   );
 
-  const rightColumn = (
+  const rightRail = (
+    <aside
+      style={{
+        // Let the rail flow naturally — it scrolls with the page once it
+        // exceeds the viewport, so all 8 cards (incl. Learning at the bottom)
+        // remain reachable.
+        alignSelf: "start",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <NorthStar value={state.northStar} onChange={setNorthStar} compact />
+      <GoalsRollup state={state} onOpenProject={setOpenProject} />
+      <Projects
+        state={state}
+        openOverride={openProject}
+        setOpenOverride={setOpenProject}
+        layout="rail"
+      />
+    </aside>
+  );
+
+  const mobileLayout = (
     <div style={styles.stack}>
-      <Upcoming items={state.upcoming} {...upcomingHandlers} />
-      <Metrics
-        m={state.metrics}
-        onUpdate={updateMetric}
-        drilldowns={state.drilldowns}
-        handlers={drilldownHandlers}
+      <NorthStar value={state.northStar} onChange={setNorthStar} compact />
+      <GoalsRollup state={state} onOpenProject={setOpenProject} />
+      <TopThree
+        state={state}
+        setState={setState}
+        onOpenProject={setOpenProject}
+      />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Calendar state={state} onOpenProject={setOpenProject} />
+      {mainSections}
+      {drilldownPanel}
+      <Projects
+        state={state}
+        openOverride={openProject}
+        setOpenOverride={setOpenProject}
+        layout="float"
       />
     </div>
   );
 
-  // Full-width sections that pin to the top of the page.
-  // Spanish + Turkish sit side-by-side on desktop (two-column language drill);
-  // both collapse together via the lifted langCollapsed flag. North Star + Habits
-  // pair below them on desktop. FoodDiary stays full-width — daily logging needs
-  // the row width.
-  const topStack = (
-    <div style={{ ...styles.stack, marginBottom: 20 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
-          gap: 12,
-          alignItems: "start",
-        }}
-      >
-        <LanguagePractice
-          name="Spanish"
-          subtitle="B1 → B2 · vos"
-          data={state.drilldowns.spanish}
-          collapsed={langCollapsed}
-          onToggleCollapse={toggleLangCollapsed}
-          {...drilldownHandlers.spanish}
-        />
-        <LanguagePractice
-          name="Turkish"
-          subtitle="B1 → B2 · ben form"
-          data={state.drilldowns.turkish}
-          collapsed={langCollapsed}
-          onToggleCollapse={toggleLangCollapsed}
-          {...drilldownHandlers.turkish}
-        />
-      </div>
-      {isDesktop ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.4fr 1fr",
-            gap: 16,
-            alignItems: "start",
-          }}
-        >
-          <NorthStar value={state.northStar} onChange={setNorthStar} />
-          <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-        </div>
-      ) : (
-        <>
-          <NorthStar value={state.northStar} onChange={setNorthStar} />
-          <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-        </>
-      )}
-      <FoodDiary data={state.foodDiary} {...foodHandlers} />
-    </div>
-  );
-
   return (
-    <div style={styles.page}>
-      <Header today={today} dayOfYear={dayOfYear} quote={quote} />
+    <AuthGate>
+      <div style={styles.page}>
+        <Header today={today} dayOfYear={dayOfYear} quote={quote} />
 
-      {topStack}
-
-      {isDesktop ? (
-        <>
+        {isDesktop ? (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "minmax(0, 1fr) 280px",
               gap: 20,
               alignItems: "start",
             }}
           >
-            {leftColumn}
-            {rightColumn}
+            {mainColumn}
+            {rightRail}
           </div>
-          {/* Full-width drill-downs below */}
-          <div style={{ marginTop: 20 }}>
-            <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-          </div>
-        </>
-      ) : (
-        <div style={styles.stack}>
-          <Priorities priorities={state.priorities} onToggle={togglePriority} onChange={changePriority} />
-          <Goals goals={state.goals} {...goalHandlers} />
-          <Upcoming items={state.upcoming} {...upcomingHandlers} />
-          <Metrics
-            m={state.metrics}
-            onUpdate={updateMetric}
-            drilldowns={state.drilldowns}
-            handlers={drilldownHandlers}
-          />
-          <Drilldowns data={state.drilldowns} handlers={drilldownHandlers} />
-          <Reflection value={state.journal} onChange={setJournal} />
-        </div>
-      )}
+        ) : (
+          mobileLayout
+        )}
 
-      {/* Floating habit ring bar — fixed at bottom on all viewports */}
-      <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-
-      {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
-    </div>
+        <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        {isDesktop && <JumpNav />}
+        {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
+      </div>
+    </AuthGate>
   );
 }

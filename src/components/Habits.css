@@ -1,0 +1,364 @@
+/* Habits.css
+ * Class rules + pseudo-elements for the row-based habit tracker.
+ * Inline styles in Habits.jsx handle dynamic per-element styling
+ * (colours via tokens, conditional layout). This file is for things
+ * inline can't do: hover/active states, animations, scrollbar, popover.
+ */
+
+/* ---- Card shell --------------------------------------------------------- */
+
+.habit-card {
+  background: #ffffff;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.habit-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+.habit-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+.habit-sub {
+  font-size: 11px;
+  color: #9a9a9a;
+}
+
+/* ---- Day-of-week header strip ------------------------------------------ */
+
+.habit-dow-strip {
+  display: grid;
+  grid-template-columns: 40px 110px 1fr 64px 72px;
+  gap: 14px;
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+.habit-dow-cells {
+  display: grid;
+  grid-template-columns: repeat(21, 1fr);
+  gap: 2px;
+}
+.habit-dow-mark {
+  text-align: center;
+  font-size: 8px;
+  color: #9a9a9a;
+  font-weight: 500;
+  line-height: 1;
+}
+.habit-dow-rh {
+  text-align: right;
+  font-size: 9px;
+  color: #9a9a9a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+/* ---- Rows --------------------------------------------------------------- */
+
+.habit-rows {
+  display: flex;
+  flex-direction: column;
+}
+.habit-row {
+  display: grid;
+  grid-template-columns: 40px 110px 1fr 64px 72px;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 4px;
+}
+.habit-row + .habit-row {
+  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ---- Ring (button + icon overlay) -------------------------------------- */
+
+.habit-ring {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.habit-ring:hover {
+  transform: scale(1.05);
+}
+.habit-ring:active {
+  transform: scale(0.95);
+}
+.habit-ring-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+@keyframes habitPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+.habit-ring-pulse {
+  animation: habitPulse 2s ease-in-out infinite;
+}
+
+/* ---- Name column ------------------------------------------------------- */
+
+.habit-name-col {
+  line-height: 1.2;
+}
+.habit-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+.habit-name-sub {
+  font-size: 10.5px;
+  color: #9a9a9a;
+  margin-top: 1px;
+}
+
+/* ---- 21-day strip ------------------------------------------------------ */
+
+.habit-strip-wrap {
+  display: grid;
+  grid-template-columns: repeat(21, 1fr);
+  gap: 2px;
+  align-items: center;
+}
+.habit-cell {
+  aspect-ratio: 1;
+  min-height: 14px;
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+  background: #e5e5e2;
+  transition: transform 0.1s ease;
+  position: relative;
+}
+.habit-cell:hover {
+  transform: scale(1.2);
+  z-index: 2;
+}
+.habit-cell-hit {
+  background: #185fa5;
+}
+.habit-cell-miss {
+  background: #f7c1c1;
+}
+.habit-cell-today {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #185fa5;
+}
+.habit-cell-today.habit-cell-hit {
+  background: #185fa5;
+  box-shadow: inset 0 0 0 1.5px #185fa5;
+}
+
+/* ---- Streak ------------------------------------------------------------ */
+
+.habit-streak {
+  text-align: right;
+}
+.habit-streak-num {
+  font-size: 18px;
+  font-weight: 500;
+  color: #185fa5;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.habit-streak-lbl {
+  font-size: 10px;
+  color: #9a9a9a;
+  margin-top: 2px;
+}
+.habit-streak-zero .habit-streak-num {
+  color: #9a9a9a;
+}
+
+/* ---- Goal delta -------------------------------------------------------- */
+
+.habit-goal {
+  text-align: right;
+}
+.habit-goal-delta {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.habit-goal-above {
+  color: #3b6d11;
+}
+.habit-goal-below {
+  color: #993c1d;
+}
+.habit-goal-ontrack {
+  color: #6b6b6b;
+}
+.habit-goal-target {
+  font-size: 10px;
+  color: #9a9a9a;
+  margin-top: 2px;
+}
+
+/* ---- Footer (legend + hint) ------------------------------------------- */
+
+.habit-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 4px 0;
+  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  color: #6b6b6b;
+}
+.habit-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.habit-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.habit-legend-sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.habit-legend-miss {
+  background: #f7c1c1;
+}
+.habit-legend-today {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #185fa5;
+}
+.habit-footer-hint {
+  color: #9a9a9a;
+}
+
+/* ---- Backfill popover -------------------------------------------------- */
+
+.habit-pop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: transparent;
+}
+.habit-pop {
+  position: fixed;
+  z-index: 51;
+  background: #ffffff;
+  border: 0.5px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+}
+.habit-pop-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+.habit-pop-sub {
+  font-size: 11px;
+  color: #9a9a9a;
+  margin-bottom: 8px;
+  text-transform: capitalize;
+}
+.habit-pop-row {
+  display: flex;
+  gap: 6px;
+}
+.habit-pop-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f1f1f;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+.habit-pop-btn:hover {
+  background: #f7f7f5;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.habit-pop-yes:hover {
+  background: #e6f1fb;
+  border-color: #185fa5;
+  color: #0c447c;
+}
+.habit-pop-no:hover {
+  background: #fcebeb;
+  border-color: #993c1d;
+  color: #791f1f;
+}
+.habit-pop-clear {
+  flex: 0 0 auto;
+  color: #9a9a9a;
+}
+
+/* ---- Mobile ------------------------------------------------------------ */
+
+@media (max-width: 600px) {
+  .habit-row,
+  .habit-dow-strip {
+    grid-template-columns: 36px 1fr 56px;
+    gap: 10px;
+  }
+  /* Hide the 21-day strip on mobile — it's too cramped. Drop it from the grid
+   * by hiding the third column entirely; the user can switch to a wider screen
+   * (or we'll add a dedicated mobile strip later). */
+  .habit-strip-wrap,
+  .habit-dow-cells {
+    display: none;
+  }
+  .habit-name-col {
+    grid-column: 2;
+  }
+  .habit-streak {
+    grid-column: 3;
+  }
+  /* Goal delta moves to a second row */
+  .habit-goal {
+    grid-column: 1 / -1;
+    text-align: left;
+    padding-left: 46px;
+    padding-top: 4px;
+  }
+  .habit-goal-delta {
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .habit-goal-target {
+    display: inline-block;
+    margin-top: 0;
+  }
+  .habit-dow-rh {
+    display: none;
+  }
+}

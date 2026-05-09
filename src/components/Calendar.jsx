@@ -407,7 +407,7 @@ function QuarterView({ dated, onOpenProject }) {
 // ---- Calendar shell --------------------------------------------------------
 
 export default function Calendar({ state, onOpenProject }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [tab, setTab] = useState("list");
   const { dated, free } = collectEvents(state);
 

@@ -143,12 +143,14 @@ export default function Dashboard() {
   const closeDrilldown = () => setOpenProject(null);
 
   const drilldownPanel = openProject ? (
-    <ProjectDrilldown
-      state={state}
-      setState={setState}
-      projectKey={openProject}
-      onClose={closeDrilldown}
-    />
+    <div id="project-drilldown-anchor">
+      <ProjectDrilldown
+        state={state}
+        setState={setState}
+        projectKey={openProject}
+        onClose={closeDrilldown}
+      />
+    </div>
   ) : null;
 
   const mainColumn = (
@@ -162,7 +164,6 @@ export default function Dashboard() {
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-      <GoalsRollup state={state} onOpenProject={setOpenProject} />
     </div>
   );
 
@@ -181,6 +182,7 @@ export default function Dashboard() {
       }}
     >
       <NorthStar value={state.northStar} onChange={setNorthStar} compact />
+      <GoalsRollup state={state} onOpenProject={setOpenProject} />
       <Projects
         state={state}
         openOverride={openProject}
@@ -193,14 +195,7 @@ export default function Dashboard() {
   const mobileLayout = (
     <div style={styles.stack}>
       <NorthStar value={state.northStar} onChange={setNorthStar} compact />
-      <div style={{ marginTop: 4 }}>
-        <Projects
-          state={state}
-          openOverride={openProject}
-          setOpenOverride={setOpenProject}
-          layout="row"
-        />
-      </div>
+      <GoalsRollup state={state} onOpenProject={setOpenProject} />
       <TopThree
         state={state}
         onOpenProject={setOpenProject}
@@ -210,7 +205,12 @@ export default function Dashboard() {
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
       <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-      <GoalsRollup state={state} onOpenProject={setOpenProject} />
+      <Projects
+        state={state}
+        openOverride={openProject}
+        setOpenOverride={setOpenProject}
+        layout="float"
+      />
     </div>
   );
 
@@ -236,7 +236,7 @@ export default function Dashboard() {
         )}
 
         <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-        <JumpNav />
+        {isDesktop && <JumpNav />}
         {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </div>
     </AuthGate>

@@ -113,7 +113,6 @@ function BusinessTile({ business, setState, isExpanded, onClick }) {
 }
 
 function TodoList({ business, setState }) {
-  const [editing, setEditing] = useState(false);
   const handlers = makeTodoHandlers(setState, business.id);
   const todos = business.todos || [];
   return (
@@ -128,44 +127,20 @@ function TodoList({ business, setState }) {
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          fontSize: 10,
+          fontWeight: 500,
+          color: C.textTertiary,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
           marginBottom: 6,
         }}
       >
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 500,
-            color: C.textTertiary,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          {business.name} · tasks
-        </span>
-        <button
-          onClick={() => setEditing(!editing)}
-          style={{
-            background: editing ? C.accent : "transparent",
-            color: editing ? "white" : C.accent,
-            border: `0.5px solid ${editing ? C.accent : C.border}`,
-            borderRadius: 4,
-            padding: "3px 10px",
-            fontSize: 10,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          {editing ? "Done" : "Edit"}
-        </button>
+        {business.name} · tasks
       </div>
 
-      {todos.length === 0 && !editing && (
+      {todos.length === 0 && (
         <div style={{ fontSize: 11, color: C.textTertiary, padding: "4px 0" }}>
-          No tasks yet. Tap Edit to add one.
+          No tasks yet. Tap + Add to start.
         </div>
       )}
 
@@ -182,8 +157,8 @@ function TodoList({ business, setState }) {
           <div
             onClick={() => handlers.onUpdate(t.id, { done: !t.done })}
             style={{
-              width: 18,
-              height: 18,
+              width: 20,
+              height: 20,
               borderRadius: 4,
               border: `1.5px solid ${t.done ? business.color : C.borderStrong}`,
               background: t.done ? business.color : "transparent",
@@ -195,7 +170,7 @@ function TodoList({ business, setState }) {
             }}
           >
             {t.done && (
-              <svg width="10" height="8" viewBox="0 0 10 8">
+              <svg width="11" height="9" viewBox="0 0 10 8">
                 <path
                   d="M1 4L4 7L9 1"
                   stroke="white"
@@ -222,22 +197,18 @@ function TodoList({ business, setState }) {
               style={{ fontSize: 13 }}
             />
           </span>
-          {editing && (
-            <IconBtn onClick={() => handlers.onRemove(t.id)} danger label="Remove">
-              ×
-            </IconBtn>
-          )}
+          <IconBtn onClick={() => handlers.onRemove(t.id)} danger label="Remove">
+            ×
+          </IconBtn>
         </div>
       ))}
 
-      {editing && (
-        <button
-          onClick={handlers.onAdd}
-          style={{ ...styles.addBtn, marginTop: 6, fontSize: 11, padding: "5px 10px" }}
-        >
-          + Add task
-        </button>
-      )}
+      <button
+        onClick={handlers.onAdd}
+        style={{ ...styles.addBtn, marginTop: 6, fontSize: 11, padding: "5px 10px" }}
+      >
+        + Add task
+      </button>
     </div>
   );
 }

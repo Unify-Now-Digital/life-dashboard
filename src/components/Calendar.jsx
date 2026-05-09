@@ -196,51 +196,49 @@ function ListView({ dated, free, onOpenProject }) {
   );
 }
 
-// ---- Week view (14-day horizontal Gantt strip) -----------------------------
+// ---- Week view (7 days × per-day event chips, trips span every day) -------
 
 function WeekView({ dated, onOpenProject }) {
   const today = startOfToday();
-  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
-  const COL_W = 40;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
-  // Map ISO date → first event for that day (chip rendered)
-  const byDate = new Map();
-  for (const e of dated) {
-    if (!byDate.has(e.isoDate)) byDate.set(e.isoDate, []);
-    byDate.get(e.isoDate).push(e);
-  }
+  // Helper: events that touch a given day (handles multi-day trip spans).
+  const eventsOn = (day) =>
+    dated.filter((e) => {
+      const start = new Date(e.isoDate + "T00:00:00");
+      const end = e.end ? new Date(e.end + "T00:00:00") : start;
+      return start <= day && day <= end;
+    });
 
   return (
-    <div className="cal-scroll-x" style={{ paddingBottom: 6 }}>
-      <div style={{ display: "flex", gap: 4, minWidth: COL_W * days.length }}>
-        {days.map((d) => {
-          const iso = isoDate(d);
-          const events = byDate.get(iso) || [];
-          const isToday = sameYMD(d, today);
-          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          const primary = events[0];
-          const chip = primary ? CHIP_STYLES[primary.kind] : null;
-          return (
-            <button
-              key={iso}
-              onClick={primary?.projectKey ? () => onOpenProject(primary.projectKey) : undefined}
-              title={events.map((e) => e.label).join("\n") || ""}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+      {days.map((d) => {
+        const events = eventsOn(d);
+        const isToday = sameYMD(d, today);
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        return (
+          <div
+            key={isoDate(d)}
+            style={{
+              background: isToday ? C.accentLight : isWeekend ? C.bgSecondary : C.bg,
+              border: `0.5px solid ${isToday ? C.accent : C.border}`,
+              borderRadius: 6,
+              padding: "6px 5px 7px",
+              minHeight: 80,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <div
               style={{
-                width: COL_W,
-                background: isToday ? C.accentLight : isWeekend ? C.bgSecondary : C.bg,
-                border: `0.5px solid ${isToday ? C.accent : C.border}`,
-                borderRadius: 6,
-                padding: "5px 0 6px",
-                cursor: primary?.projectKey ? "pointer" : "default",
-                fontFamily: "inherit",
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 3,
-                flexShrink: 0,
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                lineHeight: 1,
               }}
             >
-              <span style={{ fontSize: 9, color: C.textTertiary, letterSpacing: "0.04em" }}>
+              <span style={{ fontSize: 9, color: C.textTertiary, letterSpacing: "0.04em", fontWeight: 500 }}>
                 {DOW[d.getDay()].toUpperCase()}
               </span>
               <span
@@ -253,21 +251,48 @@ function WeekView({ dated, onOpenProject }) {
               >
                 {d.getDate()}
               </span>
-              {events.length > 0 && (
-                <span
-                  className="cal-dot"
-                  style={{ background: chip?.color || C.accent }}
-                />
-              )}
-              {events.length > 1 && (
-                <span style={{ fontSize: 9, color: C.textTertiary, marginTop: -2 }}>
-                  +{events.length - 1}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+            </div>
+            {events.length === 0 ? (
+              <div style={{ fontSize: 9, color: C.textTertiary, fontStyle: "italic", marginTop: 2 }}>
+                —
+              </div>
+            ) : (
+              events.map((e, i) => {
+                const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
+                // Mark trip days that aren't the start with a small "·" prefix
+                const start = new Date(e.isoDate + "T00:00:00");
+                const isStart = sameYMD(start, d);
+                const labelPrefix = e.kind === "trip" ? (isStart ? "✈ " : "· ") : "";
+                return (
+                  <button
+                    key={i}
+                    onClick={e.projectKey ? () => onOpenProject(e.projectKey) : undefined}
+                    title={e.label}
+                    style={{
+                      background: chip.bg,
+                      color: chip.color,
+                      border: "none",
+                      borderRadius: 3,
+                      padding: "3px 5px",
+                      fontSize: 10,
+                      fontWeight: 500,
+                      fontFamily: "inherit",
+                      cursor: e.projectKey ? "pointer" : "default",
+                      textAlign: "left",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {labelPrefix}
+                    {e.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

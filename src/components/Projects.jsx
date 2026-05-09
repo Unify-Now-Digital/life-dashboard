@@ -319,12 +319,90 @@ function Card({ meta, onClick, children, isOpen }) {
   );
 }
 
-// ---- rail ----------------------------------------------------------------
+// ---- floating mobile pill ------------------------------------------------
+
+function FloatingPill({ meta, isOpen, onClick }) {
+  const bg = isOpen ? meta.color : tint(meta.color, 0.18);
+  const fg = isOpen ? "#fff" : meta.color;
+  return (
+    <button
+      onClick={onClick}
+      title={meta.label}
+      aria-label={meta.label}
+      style={{
+        background: bg,
+        color: fg,
+        border: `0.5px solid ${tint(meta.color, 0.55)}`,
+        borderRadius: 999,
+        padding: "5px 10px",
+        fontSize: 11,
+        fontWeight: 600,
+        fontFamily: "inherit",
+        cursor: "pointer",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+        minWidth: 48,
+        minHeight: 30,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: isOpen ? "#fff" : meta.color,
+          flexShrink: 0,
+        }}
+      />
+      {meta.label}
+    </button>
+  );
+}
+
+// ---- rail / row / float --------------------------------------------------
 
 export default function Projects({ state, openOverride, setOpenOverride, layout = "rail" }) {
   const open = openOverride;
   const setOpen = setOpenOverride;
-  const isRow = layout === "row"; // mobile: horizontal scroll-snap
+
+  if (layout === "float") {
+    // Mobile: compact pills floating on the bottom-right, stacked upward.
+    // Reverse iteration so PROJECT_META[0] (Work) sits at the bottom — the
+    // most reachable spot for a thumb. column-reverse handles the visual flip.
+    const onTap = (key) => {
+      setOpen(open === key ? null : key);
+      // Scroll to the drilldown so the user sees the result immediately.
+      setTimeout(() => {
+        const drill = document.getElementById("project-drilldown-anchor");
+        if (drill) drill.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 30);
+    };
+    return (
+      <div
+        style={{
+          position: "fixed",
+          right: 8,
+          bottom: 84, // above StickyHabits
+          display: "flex",
+          flexDirection: "column-reverse",
+          gap: 5,
+          zIndex: 40,
+          pointerEvents: "auto",
+        }}
+      >
+        {PROJECT_META.map((m) => (
+          <FloatingPill key={m.key} meta={m} isOpen={open === m.key} onClick={() => onTap(m.key)} />
+        ))}
+      </div>
+    );
+  }
+
+  const isRow = layout === "row";
   return (
     <div
       style={{

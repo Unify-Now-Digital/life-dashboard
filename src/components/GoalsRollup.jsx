@@ -46,7 +46,7 @@ export default function GoalsRollup({ state, onOpenProject }) {
         }}
       >
         <span>
-          Active goals{" "}
+          Objectives{" "}
           <span style={styles.sectionSub}>
             {total === 0 ? "none yet" : `${completed}/${total} complete`}
           </span>

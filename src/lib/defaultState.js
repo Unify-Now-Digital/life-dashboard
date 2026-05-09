@@ -212,7 +212,7 @@ export const defaultState = {
         {
           id: 3,
           key: "churchill",
-          name: "Churchill",
+          name: "Churchill Memorials",
           color: "#BA7517",
           value: "£5,800",
           meta: "14 orders · 6 permits pending",

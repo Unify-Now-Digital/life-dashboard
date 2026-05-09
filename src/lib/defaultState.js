@@ -86,7 +86,10 @@ export const defaultState = {
     finance: {
       goals: [],
       displaySettings: { period: "lastMonth", chart: "table", hiddenRows: [] },
-      debts: [],
+      debts: [
+        { id: 1, name: "Student loan", amount: { amount: 22000, ccy: "GBP", eur: 25806, rate: 1.173, asOf: "2026-05-09" } },
+        { id: 2, name: "Tax debt", amount: { amount: 5000, ccy: "EUR", eur: 5000, rate: 1, asOf: "2026-05-09" } },
+      ],
       taxTimeline: [],
       savings: [
         { id: 1, account: "Revolut", balance: { amount: 8000, ccy: "EUR", eur: 8000, rate: 1, asOf: "2026-05-09" }, target: null },
@@ -111,31 +114,51 @@ export const defaultState = {
       trips: [
         {
           id: 1,
-          name: "Buenos Aires",
-          start: "2026-06-15",
-          end: "2026-07-02",
-          sub: "Jun 15 – Jul 2 · 17 nights",
-          days: 42,
+          name: "Georgia",
+          start: "2026-05-11",
+          end: "2026-05-15",
+          sub: "May 11 – May 15 · 4 nights",
+          days: 2,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
         {
           id: 2,
-          name: "London — Churchill / Matt",
-          start: "2026-07-20",
-          end: "2026-07-24",
-          sub: "Jul 20 – Jul 24 · 4 nights",
-          days: 77,
+          name: "London",
+          start: "2026-05-27",
+          end: "2026-06-04",
+          sub: "May 27 – Jun 4 · 8 nights",
+          days: 18,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
         {
           id: 3,
-          name: "Tbilisi — UD",
-          start: "2026-09-10",
-          end: "2026-09-17",
-          sub: "Sep 10 – Sep 17 · 7 nights",
-          days: 129,
+          name: "Riga / Tallinn",
+          start: "2026-08-01",
+          end: "2026-08-20",
+          sub: "Aug 1 – Aug 20 · 19 nights · TBC",
+          days: 84,
+          checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
+          notes: "TBC",
+        },
+        {
+          id: 4,
+          name: "Florence",
+          start: "2026-08-21",
+          end: "2026-08-24",
+          sub: "Aug 21 – Aug 24 · 3 nights",
+          days: 104,
+          checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
+          notes: "",
+        },
+        {
+          id: 5,
+          name: "Croatia (Hvar)",
+          start: "2026-08-29",
+          end: "2026-08-30",
+          sub: "Aug 29 – Aug 30 · 1 night",
+          days: 112,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
@@ -157,12 +180,7 @@ export const defaultState = {
           color: "#E24B4A",
           value: "£3,240",
           meta: "2 orders · 5 enquiries",
-          goals: [
-            seedGoal("sm-launch", "First 10 orders", 10, [
-              { label: "Finalise pricing sheet" },
-              { label: "Soft-launch to mailing list" },
-            ]),
-          ],
+          goals: [],
         },
         {
           id: 2,
@@ -189,12 +207,7 @@ export const defaultState = {
           color: "#534AB7",
           value: "Mason App",
           meta: "65% to launch",
-          goals: [
-            seedGoal("ud-mason", "Mason App — go live", 100, [
-              { label: "Stripe production keys swapped in" },
-              { label: "Apple submission v1" },
-            ]),
-          ],
+          goals: [],
         },
       ],
     },
@@ -206,11 +219,7 @@ export const defaultState = {
           { label: "Weekly intercambio meet-up" },
         ]),
       ],
-      reading: [
-        { id: 1, title: "The 7 Habits of Highly Effective People", author: "Stephen Covey", progress: 60, sub: "ch. 5 of 8" },
-        { id: 2, title: "Mastery", author: "Robert Greene", progress: 22, sub: "ch. 2 of 6" },
-        { id: 3, title: "Huberman Lab — Sleep & cognition", author: "Podcast · 1 episode behind", progress: null, sub: "" },
-      ],
+      reading: [],
       // Spanish micro-learning. Argentine focus: vos in conjugations, no vosotros.
       // Pronouns order: yo, vos, él/ella, nosotros, ellos/ellas
       spanish: {
@@ -329,11 +338,119 @@ export const defaultState = {
         chunkIndex: 0,
         phrasesSeen: [],
       },
-      // Mirrors Spanish shape; empty until populated.
+      // Mirrors Spanish shape. Istanbul-Turkish flavour, informal sen form.
       turkish: {
-        phrases: [],
-        chunks: [],
-        verbs: [],
+        phrases: [
+          { id: 1, tr: "Cuma'dan önce onaylamanı isterim", en: "I'd like you to confirm it before Friday", note: "subjunctive 'isterim' + -mAnI suffix" },
+          { id: 2, tr: "Bence bunu tekrar düşünmemiz gerek", en: "I think we'd have to rethink it", note: "soft business pushback" },
+          { id: 3, tr: "Geç kaldım, kusura bakma", en: "I lost track of time, sorry", note: "common informal apology" },
+          { id: 4, tr: "Haftaya bıraksak nasıl olur?", en: "How about we leave it for next week?", note: "polite reschedule with -sA conditional" },
+          { id: 5, tr: "Bir yere kadar evet", en: "To a certain extent, yes", note: "nuanced agreement" },
+          { id: 6, tr: "Vaktim olsa kendim yapardım", en: "If I had more time, I'd do it myself", note: "conditional + aorist" },
+          { id: 7, tr: "Bu hafta başımı kaşıyacak vaktim yok", en: "I'm swamped this week", note: "Turkish idiom — lit. 'no time to scratch my head'" },
+          { id: 8, tr: "Aklında ne var?", en: "What do you have in mind?", note: "opens the door, casual" },
+          { id: 9, tr: "Denemeye değer derim", en: "I'd say it's worth a shot", note: "softer opinion with aorist 'derim'" },
+          { id: 10, tr: "İstemediğimden değil, şu an yapamıyorum", en: "It's not that I don't want to, it's that I can't right now", note: "-DIğImdAn değil structure" },
+          { id: 11, tr: "Fikre bayıldım", en: "I really loved the idea", note: "'bayılmak' — strong positive informal" },
+          { id: 12, tr: "Numarayı bana atar mısın?", en: "Could you send me the contact?", note: "polite request with 'atmak' (slang send)" },
+        ],
+        chunks: [
+          { id: 1, situation: "First-date opener at a café", turns: [
+            { speaker: "them", tr: "Hafta sonları ne yapmayı seversin?", en: "What do you like to do on weekends?" },
+            { speaker: "you", options: [
+              { tone: "casual", tr: "Haftasına göre. Enerjim varsa spor ve dışarı; yoksa kitap ve dinlenme.", en: "Depends on the weekend. If I have energy, gym and outside; if not, reading and resting." },
+              { tone: "neutral", tr: "Genelde antrenman, fırsat olunca seyahat. Ya sen?", en: "I usually train and, when I can, travel. And you?" },
+              { tone: "playful", tr: "Kiminle geçirdiğime bağlı. Aklında ne var?", en: "Depends who I spend them with. What do you have in mind?" },
+            ]},
+            { speaker: "them", tr: "Güzel. Genelde dışarı mı çıkarsın yoksa evde mi takılırsın?", en: "Nice. Do you usually go out or rather stay in?" },
+            { speaker: "you", options: [
+              { tone: "honest", tr: "Yarı yarıya. Biraz spor, biraz kafe, biraz da yatak.", en: "Half and half. Some gym, some café, some bed." },
+              { tone: "outgoing", tr: "Çıkmayı severim ama abartmam. Favori bir mekânın var mı?", en: "I like going out, but I don't overdo it. Do you have a favourite spot?" },
+              { tone: "homebody", tr: "Daha çok evdeyim. Ama doğru kişi için istisna yaparım.", en: "More staying in. But for the right person I make an exception." },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 2, situation: "Pushing back on a client deadline", turns: [
+            { speaker: "them", tr: "Bunu Pazartesi'ye yetiştirmemiz lazım.", en: "We need this by Monday." },
+            { speaker: "you", options: [
+              { tone: "diplomatic", tr: "Aciliyeti anlıyorum. Düzgün yapmak için Çarşamba'yı öneririm.", en: "I understand the urgency. To do it right, I'd propose Wednesday." },
+              { tone: "firm", tr: "Kaliteyi garantilemek için en erken Çarşamba olur.", en: "To guarantee quality, the earliest would be Wednesday." },
+              { tone: "collaborative", tr: "Bazı şeyleri kaydırırsak Salı'ya yetiştirebilir miyiz?", en: "If we move some pieces around, could we aim for Tuesday?" },
+            ]},
+            { speaker: "them", tr: "Müşteri bekliyor.", en: "The client is waiting." },
+            { speaker: "you", options: [
+              { tone: "calm", tr: "Biliyorum. Pazartesi yarım yamalak yerine Çarşamba sağlam vermeyi tercih ederim.", en: "I know. I'd rather deliver something solid Wednesday than half-baked Monday." },
+              { tone: "owning", tr: "Onlara ben söylerim. İletebileceğin bir mesaj atayım mı?", en: "I'll handle telling them. Want me to send a message you can forward?" },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 3, situation: "Declining an invitation politely", turns: [
+            { speaker: "them", tr: "Cumartesi yemeğe gelir misin?", en: "Want to join us for dinner Saturday?" },
+            { speaker: "you", options: [
+              { tone: "warm", tr: "Çok isterdim ama bir işim var. Sonraya bıraksak?", en: "I'd love to, but I already have something. Can we leave it for next time?" },
+              { tone: "brief", tr: "Cumartesi olmaz. Hafta içi başka bir gün?", en: "I can't Saturday. Another day this week?" },
+              { tone: "open", tr: "Bu sefer yetişemem ama bir dahakine haber ver.", en: "Can't make it this time, but let me know next time." },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 4, situation: "Boss invites you for a one-on-one", turns: [
+            { speaker: "them", tr: "Bir dakikan var mı? Nasıl gittiğine bakmak istiyordum.", en: "Got a minute? I wanted to see how you're doing." },
+            { speaker: "you", options: [
+              { tone: "direct", tr: "Var. Aslında son aylar ışığında maaşımı konuşmak istiyordum.", en: "Yes, I actually wanted to review my compensation given the last few months." },
+              { tone: "framed", tr: "Var. Roldeki bir sonraki adımı konuşmak isterim.", en: "Yes. I'd like to talk about the next step in my role." },
+              { tone: "data-led", tr: "Var. Bu çeyrek tesliminin özetini hazırladım, beraber bakalım mı?", en: "Yes. I put together a summary of what I delivered this quarter, shall we look at it?" },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 5, situation: "Recovering from a missed message", turns: [
+            { speaker: "them", tr: "Sana üç gün önce yazmıştım.", en: "I wrote to you three days ago." },
+            { speaker: "them", tr: "Her şey yolunda mı?", en: "Is everything OK?" },
+            { speaker: "you", options: [
+              { tone: "honest", tr: "Pardon, gözümden kaçmış. Çok yoğundum, daha yeni gördüm.", en: "Sorry, it slipped by. I was swamped and just saw it." },
+              { tone: "warm", tr: "Bu hafta seni özledim. Geç kaldığım için affet.", en: "I missed you this week. Sorry for the delay." },
+              { tone: "playful", tr: "Sana borçluyum. Nasıl telafi edeyim?", en: "I owe you. How do I make it up to you?" },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 6, situation: "Disagreeing with a teammate", turns: [
+            { speaker: "them", tr: "Ben olsam böyle yapardım, o kadar.", en: "I'd just do it this way, end of story." },
+            { speaker: "you", options: [
+              { tone: "respectful", tr: "Anlıyorum ama uzun vadeli etkisi beni endişelendiriyor.", en: "I get your point, but I'm worried about the long-term impact." },
+              { tone: "questioning", tr: "Karar vermeden başka bir açıdan baksak?", en: "What if we look at it from another angle before deciding?" },
+              { tone: "alternative", tr: "Şart değil. Daha iyi işleyebilecek başka bir yol var.", en: "Not necessarily. There's another way that could work better." },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 7, situation: "Catching up after a long time", turns: [
+            { speaker: "them", tr: "Ne kadar oldu! Nasılsın?", en: "It's been so long! How are you?" },
+            { speaker: "you", options: [
+              { tone: "honest", tr: "Açıkçası baya hareketli. Bin tane şey oluyor ama keyifliyim. Sen nasılsın?", en: "Pretty busy, honestly. A thousand things going on, but happy. You?" },
+              { tone: "brief", tr: "İyiyim, iş yoğun. Sende ne var ne yok?", en: "All good, lots of work. How's yours going?" },
+              { tone: "deflect", tr: "Uzun hikâye. Önce sen anlat.", en: "Long story. You go first." },
+            ]},
+          ], bucket: 0, lastSeen: null },
+          { id: 8, situation: "Negotiating at a market", turns: [
+            { speaker: "them", tr: "Elli euro.", en: "That'll be fifty euros." },
+            { speaker: "you", options: [
+              { tone: "polite", tr: "İki tane alsam bir esneklik olur mu?", en: "Would there be some flexibility if I take two?" },
+              { tone: "direct", tr: "Sana kırk veririm, nakit.", en: "I'll offer you forty in cash." },
+              { tone: "soft", tr: "Çok beğendim ama bütçemi aşıyor. Otuza yakın bir şey?", en: "I love it, but it's outside my budget. Anything closer to thirty?" },
+            ]},
+            { speaker: "them", tr: "Yapabileceğimin en iyisi bu. Kırk beş, son fiyat.", en: "That's the best I can do. Forty-five, final price." },
+            { speaker: "you", options: [
+              { tone: "accept", tr: "Anlaştık. Kırk beş tamam.", en: "Done. Forty-five works." },
+              { tone: "walk", tr: "Düşünüp haber veririm. Yine de teşekkürler.", en: "I'll think about it and let you know. Thanks anyway." },
+            ]},
+          ], bucket: 0, lastSeen: null },
+        ],
+        verbs: [
+          { id: 1, infinitive: "olmak", en: "to be / become", forms: { past: "oldum", present: "oluyorum", future: "olacağım" }, rule: "core copula; aorist 'olurum'", correctPasses: 0 },
+          { id: 2, infinitive: "yapmak", en: "to do / make", forms: { past: "yaptım", present: "yapıyorum", future: "yapacağım" }, rule: "regular -mak; vowel harmony a→ı", correctPasses: 0 },
+          { id: 3, infinitive: "gitmek", en: "to go", forms: { past: "gittim", present: "gidiyorum", future: "gideceğim" }, rule: "consonant softening t→d before vowels", correctPasses: 0 },
+          { id: 4, infinitive: "gelmek", en: "to come", forms: { past: "geldim", present: "geliyorum", future: "geleceğim" }, rule: "regular -mek; e-class harmony", correctPasses: 0 },
+          { id: 5, infinitive: "almak", en: "to take / buy", forms: { past: "aldım", present: "alıyorum", future: "alacağım" }, rule: "regular -mak", correctPasses: 0 },
+          { id: 6, infinitive: "vermek", en: "to give", forms: { past: "verdim", present: "veriyorum", future: "vereceğim" }, rule: "regular -mek", correctPasses: 0 },
+          { id: 7, infinitive: "görmek", en: "to see", forms: { past: "gördüm", present: "görüyorum", future: "göreceğim" }, rule: "ö→ü harmony in -Iyor", correctPasses: 0 },
+          { id: 8, infinitive: "bilmek", en: "to know", forms: { past: "bildim", present: "biliyorum", future: "bileceğim" }, rule: "regular -mek; common aorist 'bilirim'", correctPasses: 0 },
+          { id: 9, infinitive: "istemek", en: "to want", forms: { past: "istedim", present: "istiyorum", future: "isteyeceğim" }, rule: "buffer y in future after vowel-stem", correctPasses: 0 },
+          { id: 10, infinitive: "demek", en: "to say", forms: { past: "dedim", present: "diyorum", future: "diyeceğim" }, rule: "irregular: e→i in present/future", correctPasses: 0 },
+          { id: 11, infinitive: "edebilmek", en: "to be able to", forms: { past: "edebildim", present: "edebiliyorum", future: "edebileceğim" }, rule: "ability suffix -Abil; commonly attached to other verbs", correctPasses: 0 },
+          { id: 12, infinitive: "durmak", en: "to stop / stand", forms: { past: "durdum", present: "duruyorum", future: "duracağım" }, rule: "regular -mak; o→u harmony in -Iyor", correctPasses: 0 },
+        ],
         phraseIndex: 0,
         chunkIndex: 0,
         phrasesSeen: [],
@@ -343,11 +460,22 @@ export const defaultState = {
     journal: {
       goals: [],
       entries: [],
-      mood: [],
-      weekly: [],
+      mood: [
+        { date: "2026-05-09", energy: 3, mood: 3 },
+      ],
+      weekly: [
+        {
+          weekISO: "2026-W19",
+          prompts: [
+            { q: "What went well?", a: "" },
+            { q: "What didn't?", a: "" },
+            { q: "What's next?", a: "" },
+          ],
+        },
+      ],
       monthly: [],
       // Top-of-mind: short rolling list, FIFO ~10 entries, surfaced in dashboard summary.
-      topOfMind: [],
+      topOfMind: ["Buenos Aires planning", "Mason App launch"],
     },
 
     relationships: {

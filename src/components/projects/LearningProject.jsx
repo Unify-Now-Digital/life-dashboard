@@ -2,31 +2,31 @@ import React, { useState } from "react";
 import { C, styles } from "../../lib/tokens";
 import { EditableText, IconBtn, EditModeToggle } from "../Editable.jsx";
 import Project from "./Project.jsx";
-import Spanish from "../Spanish.jsx";
+import LanguageDeck from "../LanguageDeck.jsx";
 import { nextId } from "../../lib/defaultState";
 
-export default function LearningProject({ state, setState, meta, onClose, goalHandlers }) {
-  const data = state.projects.learning;
-  const [tab, setTab] = useState("spanish");
-
-  // Spanish handlers — operate on state.projects.learning.spanish
-  const updateSpanish = (updater) =>
+// Per-language deck handlers. `langSlot` is the key under
+// state.projects.learning that holds the deck (e.g. "spanish" / "turkish").
+function makeDeckHandlers(setState, langSlot) {
+  const update = (updater) =>
     setState((s) => ({
       ...s,
-      projects: { ...s.projects, learning: { ...s.projects.learning, spanish: updater(s.projects.learning.spanish) } },
+      projects: {
+        ...s.projects,
+        learning: { ...s.projects.learning, [langSlot]: updater(s.projects.learning[langSlot]) },
+      },
     }));
-
-  const spanishHandlers = {
+  return {
     onCyclePhrase: () =>
-      updateSpanish((sp) => ({ ...sp, phraseIndex: (sp.phraseIndex + 1) % sp.phrases.length })),
+      update((sp) => ({ ...sp, phraseIndex: (sp.phraseIndex + 1) % sp.phrases.length })),
     onMarkPhraseSeen: (phraseId) =>
-      updateSpanish((sp) => {
+      update((sp) => {
         const seen = sp.phrasesSeen || [];
         if (seen.includes(phraseId)) return sp;
         return { ...sp, phrasesSeen: [...seen, phraseId] };
       }),
     onRateChunk: (id, rating) =>
-      updateSpanish((sp) => {
+      update((sp) => {
         const chunks = sp.chunks.map((c) => {
           if (c.id !== id) return c;
           if (rating === "good") return { ...c, bucket: Math.min(c.bucket + 1, 5), lastSeen: Date.now() };
@@ -36,13 +36,21 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
         return { ...sp, chunks, chunkIndex: (sp.chunkIndex + 1) % sp.chunks.length };
       }),
     onCheckVerb: (id, allFilledAndRight) =>
-      updateSpanish((sp) => ({
+      update((sp) => ({
         ...sp,
         verbs: sp.verbs.map((v) =>
           v.id === id ? { ...v, correctPasses: allFilledAndRight ? v.correctPasses + 1 : 0 } : v
         ),
       })),
   };
+}
+
+export default function LearningProject({ state, setState, meta, onClose, goalHandlers }) {
+  const data = state.projects.learning;
+  const [tab, setTab] = useState("spanish");
+
+  const spanishHandlers = makeDeckHandlers(setState, "spanish");
+  const turkishHandlers = makeDeckHandlers(setState, "turkish");
 
   // Reading list handlers
   const updateReading = (updater) =>
@@ -66,11 +74,25 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
     <Project title="Learning" color={meta.color} onClose={onClose} goals={data.goals} goalHandlers={goalHandlers}>
       <Tabs tab={tab} onChange={setTab} />
 
-      {tab === "spanish" && <Spanish data={data.spanish} {...spanishHandlers} />}
+      {tab === "spanish" && (
+        <LanguageDeck
+          data={data.spanish}
+          langKey="es"
+          title="Spanish"
+          subtitle="B1 → B2 · vos"
+          pronoun="yo"
+          {...spanishHandlers}
+        />
+      )}
       {tab === "turkish" && (
-        <div style={{ fontSize: 12, color: C.textTertiary, padding: "12px 0" }}>
-          Turkish module mirrors Spanish. {data.turkish.phrases.length === 0 ? "No content seeded yet." : `${data.turkish.phrases.length} phrases.`}
-        </div>
+        <LanguageDeck
+          data={data.turkish}
+          langKey="tr"
+          title="Turkish"
+          subtitle="A1 · informal sen"
+          pronoun="ben"
+          {...turkishHandlers}
+        />
       )}
       {tab === "reading" && <ReadingList items={data.reading} {...readingH} />}
     </Project>

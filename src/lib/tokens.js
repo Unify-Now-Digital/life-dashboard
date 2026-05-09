@@ -49,6 +49,14 @@ export const PROJECT_COLORS = {
   charity: "#0C447C",
 };
 
+// Calendar chip palette — one tone per chip kind. Reuses existing project hues.
+export const CHIP_STYLES = {
+  trip:     { bg: "#E1F5EE", color: "#0F6E56" }, // travel
+  deadline: { bg: "#FCEBEB", color: "#791F1F" }, // journal red
+  prompt:   { bg: "#FAEEDA", color: "#854F0B" }, // amber
+  personal: { bg: "#EEEDFE", color: "#3C3489" }, // purple
+};
+
 export const QUOTES = [
   '"Discipline equals freedom."',
   '"What gets measured gets managed."',

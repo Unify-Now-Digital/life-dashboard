@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { C, styles } from "../lib/tokens";
 
-const TENSES = [
-  { key: "past", label: "yo past" },
-  { key: "present", label: "yo present" },
-  { key: "future", label: "yo future" },
-];
+// Generic language-deck component. Originally Spanish-only; now parameterised
+// by `langKey` ('es' | 'tr' | …) so the same UI drives any language whose
+// state shape matches the deck contract:
+//   data = { phrases:[{ id, [langKey], en, note }], chunks:[…], verbs:[…],
+//            phraseIndex, chunkIndex, phrasesSeen }
+//   verbs: { id, infinitive, en, forms:{past, present, future}, rule, correctPasses }
+
 const RULE_MASTERY_THRESHOLD = 2;
+
+function tensesFor(pronoun) {
+  return [
+    { key: "past", label: `${pronoun} past` },
+    { key: "present", label: `${pronoun} present` },
+    { key: "future", label: `${pronoun} future` },
+  ];
+}
 
 function SubTabs({ tab, setTab, progress }) {
   const tabs = [
@@ -58,12 +68,8 @@ function SubTabs({ tab, setTab, progress }) {
   );
 }
 
-function PhraseView({ phrases, index, onCycle, onMarkSeen }) {
+function PhraseView({ phrases, index, langKey, onCycle, onMarkSeen }) {
   const phrase = phrases[index % phrases.length];
-  // Mark the currently displayed phrase as seen whenever it changes — including
-  // the first render — so the Phrase tab counter advances naturally.
-  // onMarkSeen is excluded from deps because it's a fresh handler on every
-  // Dashboard render; the underlying setState is idempotent regardless.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     onMarkSeen(phrase.id);
@@ -73,7 +79,7 @@ function PhraseView({ phrases, index, onCycle, onMarkSeen }) {
       <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 6 }}>
         Phrase {(index % phrases.length) + 1} of {phrases.length}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.4 }}>{phrase.es}</div>
+      <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.4 }}>{phrase[langKey]}</div>
       <div style={{ fontSize: 13, color: C.textSecondary, marginTop: 6 }}>{phrase.en}</div>
       {phrase.note && (
         <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 10, fontStyle: "italic" }}>
@@ -100,12 +106,8 @@ function PhraseView({ phrases, index, onCycle, onMarkSeen }) {
   );
 }
 
-function TappableSpanish({ es, en, revealed, onToggle, variant }) {
-  // variant: "them" (left chat bubble) | "option" (subtle, with left border)
-  const baseStyle = {
-    cursor: "pointer",
-    userSelect: "none",
-  };
+function TappableLine({ source, en, revealed, onToggle, variant }) {
+  const baseStyle = { cursor: "pointer", userSelect: "none" };
   if (variant === "them") {
     return (
       <div onClick={onToggle} style={baseStyle}>
@@ -118,18 +120,10 @@ function TappableSpanish({ es, en, revealed, onToggle, variant }) {
             fontSize: 15,
           }}
         >
-          {es}
+          {source}
         </div>
         {revealed && (
-          <div
-            style={{
-              fontSize: 12,
-              color: C.textTertiary,
-              fontStyle: "italic",
-              marginTop: 4,
-              paddingLeft: 13,
-            }}
-          >
+          <div style={{ fontSize: 12, color: C.textTertiary, fontStyle: "italic", marginTop: 4, paddingLeft: 13 }}>
             {en}
           </div>
         )}
@@ -141,25 +135,21 @@ function TappableSpanish({ es, en, revealed, onToggle, variant }) {
       </div>
     );
   }
-  // option variant
   return (
     <div onClick={onToggle} style={{ ...baseStyle, borderLeft: `2px solid ${C.accent}`, padding: "4px 12px" }}>
-      <div style={{ fontSize: 14 }}>{es}</div>
+      <div style={{ fontSize: 14 }}>{source}</div>
       {revealed && (
-        <div style={{ fontSize: 12, color: C.textTertiary, fontStyle: "italic", marginTop: 2 }}>
-          {en}
-        </div>
+        <div style={{ fontSize: 12, color: C.textTertiary, fontStyle: "italic", marginTop: 2 }}>{en}</div>
       )}
     </div>
   );
 }
 
-function ChunksView({ chunks, index, onAdvance }) {
+function ChunksView({ chunks, index, langKey, onAdvance }) {
   const chunk = chunks[index % chunks.length];
-  const [step, setStep] = useState(1); // number of turns currently visible
-  const [revealedEN, setRevealedEN] = useState({}); // keys: "t-{idx}" or "o-{turnIdx}-{optIdx}"
+  const [step, setStep] = useState(1);
+  const [revealedEN, setRevealedEN] = useState({});
 
-  // Reset progress when the chunk changes (after a rating advances index)
   useEffect(() => {
     setStep(1);
     setRevealedEN({});
@@ -173,7 +163,6 @@ function ChunksView({ chunks, index, onAdvance }) {
 
   const handleRate = (rating) => {
     onAdvance(chunk.id, rating);
-    // useEffect on chunk.id change will reset step + revealedEN
   };
 
   return (
@@ -189,8 +178,8 @@ function ChunksView({ chunks, index, onAdvance }) {
             return (
               <div key={ti}>
                 <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 4 }}>them</div>
-                <TappableSpanish
-                  es={turn.es}
+                <TappableLine
+                  source={turn[langKey]}
                   en={turn.en}
                   revealed={!!revealedEN[key]}
                   onToggle={() => toggleEn(key)}
@@ -199,7 +188,6 @@ function ChunksView({ chunks, index, onAdvance }) {
               </div>
             );
           }
-          // you turn — render the option list
           return (
             <div key={ti}>
               <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 6 }}>
@@ -213,8 +201,8 @@ function ChunksView({ chunks, index, onAdvance }) {
                       <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 2, paddingLeft: 14 }}>
                         {opt.tone}
                       </div>
-                      <TappableSpanish
-                        es={opt.es}
+                      <TappableLine
+                        source={opt[langKey]}
                         en={opt.en}
                         revealed={!!revealedEN[key]}
                         onToggle={() => toggleEn(key)}
@@ -287,14 +275,10 @@ function RateBtn({ children, onClick, primary }) {
 }
 
 function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
-  const borderColor =
-    status === true ? C.success : status === false ? C.accent : C.borderStrong;
+  const borderColor = status === true ? C.success : status === false ? C.accent : C.borderStrong;
   const bg = status === false ? C.accentLight : C.bgSecondary;
   const color = revealed ? C.textTertiary : C.text;
   const fontStyle = revealed ? "italic" : "normal";
-  // After a check, show the canonical answer beneath every typed cell so the
-  // user can compare against what they typed — even when correct (useful when
-  // accent-insensitive matching forgave a missing accent).
   const showAnswerBeneath = status !== undefined && !revealed;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -303,11 +287,7 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
         value={value}
         onChange={onChange}
         onKeyDown={onKeyDown}
-        onFocus={(e) => {
-          // Auto-select revealed answers so the first keystroke replaces them
-          // and the user can practise typing over the prompt.
-          if (revealed) e.target.select();
-        }}
+        onFocus={(e) => { if (revealed) e.target.select(); }}
         autoComplete="off"
         autoCapitalize="none"
         spellCheck={false}
@@ -326,13 +306,7 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
         }}
       />
       {showAnswerBeneath && (
-        <div
-          style={{
-            fontSize: 10,
-            color: status ? C.textTertiary : C.accentDark,
-            paddingLeft: 2,
-          }}
-        >
+        <div style={{ fontSize: 10, color: status ? C.textTertiary : C.accentDark, paddingLeft: 2 }}>
           {correct}
         </div>
       )}
@@ -340,13 +314,10 @@ function VerbCell({ value, onChange, onKeyDown, status, correct, revealed }) {
   );
 }
 
-// Per-row state model:
-//   evals[verbId]?.[tk]: undefined = not yet checked, true = right, false = wrong
-//   revealed[verbId]?.[tk]: true = filled by clicking "show", false/undefined = user-typed
-//   editing a cell clears its eval and revealed flags
 const GRID_COLS = "minmax(96px, 1.4fr) repeat(3, minmax(56px, 78px)) 26px 38px";
 
-function VerbsView({ verbs, onCheckVerb }) {
+function VerbsView({ verbs, pronoun, onCheckVerb }) {
+  const TENSES = tensesFor(pronoun);
   const blankDrafts = () =>
     verbs.reduce((acc, v) => {
       acc[v.id] = { past: "", present: "", future: "" };
@@ -355,7 +326,7 @@ function VerbsView({ verbs, onCheckVerb }) {
 
   const [drafts, setDrafts] = useState(blankDrafts);
   const [evals, setEvals] = useState({});
-  const [revealed, setRevealed] = useState({}); // { [verbId]: { past, present, future } as bool }
+  const [revealed, setRevealed] = useState({});
 
   const updateDraft = (verbId, tk, value) => {
     setDrafts((d) => ({ ...d, [verbId]: { ...d[verbId], [tk]: value } }));
@@ -364,7 +335,6 @@ function VerbsView({ verbs, onCheckVerb }) {
       if (!row || row[tk] === undefined) return e;
       return { ...e, [verbId]: { ...row, [tk]: undefined } };
     });
-    // Typing into a revealed cell makes it user-typed
     setRevealed((r) => {
       if (!r[verbId]?.[tk]) return r;
       return { ...r, [verbId]: { ...r[verbId], [tk]: false } };
@@ -381,7 +351,6 @@ function VerbsView({ verbs, onCheckVerb }) {
     let allRight = true;
     for (const t of TENSES) {
       const filled = (d[t.key] || "").trim().length > 0;
-      // Revealed cells don't count as user attempts — they're study, not test
       if (!filled || r[t.key]) {
         cell[t.key] = undefined;
         allFilled = false;
@@ -401,7 +370,6 @@ function VerbsView({ verbs, onCheckVerb }) {
     const cur = revealed[verbId] || {};
     const anyRevealed = TENSES.some((t) => cur[t.key]);
     if (anyRevealed) {
-      // Hide: clear revealed cells and their drafts
       setDrafts((d) => {
         const row = { ...d[verbId] };
         for (const t of TENSES) if (cur[t.key]) row[t.key] = "";
@@ -409,7 +377,6 @@ function VerbsView({ verbs, onCheckVerb }) {
       });
       setRevealed((r) => ({ ...r, [verbId]: {} }));
     } else {
-      // Show: fill empty cells with correct answers
       const newRev = {};
       setDrafts((d) => {
         const row = { ...d[verbId] };
@@ -446,13 +413,12 @@ function VerbsView({ verbs, onCheckVerb }) {
           gap: 8,
         }}
       >
-        <span>Type the yo form. Enter (or ↩) to check, show to reveal.</span>
+        <span>Type the {pronoun} form. Enter (or ↩) to check, show to reveal.</span>
         <span style={{ color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
           {masteredCount} / {verbs.length} mastered
         </span>
       </div>
 
-      {/* Header row — labels appear once at top so each verb row stays compact */}
       <div
         style={{
           display: "grid",
@@ -466,9 +432,9 @@ function VerbsView({ verbs, onCheckVerb }) {
         }}
       >
         <div></div>
-        <div>yo past</div>
-        <div>yo present</div>
-        <div>yo future</div>
+        {TENSES.map((t) => (
+          <div key={t.key}>{t.label}</div>
+        ))}
         <div></div>
         <div></div>
       </div>
@@ -638,7 +604,6 @@ function VerbsView({ verbs, onCheckVerb }) {
 }
 
 function normalize(s) {
-  // Strip accents so users typing "tendre" on mobile match "tendré"
   return (s || "")
     .trim()
     .toLowerCase()
@@ -646,7 +611,17 @@ function normalize(s) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb, onMarkPhraseSeen }) {
+export default function LanguageDeck({
+  data,
+  langKey,
+  title,
+  subtitle,
+  pronoun,
+  onCyclePhrase,
+  onRateChunk,
+  onCheckVerb,
+  onMarkPhraseSeen,
+}) {
   const [tab, setTab] = useState("verbs");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -660,8 +635,6 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
     phrase: { done: phrasesSeen, total: data.phrases.length, metric: "seen" },
   };
 
-  // Pill summary when collapsed — shows progress at a glance so the user
-  // knows where they are without having to expand. Single tap reopens.
   if (collapsed) {
     return (
       <div
@@ -681,7 +654,7 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontWeight: 500, color: C.text }}>Spanish</span>
+          <span style={{ fontWeight: 500, color: C.text }}>{title}</span>
           <span style={{ color: C.textTertiary }}>
             verbs {verbsMastered}/{data.verbs.length} · conv {chunksMastered}/{data.chunks.length} · phr {phrasesSeen}/{data.phrases.length}
           </span>
@@ -694,12 +667,12 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
   return (
     <div style={styles.card}>
       <div style={{ ...styles.sectionH, marginBottom: 12 }}>
-        <span style={{ fontWeight: 500 }}>Spanish</span>
+        <span style={{ fontWeight: 500 }}>{title}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={styles.sectionSub}>B1 → B2 · vos</span>
+          <span style={styles.sectionSub}>{subtitle}</span>
           <button
             onClick={() => setCollapsed(true)}
-            aria-label="Collapse Spanish section"
+            aria-label={`Collapse ${title} section`}
             title="Collapse"
             style={{
               background: "transparent",
@@ -721,14 +694,15 @@ export default function Spanish({ data, onCyclePhrase, onRateChunk, onCheckVerb,
         <PhraseView
           phrases={data.phrases}
           index={data.phraseIndex}
+          langKey={langKey}
           onCycle={onCyclePhrase}
           onMarkSeen={onMarkPhraseSeen}
         />
       )}
       {tab === "chunks" && (
-        <ChunksView chunks={data.chunks} index={data.chunkIndex} onAdvance={onRateChunk} />
+        <ChunksView chunks={data.chunks} index={data.chunkIndex} langKey={langKey} onAdvance={onRateChunk} />
       )}
-      {tab === "verbs" && <VerbsView verbs={data.verbs} onCheckVerb={onCheckVerb} />}
+      {tab === "verbs" && <VerbsView verbs={data.verbs} pronoun={pronoun} onCheckVerb={onCheckVerb} />}
     </div>
   );
 }

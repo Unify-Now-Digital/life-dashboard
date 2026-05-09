@@ -87,7 +87,6 @@ export const defaultState = {
 
     finance: {
       goals: [],
-      displaySettings: { period: "lastMonth", chart: "table", hiddenRows: [] },
       // Weekly net-worth snapshots in EUR. Powers the sparkline on the
       // Finance dashboard card. Dashboard reads the last 7 entries.
       netWorthHistory: [
@@ -99,27 +98,24 @@ export const defaultState = {
         { date: "2026-05-03", eur: -5300 },
         { date: "2026-05-09", eur: -4806 },
       ],
+      // EUR-only after the simplification. Tax timeline merged in here.
       debts: [
-        { id: 1, name: "Student loan", amount: { amount: 22000, ccy: "GBP", eur: 25806, rate: 1.173, asOf: "2026-05-09" } },
-        { id: 2, name: "Tax debt", amount: { amount: 5000, ccy: "EUR", eur: 5000, rate: 1, asOf: "2026-05-09" } },
+        { id: 1, name: "Student loan", amount: 25806 },
+        { id: 2, name: "Tax debt", amount: 5000 },
       ],
-      taxTimeline: [],
       savings: [
-        { id: 1, account: "Revolut", balance: { amount: 8000, ccy: "EUR", eur: 8000, rate: 1, asOf: "2026-05-09" }, target: null },
+        { id: 1, name: "Revolut", amount: 8000 },
       ],
       investments: [
-        { id: 1, account: "eToro", value: { amount: 12000, ccy: "EUR", eur: 12000, rate: 1, asOf: "2026-05-09" }, breakdown: "" },
+        { id: 1, name: "eToro", amount: 12000 },
       ],
-      monthlyRevenue: {
-        // Unify Digital — variable, 12% of Churchill revenue. manualOverride wins if set.
-        ud: { type: "variableFromChurchill", percent: 12, manualOverride: null },
-        // Sears Melvin — fixed monthly draw (currently £0/mo while reinvesting).
-        sm: { type: "fixedMonthly", amount: { amount: 0, ccy: "GBP", eur: 0, rate: 1.173, asOf: "2026-05-09" } },
-        // BODDY — €2,250/mo retainer.
-        boddy: { type: "fixedMonthly", amount: { amount: 2250, ccy: "EUR", eur: 2250, rate: 1, asOf: "2026-05-09" } },
-        // Personal training — £60/wk.
-        personalTraining: { type: "fixedWeekly", amount: { amount: 60, ccy: "GBP", eur: 70.4, rate: 1.173, asOf: "2026-05-09" } },
-      },
+      // Flat monthly revenue lines — no UD percentage formula, plain EUR.
+      monthlyRevenue: [
+        { id: 1, name: "Unify Digital", amount: 8343 },
+        { id: 2, name: "Sears Melvin", amount: 0 },
+        { id: 3, name: "BODDY", amount: 2250 },
+        { id: 4, name: "Personal training", amount: 240 },
+      ],
     },
 
     travel: {

@@ -133,11 +133,19 @@ function deltaHealth(state, meta) {
   });
 }
 
+// Defensive: handles new plain-EUR-number shape AND legacy money-object shape.
+const moneyEur = (item) => {
+  const v = item?.amount ?? item?.balance ?? item?.value;
+  if (typeof v === "number") return v;
+  if (v && typeof v === "object") return v.eur ?? v.amount ?? 0;
+  return 0;
+};
+
 function deltaFinance(state, meta) {
   const f = state.projects?.finance || {};
-  const sav = (f.savings || []).reduce((a, b) => a + (b.balance?.eur || 0), 0);
-  const inv = (f.investments || []).reduce((a, b) => a + (b.value?.eur || 0), 0);
-  const debt = (f.debts || []).reduce((a, b) => a + (b.amount?.eur || 0), 0);
+  const sav = (f.savings || []).reduce((a, b) => a + moneyEur(b), 0);
+  const inv = (f.investments || []).reduce((a, b) => a + moneyEur(b), 0);
+  const debt = (f.debts || []).reduce((a, b) => a + moneyEur(b), 0);
   const net = sav + inv - debt;
   const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
   // Sparkline of last 7 weekly net-worth snapshots. Falls back to flat-line

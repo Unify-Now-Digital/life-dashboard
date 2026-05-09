@@ -18,7 +18,7 @@ function gatherGoals(state) {
 }
 
 export default function GoalsRollup({ state, onOpenProject }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const all = gatherGoals(state);
   const total = all.length;
   const completed = all.reduce((acc, { goal }) => {

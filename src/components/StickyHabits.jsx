@@ -6,8 +6,8 @@ import HabitDots from "./HabitDots.jsx";
 import HabitConfirm from "./HabitConfirm.jsx";
 
 const HABITS = [
-  { key: "gym", label: "Gym session" },
   { key: "spanish", label: "Spanish practice" },
+  { key: "gym", label: "Gym session" },
   { key: "clean", label: "Clean eating, no alcohol" },
   { key: "sleep", label: "Bed by 10pm" },
 ];

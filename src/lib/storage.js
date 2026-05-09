@@ -27,6 +27,7 @@ export function migrate(raw) {
   const v = s.schemaVersion || 1;
 
   if (v < 2) s = migrateV1toV2(s);
+  if (v < 3) s = migrateV2toV3(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -116,6 +117,76 @@ function migrateV1toV2(s) {
 }
 
 const slug = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+// v2 → v3: Finance simplification.
+// - monthlyRevenue: object { ud, sm, boddy, personalTraining } → array of
+//   { id, name, amount } in EUR.
+// - debts/savings/investments: any { amount: {amount,ccy,eur,...} } money
+//   snapshots → plain EUR numbers as `amount`.
+// - savings.balance / investments.value → unified `amount` field.
+function migrateV2toV3(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  const fin = out.projects?.finance;
+  if (!fin) return out;
+
+  // Money snapshot → plain EUR number.
+  const toEur = (v) => {
+    if (typeof v === "number") return v;
+    if (v && typeof v === "object") return v.eur ?? v.amount ?? 0;
+    return 0;
+  };
+
+  if (Array.isArray(fin.debts)) {
+    fin.debts = fin.debts.map((d) => ({
+      id: d.id,
+      name: d.name ?? d.label ?? "Debt",
+      amount: toEur(d.amount),
+    }));
+  }
+  if (Array.isArray(fin.savings)) {
+    fin.savings = fin.savings.map((sv) => ({
+      id: sv.id,
+      name: sv.name ?? sv.account ?? "Account",
+      amount: toEur(sv.balance ?? sv.amount),
+    }));
+  }
+  if (Array.isArray(fin.investments)) {
+    fin.investments = fin.investments.map((iv) => ({
+      id: iv.id,
+      name: iv.name ?? iv.account ?? "Account",
+      amount: toEur(iv.value ?? iv.amount),
+    }));
+  }
+
+  // monthlyRevenue: object → array, preserving labels.
+  if (fin.monthlyRevenue && !Array.isArray(fin.monthlyRevenue)) {
+    const labels = {
+      ud: "Unify Digital",
+      sm: "Sears Melvin",
+      boddy: "BODDY",
+      personalTraining: "Personal training",
+    };
+    const next = [];
+    let i = 1;
+    for (const [k, v] of Object.entries(fin.monthlyRevenue)) {
+      let amount = 0;
+      if (v && typeof v === "object") {
+        if ("manualOverride" in v && v.manualOverride != null) amount = toEur(v.manualOverride);
+        else if ("amount" in v) amount = toEur(v.amount);
+      } else if (typeof v === "number") {
+        amount = v;
+      }
+      next.push({ id: i++, name: labels[k] || k, amount });
+    }
+    fin.monthlyRevenue = next;
+  }
+
+  // Drop fields that no longer have UI; schema cleanliness.
+  delete fin.taxTimeline;
+  delete fin.displaySettings;
+
+  return out;
+}
 
 // ----- load ----------------------------------------------------------------
 export function loadFromCache() {

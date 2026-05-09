@@ -161,24 +161,22 @@ export default function Dashboard() {
         onTogglePriority={togglePriorityDone}
         onUnstar={unstar}
       />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
     </div>
   );
 
   const rightRail = (
     <aside
       style={{
-        position: isDesktop ? "sticky" : "static",
-        top: 24,
+        // Let the rail flow naturally — it scrolls with the page once it
+        // exceeds the viewport, so all 8 cards (incl. Learning at the bottom)
+        // remain reachable.
         alignSelf: "start",
         display: "flex",
         flexDirection: "column",
-        gap: 12,
-        maxHeight: isDesktop ? "calc(100vh - 48px)" : undefined,
-        overflowY: isDesktop ? "auto" : "visible",
-        paddingRight: 2,
+        gap: 8,
       }}
     >
       <NorthStar value={state.northStar} onChange={setNorthStar} compact />
@@ -202,9 +200,9 @@ export default function Dashboard() {
         onTogglePriority={togglePriorityDone}
         onUnstar={unstar}
       />
+      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       {drilldownPanel}
       <Calendar state={state} onOpenProject={setOpenProject} />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <Projects
         state={state}
         openOverride={openProject}

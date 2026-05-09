@@ -97,8 +97,8 @@ function collectEvents(state) {
 
 function Tabs({ tab, setTab }) {
   const items = [
+    { id: "fortnight", label: "2 weeks" },
     { id: "list", label: "List" },
-    { id: "week", label: "Week" },
     { id: "quarter", label: "Quarter" },
   ];
   return (
@@ -196,11 +196,11 @@ function ListView({ dated, free, onOpenProject }) {
   );
 }
 
-// ---- Week view (7 days × per-day event chips, trips span every day) -------
+// ---- Fortnight view (14 days × per-day event chips, 7-col × 2-row grid) ---
 
-function WeekView({ dated, onOpenProject }) {
+function FortnightView({ dated, onOpenProject }) {
   const today = startOfToday();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
 
   // Helper: events that touch a given day (handles multi-day trip spans).
   const eventsOn = (day) =>
@@ -433,7 +433,7 @@ function QuarterView({ dated, onOpenProject }) {
 
 export default function Calendar({ state, onOpenProject }) {
   const [open, setOpen] = useState(true);
-  const [tab, setTab] = useState("list");
+  const [tab, setTab] = useState("fortnight");
   const { dated, free } = collectEvents(state);
 
   return (
@@ -476,11 +476,11 @@ export default function Calendar({ state, onOpenProject }) {
           <div style={{ marginBottom: 8 }}>
             <Tabs tab={tab} setTab={setTab} />
           </div>
+          {tab === "fortnight" && (
+            <FortnightView dated={dated} onOpenProject={onOpenProject} />
+          )}
           {tab === "list" && (
             <ListView dated={dated} free={free} onOpenProject={onOpenProject} />
-          )}
-          {tab === "week" && (
-            <WeekView dated={dated} onOpenProject={onOpenProject} />
           )}
           {tab === "quarter" && (
             <QuarterView dated={dated} onOpenProject={onOpenProject} />

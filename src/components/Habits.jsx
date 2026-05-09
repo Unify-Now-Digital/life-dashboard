@@ -9,8 +9,8 @@ import "./Habits.css";
 // renders below the name. Inline so the file stays self-contained; can be
 // promoted into defaultState.js later if Arin wants to edit targets in-app.
 const HABITS = [
-  { key: "gym", label: "Gym", target: 5, period: 7, sub: "5x / week" },
   { key: "spanish", label: "Spanish", target: 7, period: 7, sub: "daily" },
+  { key: "gym", label: "Gym", target: 5, period: 7, sub: "5x / week" },
   { key: "clean", label: "Clean", target: 3, period: 7, sub: "3x / week" },
   { key: "sleep", label: "Sleep", target: 7, period: 7, sub: "8h+ daily" },
 ];

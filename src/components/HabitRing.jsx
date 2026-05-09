@@ -39,7 +39,10 @@ export default function HabitRing({ habit, status, streak, onClick, size = 44 })
   // status: "yes" | "no" | "unanswered" — for yesterday
   const radius = size / 2 - 3;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(streak / STREAK_GOAL, 1);
+  // When the most recent answered day is "yes", fill the ring entirely so
+  // a confirmed completion reads at a glance. Otherwise fall back to the
+  // streak-progress indicator.
+  const progress = status === "yes" ? 1 : Math.min(streak / STREAK_GOAL, 1);
   const dashOffset = circumference * (1 - progress);
 
   // Ring colour by status

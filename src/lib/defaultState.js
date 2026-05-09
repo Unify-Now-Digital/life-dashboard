@@ -3,7 +3,7 @@
 // Schema is the contract: additive changes only. Renames break things.
 // `migrate()` in storage.js upgrades older blobs in place.
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,

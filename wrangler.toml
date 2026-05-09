@@ -1,0 +1,23 @@
+name = "life-dashboard"
+main = "worker/index.js"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Workers Build runs this when the source repo is pushed.
+# Vite emits the SPA into ./dist which is then served by the [assets] block.
+[build]
+command = "npm run build"
+
+# Static assets (the Vite build output). `not_found_handling = "single-page-application"`
+# tells Workers to serve /index.html for any unknown path so React Router /
+# client-side navigation keeps working.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Secrets used by the Worker. Set via the Cloudflare dashboard
+# (Workers & Pages → life-dashboard → Settings → Variables) or CLI:
+#   wrangler secret put ANTHROPIC_API_KEY
+# The Worker treats a missing key as 503 so the app falls back to manual
+# macro entry without the integration configured.

@@ -124,14 +124,7 @@ export default function Project({ title, color, onClose, goals, goalHandlers, ch
   const [editing, setEditing] = useState(false);
   return (
     <div>
-      {hideHeader ? (
-        // Embedded mode: parent provides the title, we still need an Edit
-        // toggle so the goals block becomes addable. Sit it flush-right.
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          {headerExtras}
-          <EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />
-        </div>
-      ) : (
+      {hideHeader ? null : (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {color && (

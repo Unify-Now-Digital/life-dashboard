@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { C, styles, QUOTES } from "./lib/tokens";
+import { C, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue } from "./lib/storage";
 
@@ -16,93 +16,33 @@ import Projects, { PROJECT_META } from "./components/Projects.jsx";
 import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
 import JumpNav from "./components/JumpNav.jsx";
 
-// Projects that get always-rendered collapsible sections in the main column,
-// in display order (beneath Habits). Tapping their rail card / floating pill
-// expands the corresponding section; everything else uses the on-demand
-// drilldown panel.
-//
-// Each entry sets the section's default open/closed state independently —
-// Work and Finance start expanded so the subcards show without an extra tap.
-const SECTIONS = [
-  { key: "work", defaultOpen: true },
-  { key: "finance", defaultOpen: true },
-  { key: "health", defaultOpen: false },
-];
-const SECTION_KEYS = SECTIONS.map((s) => s.key);
+// Projects that get always-rendered sections in the main column, in display
+// order beneath Habits. Each section is just a colour-tinted card that wraps
+// the project's subcard layout — no title/chevron header (the colour is the
+// identifier). Subcards expand inline within the project body when tapped.
+const SECTION_KEYS = ["work", "finance", "health"];
 
-function MainSection({ projectKey, defaultOpen, openProject, setOpenProject, state, setState }) {
+function MainSection({ projectKey, state, setState }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
-  // Local open state (so each section has its own life) seeded by defaultOpen.
-  // Tapping a rail card / floating pill sets openProject = projectKey, which
-  // is treated as a force-open signal — but local toggle remains the source
-  // of truth thereafter so users can collapse expanded-by-default sections.
-  const [localOpen, setLocalOpen] = React.useState(defaultOpen);
-  const railSignal = openProject === projectKey;
-  // Sync: when the rail flips this section to open, mirror that locally.
-  React.useEffect(() => {
-    if (railSignal) setLocalOpen(true);
-  }, [railSignal]);
-
-  const isOpen = localOpen;
-  const toggle = () => {
-    setLocalOpen((v) => !v);
-    if (openProject === projectKey) setOpenProject(null);
-  };
-
+  const color = meta?.color || C.accent;
   return (
-    <div style={styles.card}>
-      <button
-        onClick={toggle}
-        aria-expanded={isOpen}
-        style={{
-          ...styles.sectionH,
-          margin: 0,
-          width: "100%",
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          color: "inherit",
-          textAlign: "left",
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: meta?.color || C.accent,
-            }}
-          />
-          {meta?.label || projectKey}
-        </span>
-        <span
-          aria-hidden="true"
-          style={{
-            fontSize: 11,
-            color: C.textTertiary,
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.15s",
-            display: "inline-block",
-          }}
-        >
-          ▾
-        </span>
-      </button>
-      {isOpen && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `0.5px solid ${C.border}` }}>
-          <ProjectDrilldown
-            projectKey={projectKey}
-            state={state}
-            setState={setState}
-            onClose={() => setLocalOpen(false)}
-            embedded
-          />
-        </div>
-      )}
+    <div
+      id={`section-${projectKey}`}
+      style={{
+        background: tint(color, 0.04),
+        border: `0.5px solid ${tint(color, 0.22)}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 10,
+        padding: "10px 12px",
+      }}
+    >
+      <ProjectDrilldown
+        projectKey={projectKey}
+        state={state}
+        setState={setState}
+        onClose={() => {}}
+        embedded
+      />
     </div>
   );
 }
@@ -247,16 +187,8 @@ export default function Dashboard() {
       </div>
     ) : null;
 
-  const mainSections = SECTIONS.map((s) => (
-    <MainSection
-      key={s.key}
-      projectKey={s.key}
-      defaultOpen={s.defaultOpen}
-      openProject={openProject}
-      setOpenProject={setOpenProject}
-      state={state}
-      setState={setState}
-    />
+  const mainSections = SECTION_KEYS.map((key) => (
+    <MainSection key={key} projectKey={key} state={state} setState={setState} />
   ));
 
   const mainColumn = (

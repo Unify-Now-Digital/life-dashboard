@@ -13,15 +13,19 @@ import {
   isFaceIdEnabled,
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
+  syncFromCloud,
 } from "../lib/authLocal";
+import { supabase, isSupabaseEnabled } from "../lib/supabase";
 
 // Privacy lock that sits in front of the dashboard. Three modes:
 //   "setup"  — first run, asks user to set a PIN (or skip)
 //   "unlock" — PIN entry, with a Face ID button if a passkey is registered
 //   "open"   — render children
 //
-// Cloud login (Supabase magic link) is unaffected; it runs underneath this
-// component via AuthGate.
+// When Supabase is configured the PIN/passkeys are account-tied and live in
+// user_security / user_passkeys. The local cache is hydrated by syncFromCloud()
+// after sign-in. With no local PIN we render children (AuthGate) so the user
+// can sign in; if their account has a PIN, sync installs it and we re-gate.
 
 const PIN_LEN_MIN = 4;
 const PIN_LEN_MAX = 8;
@@ -29,9 +33,31 @@ const PIN_LEN_MAX = 8;
 export default function LocalLock({ children }) {
   const [mode, setMode] = useState(() => {
     if (isLockSkipped()) return "open";
-    if (!isLockEnabled()) return "setup";
-    return isUnlocked() ? "open" : "unlock";
+    if (isLockEnabled()) return isUnlocked() ? "open" : "unlock";
+    // No local PIN. With Supabase we defer to AuthGate and let sync decide;
+    // without it, prompt setup directly.
+    return isSupabaseEnabled() ? "open" : "setup";
   });
+
+  // After sign-in, pull cloud security state into the local cache. If a PIN
+  // is found and we're not already unlocked, switch to "unlock".
+  useEffect(() => {
+    if (!isSupabaseEnabled()) return;
+    let alive = true;
+    const sync = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await syncFromCloud();
+      if (!alive) return;
+      if (isLockSkipped()) return;
+      if (isLockEnabled() && !isUnlocked()) setMode("unlock");
+    };
+    sync();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") sync();
+    });
+    return () => { alive = false; sub.subscription.unsubscribe(); };
+  }, []);
 
   // Re-lock when the tab is hidden for >5 minutes. The lock is a privacy
   // boundary — short backgrounding (switching apps to grab a number) shouldn't
@@ -70,8 +96,8 @@ export default function LocalLock({ children }) {
             markUnlocked();
             setMode("open");
           }}
-          onSkip={() => {
-            skipLock();
+          onSkip={async () => {
+            await skipLock();
             setMode("open");
           }}
         />

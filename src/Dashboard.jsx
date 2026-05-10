@@ -305,10 +305,14 @@ export default function Dashboard() {
   const rightRail = (
     <aside
       style={{
-        // Let the rail flow naturally — it scrolls with the page once it
-        // exceeds the viewport, so all 8 cards (incl. Learning at the bottom)
-        // remain reachable.
+        // Sticky so the rail follows the page as the main column scrolls.
+        // max-height + overflow keep the bottom tiles reachable when the rail
+        // is taller than the viewport.
+        position: "sticky",
+        top: 16,
         alignSelf: "start",
+        maxHeight: "calc(100vh - 32px)",
+        overflowY: "auto",
         display: "flex",
         flexDirection: "column",
         gap: 8,

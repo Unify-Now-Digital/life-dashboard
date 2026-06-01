@@ -31,6 +31,7 @@ export function migrate(raw) {
   if (v < 4) s = migrateV3toV4(s);
   if (v < 5) s = migrateV4toV5(s);
   if (v < 6) s = migrateV5toV6(s);
+  if (v < 7) s = migrateV6toV7(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -469,6 +470,21 @@ function migrateV5toV6(s) {
   if (out.projects?.finance) {
     delete out.projects.finance.netWorthHistory;
     delete out.projects.finance.revenueHistory;
+  }
+  return out;
+}
+
+// v6 → v7: remove BODDY. Matched on the seeded `boddy` business key and the
+// "BODDY" revenue line so a user-renamed entry wouldn't be caught.
+function migrateV6toV7(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  const work = out.projects?.work;
+  if (work?.businesses) {
+    work.businesses = work.businesses.filter((b) => b.key !== "boddy");
+  }
+  const fin = out.projects?.finance;
+  if (fin?.revenue) {
+    fin.revenue = fin.revenue.filter((r) => r.project !== "boddy" && r.name !== "BODDY");
   }
   return out;
 }

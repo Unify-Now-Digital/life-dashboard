@@ -54,6 +54,19 @@ export function revenueSeries(finance) {
   });
 }
 
+// Total of one balance category (saving|investment|debt) over time: one point
+// per distinct snapshot date, each summing that type's accounts as-of the date.
+// Returns [{ label /* date */, eur }] ascending.
+export function balanceSeries(finance, type) {
+  const accts = (finance?.accounts || []).filter((a) => a.type === type);
+  const dates = new Set();
+  for (const a of accts) for (const h of a.history || []) if (h.date) dates.add(h.date);
+  return [...dates].sort().map((date) => ({
+    label: date,
+    eur: accts.reduce((s, a) => s + valueAsOf(a.history, "date", date), 0),
+  }));
+}
+
 // Current net worth (latest snapshot of every account).
 export function currentNetWorth(finance) {
   const accounts = finance?.accounts || [];

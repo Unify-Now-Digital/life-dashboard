@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,
@@ -115,7 +115,6 @@ export const defaultState = {
       revenue: [
         { id: 1, name: "Unify Digital", project: "unify", history: [{ month: "2026-04", eur: 8000 }, { month: "2026-05", eur: 8343 }] },
         { id: 2, name: "Sears Melvin", project: "searsMelvin", history: [{ month: "2026-04", eur: 0 }, { month: "2026-05", eur: 0 }] },
-        { id: 3, name: "BODDY", project: "boddy", history: [{ month: "2026-04", eur: 2250 }, { month: "2026-05", eur: 2250 }] },
         { id: 4, name: "Personal training", project: null, history: [{ month: "2026-04", eur: 250 }, { month: "2026-05", eur: 240 }] },
       ],
     },
@@ -208,18 +207,6 @@ export const defaultState = {
           todos: [
             { id: 1, title: "Chase 6 outstanding permits", done: false },
             { id: 2, title: "Aylin 1-1 — raise discussion", done: false },
-          ],
-        },
-        {
-          id: 4,
-          key: "boddy",
-          name: "BODDY",
-          color: "#185FA5",
-          meta: "12 deals · 3 close this week",
-          goals: [],
-          todos: [
-            { id: 1, title: "Weekly status to founders", done: false },
-            { id: 2, title: "Onboarding doc for new SDR", done: false },
           ],
         },
       ],

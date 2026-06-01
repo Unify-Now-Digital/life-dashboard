@@ -7,6 +7,10 @@ import { supabase, isSupabaseEnabled } from "../lib/supabase";
 //
 // When Supabase IS configured we show a magic-link prompt until a session is
 // established, then render children.
+// Only this address may sign in. Enforced authoritatively by a server-side
+// trigger on auth.users; mirrored here for UX.
+const ALLOWED_EMAIL = "arinmelvin@gmail.com";
+
 export default function AuthGate({ children }) {
   if (!isSupabaseEnabled()) return children;
 
@@ -14,6 +18,7 @@ export default function AuthGate({ children }) {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -27,10 +32,19 @@ export default function AuthGate({ children }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!email) return;
+    // Client-side allowlist (the authoritative check is a server-side trigger
+    // on auth.users — see migration restrict_signups_to_owner_email). This
+    // just avoids firing a pointless magic link and gives a clear message.
+    if (email.trim().toLowerCase() !== ALLOWED_EMAIL) {
+      setError("This dashboard is private.");
+      return;
+    }
+    setError("");
     setSending(true);
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     setSending(false);
     if (!error) setSent(true);
+    else setError("Could not send link. Try again.");
   };
 
   return (
@@ -82,6 +96,9 @@ export default function AuthGate({ children }) {
             >
               {sending ? "Sending…" : "Send magic link"}
             </button>
+            {error && (
+              <div style={{ fontSize: 12, color: C.danger, marginTop: 8 }}>{error}</div>
+            )}
           </form>
         )}
       </div>

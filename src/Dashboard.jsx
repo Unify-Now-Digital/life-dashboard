@@ -295,7 +295,7 @@ export default function Dashboard() {
         setState={setState}
         onOpenProject={setOpenProject}
       />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <Calendar state={state} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
@@ -334,7 +334,7 @@ export default function Dashboard() {
         setState={setState}
         onOpenProject={setOpenProject}
       />
-      <Habits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+      <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <Calendar state={state} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
@@ -369,7 +369,7 @@ export default function Dashboard() {
           mobileLayout
         )}
 
-        <StickyHabits habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
+        <StickyHabits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
         <PhotoQuickAdd
           setState={setState}
           onCreated={() => setOpenProject("journal")}

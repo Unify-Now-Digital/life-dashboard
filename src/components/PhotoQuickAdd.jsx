@@ -83,7 +83,7 @@ export default function PhotoQuickAdd({ setState, onCreated }) {
                 date: isoToday(),
                 text: summary,
                 label,
-                images: [{ id: Date.now(), dataUrl }],
+                images: [{ id: Date.now(), url: dataUrl }],
                 isPrivate: false,
               },
               ...((s.projects.journal && s.projects.journal.entries) || []),

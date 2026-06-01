@@ -4,6 +4,28 @@ import { EditableText, IconBtn, EditModeToggle } from "../Editable.jsx";
 import Project from "./Project.jsx";
 import { nextId } from "../../lib/defaultState";
 
+// Days since last contact, or null if never recorded.
+function daysSince(iso) {
+  if (!iso) return null;
+  const then = new Date(iso + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((today - then) / 86400000);
+}
+// A contact is overdue when more days have passed than its cadence allows.
+function isOverdue(contact) {
+  const d = daysSince(contact.lastContact);
+  if (d == null) return false;
+  return d > (contact.cadenceDays || 0);
+}
+function agoLabel(iso) {
+  const d = daysSince(iso);
+  if (d == null) return "never";
+  if (d === 0) return "today";
+  if (d === 1) return "yesterday";
+  return `${d} days ago`;
+}
+
 export default function RelationshipsProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.relationships;
   const [editing, setEditing] = useState(false);
@@ -22,9 +44,10 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
         name: "New person",
         initials: "NP",
         color: AVATAR_KEYS[cs.length % AVATAR_KEYS.length],
-        last: "—",
-        action: "tap to set",
-        stale: false,
+        lastContact: new Date().toISOString().slice(0, 10),
+        channel: "",
+        cadenceDays: 7,
+        action: "",
       },
     ]);
   const onUpdate = (id, field, value) =>
@@ -43,6 +66,7 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
     >
       {data.contacts.map((r, i) => {
         const av = AVATAR_STYLES[r.color] || AVATAR_STYLES.blue;
+        const overdue = isOverdue(r);
         return (
           <div
             key={r.id}
@@ -85,21 +109,44 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
                 />
               </div>
               <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 2 }}>
-                Last: <EditableText value={r.last} onChange={(v) => onUpdate(r.id, "last", v)} style={{ fontSize: 11 }} />
+                {editing ? (
+                  <>
+                    Last:{" "}
+                    <EditableText value={r.lastContact || ""} onChange={(v) => onUpdate(r.id, "lastContact", v || null)} placeholder="YYYY-MM-DD" style={{ fontSize: 11 }} />
+                    {" · "}
+                    <EditableText value={r.channel || ""} onChange={(v) => onUpdate(r.id, "channel", v)} placeholder="channel" style={{ fontSize: 11 }} />
+                  </>
+                ) : (
+                  <>
+                    {agoLabel(r.lastContact)}
+                    {r.channel ? ` · ${r.channel}` : ""}
+                  </>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 500, color: r.stale ? C.danger : C.accent }}>
-                <EditableText
-                  value={r.action}
-                  onChange={(v) => onUpdate(r.id, "action", v)}
-                  style={{ fontSize: 11, fontWeight: 500, color: r.stale ? C.danger : C.accent }}
-                />
+              <span style={{ fontSize: 11, fontWeight: 500, color: overdue ? C.danger : C.accent }}>
+                {overdue && !(r.action || "").trim() ? (
+                  "overdue"
+                ) : (
+                  <EditableText
+                    value={r.action}
+                    onChange={(v) => onUpdate(r.id, "action", v)}
+                    placeholder="next step"
+                    style={{ fontSize: 11, fontWeight: 500, color: overdue ? C.danger : C.accent }}
+                  />
+                )}
               </span>
               {editing && (
-                <label style={{ fontSize: 10, color: C.textTertiary, fontWeight: 400, cursor: "pointer" }}>
-                  <input type="checkbox" checked={r.stale} onChange={(e) => onUpdate(r.id, "stale", e.target.checked)} style={{ marginRight: 4 }} />
-                  overdue
+                <label style={{ fontSize: 10, color: C.textTertiary, fontWeight: 400 }}>
+                  every{" "}
+                  <EditableText
+                    value={String(r.cadenceDays ?? 7)}
+                    onChange={(v) => onUpdate(r.id, "cadenceDays", Math.max(1, parseInt(v) || 7))}
+                    type="number"
+                    style={{ fontSize: 10 }}
+                  />
+                  {" days"}
                 </label>
               )}
             </div>

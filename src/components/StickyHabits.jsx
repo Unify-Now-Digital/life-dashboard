@@ -5,15 +5,28 @@ import HabitRing from "./HabitRing.jsx";
 import HabitDots from "./HabitDots.jsx";
 import HabitConfirm from "./HabitConfirm.jsx";
 
-const HABITS = [
-  { key: "spanish", label: "Spanish practice" },
-  { key: "gym", label: "Gym session" },
-  { key: "clean", label: "Clean eating, no alcohol" },
-  { key: "sleep", label: "Bed by 10pm" },
+// Fallback set + the descriptive confirm-prompt copy for the built-in habits.
+// The live habit set comes from state.habits; PROMPTS keeps the nicer popover
+// wording for known keys (new habits just use their label).
+const DEFAULT_HABITS = [
+  { key: "spanish", label: "Spanish" },
+  { key: "gym", label: "Gym" },
+  { key: "clean", label: "Clean" },
+  { key: "sleep", label: "Sleep" },
 ];
+const PROMPTS = {
+  spanish: "Spanish practice",
+  gym: "Gym session",
+  clean: "Clean eating, no alcohol",
+  sleep: "Bed by 10pm",
+};
 
-export default function StickyHabits({ habitLog, habitNoLog, onConfirm }) {
+export default function StickyHabits({ habits, habitLog, habitNoLog, onConfirm }) {
   const [open, setOpen] = useState(null); // habit key currently being confirmed
+  const HABITS = (habits && habits.length ? habits : DEFAULT_HABITS).filter(
+    (h) => h.active !== false
+  );
+  const promptFor = (key) => PROMPTS[key] || HABITS.find((h) => h.key === key)?.label || key;
   const yesISO = isoYesterday();
   const anyUnanswered = HABITS.some((h) => hasUnanswered(h.key, habitLog, habitNoLog));
 
@@ -69,7 +82,7 @@ export default function StickyHabits({ habitLog, habitNoLog, onConfirm }) {
 
       {open && (
         <HabitConfirm
-          label={HABITS.find((h) => h.key === open).label}
+          label={promptFor(open)}
           status={statusFor(open, yesISO, habitLog, habitNoLog)}
           onAnswer={(answer) => {
             onConfirm(open, yesISO, answer);

@@ -9,3 +9,4 @@ package-lock.json
 .idea
 *.log
 .vercel
+node_modules/

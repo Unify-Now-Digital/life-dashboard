@@ -148,19 +148,22 @@ function deltaHealth(state, meta) {
   });
 }
 
-// Defensive: handles new plain-EUR-number shape AND legacy money-object shape.
-const moneyEur = (item) => {
-  const v = item?.amount ?? item?.balance ?? item?.value;
-  if (typeof v === "number") return v;
-  if (v && typeof v === "object") return v.eur ?? v.amount ?? 0;
-  return 0;
+// Latest snapshot (by date/month key) of an account/revenue history, in EUR.
+const latestEur = (history, key) => {
+  if (!Array.isArray(history) || history.length === 0) return 0;
+  let best = history[0];
+  for (const h of history) if ((h[key] || "") >= (best[key] || "")) best = h;
+  return best.eur || 0;
 };
 
 function deltaFinance(state, meta) {
   const f = state.projects?.finance || {};
-  const sav = (f.savings || []).reduce((a, b) => a + moneyEur(b), 0);
-  const inv = (f.investments || []).reduce((a, b) => a + moneyEur(b), 0);
-  const debt = (f.debts || []).reduce((a, b) => a + moneyEur(b), 0);
+  const accounts = f.accounts || [];
+  const sumType = (t) =>
+    accounts.filter((a) => a.type === t).reduce((s, a) => s + latestEur(a.history, "date"), 0);
+  const sav = sumType("saving");
+  const inv = sumType("investment");
+  const debt = sumType("debt");
   const net = sav + inv - debt;
   const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
 
@@ -197,9 +200,14 @@ function deltaTravel(state) {
     .find((t) => new Date(t.start) >= today);
   if (!next) return deltaBlock({ value: "—", sub: "no trips planned" });
   const days = Math.max(0, Math.ceil((new Date(next.start) - today) / 86400000));
+  let nightsLabel = null;
+  if (next.end) {
+    const nights = Math.max(0, Math.round((new Date(next.end) - new Date(next.start)) / 86400000));
+    if (nights) nightsLabel = `${nights} night${nights === 1 ? "" : "s"}`;
+  }
   return deltaBlock({
     value: `${days}d → ${next.name}`,
-    sub: next.sub || null,
+    sub: nightsLabel,
   });
 }
 
@@ -251,7 +259,12 @@ function deltaJournal(state) {
 
 function deltaRelationships(state) {
   const c = state.projects?.relationships?.contacts || [];
-  const overdue = c.filter((x) => x.stale).length;
+  // Overdue derives from lastContact + cadenceDays (stale is no longer stored).
+  const overdue = c.filter((x) => {
+    if (!x.lastContact) return false;
+    const days = Math.round((Date.now() - new Date(x.lastContact + "T00:00:00")) / 86400000);
+    return days > (x.cadenceDays || 0);
+  }).length;
   const accent = overdue > 0 ? C.danger : C.text;
   return deltaBlock({
     value: `${overdue} overdue`,

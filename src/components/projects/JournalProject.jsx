@@ -41,13 +41,20 @@ export default function JournalProject({ state, setState, meta, onClose, goalHan
       return { ...j, mood: next };
     });
 
-  // Top of mind — FIFO at ~10
+  // Top of mind — FIFO at ~10. Entries are { id, text } objects.
   const addTop = () =>
-    updateJournal((j) => ({ ...j, topOfMind: ["", ...(j.topOfMind || [])].slice(0, 10) }));
-  const updateTop = (idx, value) =>
-    updateJournal((j) => ({ ...j, topOfMind: j.topOfMind.map((t, i) => (i === idx ? value : t)) }));
-  const removeTop = (idx) =>
-    updateJournal((j) => ({ ...j, topOfMind: j.topOfMind.filter((_, i) => i !== idx) }));
+    updateJournal((j) => {
+      const list = j.topOfMind || [];
+      const id = list.reduce((m, t) => Math.max(m, t.id || 0), 0) + 1;
+      return { ...j, topOfMind: [{ id, text: "" }, ...list].slice(0, 10) };
+    });
+  const updateTop = (id, value) =>
+    updateJournal((j) => ({
+      ...j,
+      topOfMind: (j.topOfMind || []).map((t) => (t.id === id ? { ...t, text: value } : t)),
+    }));
+  const removeTop = (id) =>
+    updateJournal((j) => ({ ...j, topOfMind: (j.topOfMind || []).filter((t) => t.id !== id) }));
 
   // Weekly
   const addWeekly = () =>
@@ -122,7 +129,7 @@ export default function JournalProject({ state, setState, meta, onClose, goalHan
                   {e.images.map((img) => (
                     <img
                       key={img.id}
-                      src={img.dataUrl}
+                      src={img.url}
                       alt={e.label || "diary photo"}
                       style={{
                         maxWidth: "100%",
@@ -157,12 +164,12 @@ export default function JournalProject({ state, setState, meta, onClose, goalHan
       {tab === "topOfMind" && (
         <div>
           <button onClick={addTop} style={styles.addBtn}>+ Add</button>
-          {(data.topOfMind || []).map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `0.5px solid ${C.border}` }}>
+          {(data.topOfMind || []).map((t) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `0.5px solid ${C.border}` }}>
               <span style={{ flex: 1, fontSize: 14 }}>
-                <EditableText value={t} onChange={(v) => updateTop(i, v)} placeholder="Top of mind…" style={{ fontSize: 14 }} />
+                <EditableText value={t.text} onChange={(v) => updateTop(t.id, v)} placeholder="Top of mind…" style={{ fontSize: 14 }} />
               </span>
-              <IconBtn onClick={() => removeTop(i)} danger label="Remove">×</IconBtn>
+              <IconBtn onClick={() => removeTop(t.id)} danger label="Remove">×</IconBtn>
             </div>
           ))}
         </div>

@@ -1,9 +1,10 @@
-// Default data — schemaVersion 2.
+// Default data — schemaVersion 5.
 //
-// Schema is the contract: additive changes only. Renames break things.
-// `migrate()` in storage.js upgrades older blobs in place.
+// Schema is the contract. `migrate()` in storage.js upgrades older blobs in
+// place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
+// Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,
@@ -28,39 +29,37 @@ export const defaultState = {
   northStar:
     "Sears Melvin — the UK's most trusted memorial mason brand by 2027.",
 
+  // Habit definitions — the single source of truth for which habits are
+  // tracked. Add/retire a habit here (no code change). `target`/`period`/`sub`
+  // drive the weekly progress display in Habits.jsx; StickyHabits uses `label`.
+  // Logs below are keyed by `key`.
+  habits: [
+    { key: "spanish", label: "Spanish", active: true, target: 7, period: 7, sub: "daily" },
+    { key: "gym", label: "Gym", active: true, target: 5, period: 7, sub: "5x / week" },
+    { key: "clean", label: "Clean", active: true, target: 3, period: 7, sub: "3x / week" },
+    { key: "sleep", label: "Sleep", active: true, target: 7, period: 7, sub: "8h+ daily" },
+  ],
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
-  // TopThree component. Auto-filled when a Work todo is starred. Always
-  // exactly three entries; an empty title means the slot is unused.
+  // TopThree component. Auto-filled when a Work todo is starred (which also
+  // stamps the originating `business` name). Always exactly three entries; an
+  // empty title means the slot is unused.
   topThree: [
-    { id: 1, title: "", projectKey: null, done: false },
-    { id: 2, title: "", projectKey: null, done: false },
-    { id: 3, title: "", projectKey: null, done: false },
+    { id: 1, title: "", projectKey: null, business: null, done: false },
+    { id: 2, title: "", projectKey: null, business: null, done: false },
+    { id: 3, title: "", projectKey: null, business: null, done: false },
   ],
 
+  // Dated one-offs. `date` is an ISO date (YYYY-MM-DD) so the Calendar can
+  // place them on the grid; the "Tue 5" style label is derived at render.
   upcoming: [
-    { id: 1, date: "Tue 5", text: "Aylin 1-1 — raise discussion", cat: "CM" },
-    { id: 2, date: "Wed 6", text: "Push leg day", cat: "Fitness" },
-    { id: 3, date: "Thu 7", text: "Giorgi sync — Mason App release", cat: "UD" },
-    { id: 4, date: "Sat 9", text: "Spanish exchange meetup", cat: "Personal" },
+    { id: 1, date: "2026-06-02", text: "Aylin 1-1 — raise discussion", cat: "CM" },
+    { id: 2, date: "2026-06-03", text: "Push leg day", cat: "Fitness" },
+    { id: 3, date: "2026-06-04", text: "Giorgi sync — Mason App release", cat: "UD" },
+    { id: 4, date: "2026-06-06", text: "Spanish exchange meetup", cat: "Personal" },
   ],
-
-  // Routines: cadence-driven recurring tasks (Phase 2 — UI deferred).
-  routines: [],
-
-  // Top-level summary card on dashboard. Source-of-truth for cross-cutting numbers.
-  metrics: {
-    unifyMTD: "£0",
-    smMTD: "£3,240",
-    cmMTD: "£18,420",
-    boddyPipeline: "CHF 84k",
-    netWorth: "£—",
-    daysToTrip: "42",
-    nextTripName: "Buenos Aires",
-    spanishLevel: "B1+",
-  },
 
   projects: {
     health: {
@@ -109,29 +108,30 @@ export const defaultState = {
         { date: "2026-05-03", eur: -5300 },
         { date: "2026-05-09", eur: -4806 },
       ],
-      // Monthly revenue snapshots in EUR — sum of all monthlyRevenue lines for
-      // that month. Powers the Δ-vs-last-month figure on the Finance rail card.
+      // Monthly revenue snapshots in EUR — sum of all `revenue` lines for that
+      // month. Powers the Δ-vs-last-month figure on the Finance rail card.
       revenueHistory: [
         { month: "2026-04", eur: 10500 },
         { month: "2026-05", eur: 10833 },
       ],
-      // EUR-only after the simplification. Tax timeline merged in here.
-      debts: [
-        { id: 1, name: "Student loan", amount: 25806 },
-        { id: 2, name: "Tax debt", amount: 5000 },
+      // Balance accounts — savings, investments, debts — all in EUR. Each
+      // carries its own snapshot history so any account can be charted over
+      // time. Current balance = latest history entry. Net worth on a date =
+      // sum of each account's latest snapshot on/before it (debts subtract).
+      accounts: [
+        { id: 1, name: "Revolut", type: "saving", history: [{ date: "2026-05-09", eur: 8000 }] },
+        { id: 2, name: "eToro", type: "investment", history: [{ date: "2026-05-09", eur: 12000 }] },
+        { id: 3, name: "Student loan", type: "debt", history: [{ date: "2026-05-09", eur: 25806 }] },
+        { id: 4, name: "Tax debt", type: "debt", history: [{ date: "2026-05-09", eur: 5000 }] },
       ],
-      savings: [
-        { id: 1, name: "Revolut", amount: 8000 },
-      ],
-      investments: [
-        { id: 1, name: "eToro", amount: 12000 },
-      ],
-      // Flat monthly revenue lines — no UD percentage formula, plain EUR.
-      monthlyRevenue: [
-        { id: 1, name: "Unify Digital", amount: 8343 },
-        { id: 2, name: "Sears Melvin", amount: 0 },
-        { id: 3, name: "BODDY", amount: 2250 },
-        { id: 4, name: "Personal training", amount: 240 },
+      // Revenue sources — per project, monthly figures over time. `project`
+      // is a loose label (not a hard link to Work). MTD / Δ-vs-last-month
+      // derive from each source's latest history entries.
+      revenue: [
+        { id: 1, name: "Unify Digital", project: "unify", history: [{ month: "2026-05", eur: 8343 }] },
+        { id: 2, name: "Sears Melvin", project: "searsMelvin", history: [{ month: "2026-05", eur: 0 }] },
+        { id: 3, name: "BODDY", project: "boddy", history: [{ month: "2026-05", eur: 2250 }] },
+        { id: 4, name: "Personal training", project: null, history: [{ month: "2026-05", eur: 240 }] },
       ],
     },
 
@@ -143,8 +143,6 @@ export const defaultState = {
           name: "Georgia",
           start: "2026-05-11",
           end: "2026-05-15",
-          sub: "May 11 – May 15 · 4 nights",
-          days: 2,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
@@ -153,8 +151,6 @@ export const defaultState = {
           name: "London",
           start: "2026-05-27",
           end: "2026-06-04",
-          sub: "May 27 – Jun 4 · 8 nights",
-          days: 18,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
@@ -163,8 +159,6 @@ export const defaultState = {
           name: "Riga / Tallinn",
           start: "2026-08-01",
           end: "2026-08-20",
-          sub: "Aug 1 – Aug 20 · 19 nights · TBC",
-          days: 84,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "TBC",
         },
@@ -173,8 +167,6 @@ export const defaultState = {
           name: "Florence",
           start: "2026-08-21",
           end: "2026-08-24",
-          sub: "Aug 21 – Aug 24 · 3 nights",
-          days: 104,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
@@ -183,17 +175,14 @@ export const defaultState = {
           name: "Croatia (Hvar)",
           start: "2026-08-29",
           end: "2026-08-30",
-          sub: "Aug 29 – Aug 30 · 1 night",
-          days: 112,
           checklist: { flights: false, accommodation: false, activities: false, gym: false, coworking: false, eSIM: false, insurance: false },
           notes: "",
         },
       ],
       points: { ba: 0, iberia: 0, emirates: 0, revpoints: 0, amex: 0, lastUpdated: null },
       wishlist: [],
+      // Sublet income is a plain EUR number.
       sublets: [],
-      // Recommender (places/events/restaurants) — schema slot only; UI deferred.
-      recommender: {},
     },
 
     work: {
@@ -204,7 +193,6 @@ export const defaultState = {
           key: "unify",
           name: "Unify Digital",
           color: "#534AB7",
-          value: "£8,343",
           meta: "Mason App · 65% to launch",
           goals: [],
           todos: [
@@ -218,7 +206,6 @@ export const defaultState = {
           key: "searsMelvin",
           name: "Sears Melvin",
           color: "#E24B4A",
-          value: "0 orders",
           meta: "5 enquiries",
           goals: [],
           todos: [
@@ -231,7 +218,6 @@ export const defaultState = {
           key: "churchill",
           name: "Churchill Memorials",
           color: "#BA7517",
-          value: "£5,800",
           meta: "14 orders · 6 permits pending",
           goals: [],
           todos: [
@@ -244,7 +230,6 @@ export const defaultState = {
           key: "boddy",
           name: "BODDY",
           color: "#185FA5",
-          value: "Support team",
           meta: "12 deals · 3 close this week",
           goals: [],
           todos: [
@@ -262,6 +247,9 @@ export const defaultState = {
           { label: "Weekly intercambio meet-up" },
         ]),
       ],
+      // Reading shelf. Entry shape:
+      //   { id, title, pages: { current, total }, reviewedAt, review, rating }
+      // progress % derives from pages; rating is 1–5.
       reading: [],
       // Spanish micro-learning. Argentine focus: vos in conjugations, no vosotros.
       // Pronouns order: yo, vos, él/ella, nosotros, ellos/ellas
@@ -517,17 +505,25 @@ export const defaultState = {
         },
       ],
       monthly: [],
-      // Top-of-mind: short rolling list, FIFO ~10 entries, surfaced in dashboard summary.
-      topOfMind: ["Buenos Aires planning", "Mason App launch"],
+      // Top-of-mind: short rolling list, FIFO ~10 entries, surfaced in dashboard
+      // summary. Objects with stable ids: { id, text }.
+      topOfMind: [
+        { id: 1, text: "Buenos Aires planning" },
+        { id: 2, text: "Mason App launch" },
+      ],
     },
 
     relationships: {
       goals: [],
+      // `lastContact` is an ISO date and `channel` is how you last spoke;
+      // "N days ago" derives at render. Staleness is derived too: a contact is
+      // overdue when (today − lastContact) > cadenceDays. `action` is an
+      // optional manual next-step note.
       contacts: [
-        { id: 1, name: "Matt Sears", initials: "MS", color: "amber", last: "3 days ago · WhatsApp", action: "due call", stale: false },
-        { id: 2, name: "Aylin", initials: "AY", color: "purple", last: "yesterday · email", action: "1-1 Tue", stale: false },
-        { id: 3, name: "Giorgi", initials: "G", color: "red", last: "6 days ago · Slack", action: "overdue", stale: true },
-        { id: 4, name: "Mum", initials: "M", color: "teal", last: "9 days ago · phone", action: "overdue", stale: true },
+        { id: 1, name: "Matt Sears", initials: "MS", color: "amber", lastContact: "2026-05-29", channel: "WhatsApp", cadenceDays: 7, action: "due call" },
+        { id: 2, name: "Aylin", initials: "AY", color: "purple", lastContact: "2026-05-31", channel: "email", cadenceDays: 7, action: "1-1 Tue" },
+        { id: 3, name: "Giorgi", initials: "G", color: "red", lastContact: "2026-05-26", channel: "Slack", cadenceDays: 5, action: "" },
+        { id: 4, name: "Mum", initials: "M", color: "teal", lastContact: "2026-05-23", channel: "phone", cadenceDays: 7, action: "" },
       ],
     },
 

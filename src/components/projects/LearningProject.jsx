@@ -59,12 +59,11 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
       projects: { ...s.projects, learning: { ...s.projects.learning, reading: updater(s.projects.learning.reading) } },
     }));
   const readingH = {
-    onAdd: (kind) =>
-      updateReading((r) =>
-        kind === "podcast"
-          ? [...r, { id: nextId(r), title: "New podcast", author: "Podcast", progress: null, sub: "" }]
-          : [...r, { id: nextId(r), title: "New book", author: "Author", progress: 0, sub: "ch. 1" }]
-      ),
+    onAdd: () =>
+      updateReading((r) => [
+        ...r,
+        { id: nextId(r), title: "New book", pages: { current: 0, total: 0 }, reviewedAt: null, review: "", rating: 0 },
+      ]),
     onUpdate: (id, field, value) =>
       updateReading((r) => r.map((b) => (b.id === id ? { ...b, [field]: value } : b))),
     onRemove: (id) => updateReading((r) => r.filter((b) => b.id !== id)),
@@ -134,6 +133,34 @@ function Tabs({ tab, onChange }) {
   );
 }
 
+// Read-progress derives from pages; rating is 1–5 stars.
+function pctFor(pages) {
+  const total = pages?.total || 0;
+  const current = pages?.current || 0;
+  return total > 0 ? Math.max(0, Math.min(100, Math.round((current / total) * 100))) : 0;
+}
+
+function Stars({ value, onChange }) {
+  return (
+    <span style={{ fontVariantNumeric: "tabular-nums" }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          onClick={() => onChange(n === value ? 0 : n)}
+          aria-label={`${n} star${n === 1 ? "" : "s"}`}
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            padding: 0, fontSize: 13, lineHeight: 1,
+            color: n <= value ? C.accent : C.border, fontFamily: "inherit",
+          }}
+        >
+          ★
+        </button>
+      ))}
+    </span>
+  );
+}
+
 function ReadingList({ items, onAdd, onUpdate, onRemove }) {
   const [editing, setEditing] = useState(false);
   return (
@@ -141,61 +168,82 @@ function ReadingList({ items, onAdd, onUpdate, onRemove }) {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
         <EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />
       </div>
-      {items.map((b, i) => (
-        <div
-          key={b.id}
-          style={{
-            display: "flex",
-            gap: 12,
-            padding: "10px 0",
-            borderBottom: i < items.length - 1 ? `0.5px solid ${C.border}` : "none",
-          }}
-        >
+      {items.map((b, i) => {
+        const pages = b.pages || { current: 0, total: 0 };
+        const pct = pctFor(pages);
+        const setPages = (patch) => onUpdate(b.id, "pages", { ...pages, ...patch });
+        return (
           <div
+            key={b.id}
             style={{
-              width: 36, height: 50,
-              background: b.progress === null ? C.accentLight : C.bgTertiary,
-              color: b.progress === null ? "#0C447C" : C.textTertiary,
-              borderRadius: 3, flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 9, textAlign: "center", padding: 4, lineHeight: 1.2, fontWeight: 500,
+              display: "flex",
+              gap: 12,
+              padding: "10px 0",
+              borderBottom: i < items.length - 1 ? `0.5px solid ${C.border}` : "none",
             }}
           >
-            {b.progress === null ? "pod" : b.title.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "—"}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>
-              <EditableText value={b.title} onChange={(v) => onUpdate(b.id, "title", v)} style={{ fontSize: 14, fontWeight: 500 }} />
+            <div
+              style={{
+                width: 36, height: 50,
+                background: C.bgTertiary, color: C.textTertiary,
+                borderRadius: 3, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, textAlign: "center", padding: 4, lineHeight: 1.2, fontWeight: 500,
+              }}
+            >
+              {(b.title || "").split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "—"}
             </div>
-            <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 2 }}>
-              <EditableText value={b.author} onChange={(v) => onUpdate(b.id, "author", v)} style={{ fontSize: 12 }} />
-            </div>
-            {b.progress !== null && (
-              <>
-                <div style={{ height: 3, background: C.bgTertiary, borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
-                  <div style={{ height: "100%", background: C.accent, width: `${b.progress}%` }} />
-                </div>
-                <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>
+                <EditableText value={b.title} onChange={(v) => onUpdate(b.id, "title", v)} style={{ fontSize: 14, fontWeight: 500 }} />
+              </div>
+              <div style={{ height: 3, background: C.bgTertiary, borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", background: C.accent, width: `${pct}%` }} />
+              </div>
+              <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+                p.
+                <EditableText
+                  value={String(pages.current)}
+                  onChange={(v) => setPages({ current: Math.max(0, parseInt(v) || 0) })}
+                  style={{ fontSize: 11 }}
+                  type="number"
+                />
+                {" / "}
+                <EditableText
+                  value={String(pages.total)}
+                  onChange={(v) => setPages({ total: Math.max(0, parseInt(v) || 0) })}
+                  style={{ fontSize: 11 }}
+                  type="number"
+                />
+                {` · ${pct}%`}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                <Stars value={b.rating || 0} onChange={(n) => onUpdate(b.id, "rating", n)} />
+                <span style={{ fontSize: 11, color: C.textTertiary }}>
+                  reviewed{" "}
                   <EditableText
-                    value={String(b.progress)}
-                    onChange={(v) => onUpdate(b.id, "progress", Math.max(0, Math.min(100, parseInt(v) || 0)))}
+                    value={b.reviewedAt || ""}
+                    onChange={(v) => onUpdate(b.id, "reviewedAt", v || null)}
+                    placeholder="YYYY-MM-DD"
                     style={{ fontSize: 11 }}
-                    type="number"
                   />
-                  {"% · "}
-                  <EditableText value={b.sub} onChange={(v) => onUpdate(b.id, "sub", v)} style={{ fontSize: 11 }} />
-                </div>
-              </>
-            )}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 4 }}>
+                <EditableText
+                  value={b.review || ""}
+                  onChange={(v) => onUpdate(b.id, "review", v)}
+                  placeholder="review…"
+                  style={{ fontSize: 12 }}
+                />
+              </div>
+            </div>
+            {editing && (<IconBtn onClick={() => onRemove(b.id)} danger label="Remove">×</IconBtn>)}
           </div>
-          {editing && (<IconBtn onClick={() => onRemove(b.id)} danger label="Remove">×</IconBtn>)}
-        </div>
-      ))}
+        );
+      })}
       {editing && (
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <button onClick={() => onAdd("book")} style={{ ...styles.addBtn, marginTop: 0, flex: 1 }}>+ Add book</button>
-          <button onClick={() => onAdd("podcast")} style={{ ...styles.addBtn, marginTop: 0, flex: 1 }}>+ Add podcast</button>
-        </div>
+        <button onClick={onAdd} style={{ ...styles.addBtn, marginTop: 10 }}>+ Add book</button>
       )}
     </div>
   );

@@ -24,6 +24,7 @@ function SubTabs({ tab, setTab, progress }) {
     { id: "chunks", label: "Conversations", ...progress.chunks },
     { id: "phrase", label: "Phrase", ...progress.phrase },
   ];
+  if (progress.sentence) tabs.push({ id: "sentence", label: "Sentence", ...progress.sentence });
   return (
     <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
       {tabs.map((t) => {
@@ -611,6 +612,164 @@ function normalize(s) {
     .replace(/[̀-ͯ]/g, "");
 }
 
+// Sentence comparison: case/accent-insensitive, punctuation-agnostic, spaces
+// collapsed — so only the words + order matter.
+function normalizeSentence(s) {
+  return normalize(s)
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Sentence-builder: write the target sentence from the English prompt; the
+// Hint button reveals it one word at a time.
+function SentenceView({ sentences, index, onCycle, onMarkSeen }) {
+  const sentence = sentences[index % sentences.length];
+  const words = sentence.es.split(/\s+/);
+  const [input, setInput] = useState("");
+  const [hintCount, setHintCount] = useState(0);
+  const [checked, setChecked] = useState(null); // null | true | false
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setInput("");
+    setHintCount(0);
+    setChecked(null);
+    onMarkSeen(sentence.id);
+  }, [sentence.id]);
+
+  const correct = normalizeSentence(input) === normalizeSentence(sentence.es);
+  const fullyRevealed = hintCount >= words.length;
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: C.textTertiary, marginBottom: 6 }}>
+        Sentence {(index % sentences.length) + 1} of {sentences.length}
+      </div>
+
+      <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.4 }}>{sentence.en}</div>
+      <div
+        style={{
+          display: "inline-block",
+          marginTop: 8,
+          fontSize: 11,
+          color: C.accentDark,
+          background: C.accentLight,
+          borderRadius: 4,
+          padding: "2px 8px",
+        }}
+      >
+        {sentence.tenses}
+      </div>
+
+      {/* Word mask — revealed words appear; the rest stay as blanks. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
+        {words.map((w, i) => {
+          const shown = i < hintCount;
+          return (
+            <span
+              key={i}
+              style={{
+                fontSize: 15,
+                color: shown ? C.accentDark : C.textTertiary,
+                fontWeight: shown ? 500 : 400,
+                letterSpacing: shown ? 0 : "0.05em",
+              }}
+            >
+              {shown ? w : w.replace(/[\p{L}\p{N}]/gu, "_")}
+            </span>
+          );
+        })}
+      </div>
+
+      <textarea
+        value={input}
+        onChange={(e) => { setInput(e.target.value); setChecked(null); }}
+        placeholder="Write it in Spanish…"
+        autoCapitalize="none"
+        spellCheck={false}
+        rows={2}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          marginTop: 12,
+          border: `1px solid ${checked === true ? C.success : checked === false ? C.accent : C.borderStrong}`,
+          background: C.bg,
+          borderRadius: 6,
+          padding: "8px 10px",
+          fontSize: 15,
+          fontFamily: "inherit",
+          outline: "none",
+          resize: "vertical",
+        }}
+      />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button
+          onClick={() => setHintCount((c) => Math.min(c + 1, words.length))}
+          disabled={fullyRevealed}
+          style={{
+            background: "transparent",
+            border: `0.5px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "8px 14px",
+            fontSize: 12,
+            color: fullyRevealed ? C.textTertiary : C.accent,
+            cursor: fullyRevealed ? "default" : "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {hintCount === 0 ? "Hint" : fullyRevealed ? "All shown" : "Hint next word"}
+        </button>
+        <button
+          onClick={() => setChecked(correct)}
+          style={{
+            background: C.accent,
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            padding: "8px 16px",
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Check
+        </button>
+        <button
+          onClick={onCycle}
+          style={{
+            marginLeft: "auto",
+            background: "transparent",
+            border: `0.5px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "8px 14px",
+            fontSize: 12,
+            color: C.textSecondary,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Next
+        </button>
+      </div>
+
+      {checked !== null && (
+        <div style={{ marginTop: 12 }}>
+          {checked ? (
+            <div style={{ fontSize: 13, color: C.success, fontWeight: 500 }}>¡Correcto!</div>
+          ) : (
+            <div style={{ fontSize: 13, color: C.text }}>
+              <span style={{ color: C.accentDark, fontWeight: 500 }}>Answer: </span>
+              {sentence.es}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LanguageDeck({
   data,
   langKey,
@@ -621,6 +780,8 @@ export default function LanguageDeck({
   onRateChunk,
   onCheckVerb,
   onMarkPhraseSeen,
+  onCycleSentence,
+  onMarkSentenceSeen,
 }) {
   const [tab, setTab] = useState("verbs");
   const [collapsed, setCollapsed] = useState(false);
@@ -628,11 +789,16 @@ export default function LanguageDeck({
   const verbsMastered = data.verbs.filter((v) => v.correctPasses >= RULE_MASTERY_THRESHOLD).length;
   const chunksMastered = data.chunks.filter((c) => (c.bucket || 0) >= 1).length;
   const phrasesSeen = (data.phrasesSeen || []).length;
+  const hasSentences = (data.sentences || []).length > 0;
+  const sentencesSeen = (data.sentencesSeen || []).length;
 
   const progress = {
     verbs: { done: verbsMastered, total: data.verbs.length, metric: "mastered" },
     chunks: { done: chunksMastered, total: data.chunks.length, metric: "reviewed" },
     phrase: { done: phrasesSeen, total: data.phrases.length, metric: "seen" },
+    sentence: hasSentences
+      ? { done: sentencesSeen, total: data.sentences.length, metric: "seen" }
+      : null,
   };
 
   if (collapsed) {
@@ -703,6 +869,14 @@ export default function LanguageDeck({
         <ChunksView chunks={data.chunks} index={data.chunkIndex} langKey={langKey} onAdvance={onRateChunk} />
       )}
       {tab === "verbs" && <VerbsView verbs={data.verbs} pronoun={pronoun} onCheckVerb={onCheckVerb} />}
+      {tab === "sentence" && hasSentences && (
+        <SentenceView
+          sentences={data.sentences}
+          index={data.sentenceIndex || 0}
+          onCycle={onCycleSentence}
+          onMarkSeen={onMarkSentenceSeen}
+        />
+      )}
     </div>
   );
 }

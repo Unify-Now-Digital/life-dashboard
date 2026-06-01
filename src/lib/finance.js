@@ -67,6 +67,31 @@ export function balanceSeries(finance, type) {
   }));
 }
 
+// Every month that has any finance data (revenue month or account snapshot
+// month), ascending — the shared x-axis for the combined chart.
+export function financeMonths(finance) {
+  const set = new Set();
+  for (const r of finance?.revenue || []) for (const h of r.history || []) if (h.month) set.add(h.month);
+  for (const a of finance?.accounts || []) for (const h of a.history || []) if (h.date) set.add(h.date.slice(0, 7));
+  return [...set].sort();
+}
+
+// Total of a balance type as of the end of a given month (carries forward the
+// last snapshot on/before it).
+export function balanceTotalAsOf(finance, type, month) {
+  const asOf = `${month}-31`;
+  return (finance?.accounts || [])
+    .filter((a) => a.type === type)
+    .reduce((s, a) => s + valueAsOf(a.history, "date", asOf), 0);
+}
+
+// Revenue total keyed by month.
+export function revenueByMonth(finance) {
+  const map = {};
+  for (const p of revenueSeries(finance)) map[p.month] = p.eur;
+  return map;
+}
+
 // Current net worth (latest snapshot of every account).
 export function currentNetWorth(finance) {
   const accounts = finance?.accounts || [];

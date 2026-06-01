@@ -337,6 +337,21 @@ export const defaultState = {
           { id: 11, infinitive: "venir", en: "to come", forms: { past: "vine", present: "vengo", future: "vendré" }, rule: "stems: veng- · vin- · vendr-", correctPasses: 0 },
           { id: 12, infinitive: "dar", en: "to give", forms: { past: "di", present: "doy", future: "daré" }, rule: "preterite no accent (di); present 'doy' irregular; future regular", correctPasses: 0 },
         ],
+        // Sentence-builder drill: write the Spanish for a high-frequency daily
+        // sentence that mixes past + future. `es` is the reference answer; the
+        // Hint button reveals it one word at a time. `tenses` labels the focus.
+        sentences: [
+          { id: 1, en: "Yesterday I worked a lot, but tomorrow I'm going to rest.", es: "Ayer trabajé mucho, pero mañana voy a descansar.", tenses: "past + near future" },
+          { id: 2, en: "I already ate, so later I'll go out.", es: "Ya comí, así que después voy a salir.", tenses: "past + near future" },
+          { id: 3, en: "Last night I couldn't sleep, tonight I'll go to bed early.", es: "Anoche no pude dormir, esta noche me voy a acostar temprano.", tenses: "past + near future" },
+          { id: 4, en: "I went to the gym this morning and I'll go again tomorrow.", es: "Fui al gimnasio esta mañana y voy a ir de nuevo mañana.", tenses: "past + near future" },
+          { id: 5, en: "I told you I was going to come.", es: "Te dije que iba a venir.", tenses: "past + imperfect" },
+          { id: 6, en: "We saw each other yesterday and we'll talk next week.", es: "Nos vimos ayer y vamos a hablar la semana que viene.", tenses: "past + near future" },
+          { id: 7, en: "I bought the tickets, now we just have to wait.", es: "Compré los pasajes, ahora solo tenemos que esperar.", tenses: "past + present" },
+          { id: 8, en: "I couldn't finish it today, but I'll send it to you tomorrow.", es: "No lo pude terminar hoy, pero te lo voy a mandar mañana.", tenses: "past + near future" },
+        ],
+        sentenceIndex: 0,
+        sentencesSeen: [],
         phraseIndex: 0,
         chunkIndex: 0,
         phrasesSeen: [],

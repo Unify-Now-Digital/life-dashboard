@@ -221,6 +221,10 @@ function FortnightView({ dated, onOpenProject }) {
         const events = eventsOn(d);
         const isToday = sameYMD(d, today);
         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        // Cap visible events so every day cell stays the same fixed size.
+        const MAX_CHIPS = 2;
+        const shown = events.slice(0, MAX_CHIPS);
+        const overflow = events.length - shown.length;
         return (
           <div
             key={isoDate(d)}
@@ -229,7 +233,9 @@ function FortnightView({ dated, onOpenProject }) {
               border: `0.5px solid ${isToday ? C.accent : C.border}`,
               borderRadius: 6,
               padding: "6px 5px 7px",
-              minHeight: 80,
+              height: 92,
+              boxSizing: "border-box",
+              overflow: "hidden",
               display: "flex",
               flexDirection: "column",
               gap: 4,
@@ -262,7 +268,7 @@ function FortnightView({ dated, onOpenProject }) {
                 —
               </div>
             ) : (
-              events.map((e, i) => {
+              shown.map((e, i) => {
                 const chip = CHIP_STYLES[e.kind] || { bg: C.bgSecondary, color: C.textSecondary };
                 // Mark trip days that aren't the start with a small "·" prefix
                 const start = new Date(e.isoDate + "T00:00:00");
@@ -294,6 +300,9 @@ function FortnightView({ dated, onOpenProject }) {
                   </button>
                 );
               })
+            )}
+            {overflow > 0 && (
+              <div style={{ fontSize: 9, color: C.textTertiary, fontWeight: 500 }}>+{overflow} more</div>
             )}
           </div>
         );

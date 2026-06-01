@@ -25,6 +25,14 @@ function makeDeckHandlers(setState, langSlot) {
         if (seen.includes(phraseId)) return sp;
         return { ...sp, phrasesSeen: [...seen, phraseId] };
       }),
+    onCycleSentence: () =>
+      update((sp) => ({ ...sp, sentenceIndex: ((sp.sentenceIndex || 0) + 1) % ((sp.sentences || []).length || 1) })),
+    onMarkSentenceSeen: (sentenceId) =>
+      update((sp) => {
+        const seen = sp.sentencesSeen || [];
+        if (seen.includes(sentenceId)) return sp;
+        return { ...sp, sentencesSeen: [...seen, sentenceId] };
+      }),
     onRateChunk: (id, rating) =>
       update((sp) => {
         const chunks = sp.chunks.map((c) => {

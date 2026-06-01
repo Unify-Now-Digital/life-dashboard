@@ -24,9 +24,9 @@ import SectionShell from "./components/SectionShell.jsx";
 // left-border; inner subcards carry the project tint. Travel is the only
 // project still rendered as an on-demand drilldown.
 const SECTIONS = [
+  { key: "finance", defaultOpen: true },
   { key: "work", defaultOpen: true },
   { key: "health", defaultOpen: true },
-  { key: "finance", defaultOpen: true },
   { key: "learning", defaultOpen: false },
   { key: "journal", defaultOpen: false },
   { key: "relationships", defaultOpen: false },

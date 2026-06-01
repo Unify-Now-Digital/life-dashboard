@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { C, styles, tint } from "../../lib/tokens";
 import { EditableText, IconBtn } from "../Editable.jsx";
 import Project from "./Project.jsx";
+import { balanceSeries, revenueSeries } from "../../lib/finance";
 
 const eur = (n) =>
   `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
@@ -55,40 +56,91 @@ const CARDS = [
   { key: "debts", label: "Debts", color: "#791F1F", kind: "account", type: "debt", addLabel: "+ Add debt", invert: true },
 ];
 
-function Tile({ card, total, isOpen, onClick }) {
-  const bgRest = tint(card.color, 0.06);
-  const bgOpen = tint(card.color, 0.12);
-  const borderRest = tint(card.color, 0.25);
-  const borderOpen = tint(card.color, 0.6);
+// Short axis label: "2026-04-12" → "Apr 12", "2026-04" → "Apr".
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortLabel(s) {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(s || "");
+  if (!m) return s || "";
+  const mon = MON[parseInt(m[2], 10) - 1] || m[2];
+  return m[3] ? `${mon} ${parseInt(m[3], 10)}` : mon;
+}
+
+// Line chart of one category's total over time. points: [{ label, eur }].
+function LineChart({ points, color }) {
+  const W = 300;
+  const H = 96;
+  const padL = 4;
+  const padR = 4;
+  const padT = 10;
+  const padB = 16;
+  if (!points || points.length === 0) {
+    return <div style={{ fontSize: 11, color: C.textTertiary, padding: "8px 0" }}>No history yet.</div>;
+  }
+  const vals = points.map((p) => p.eur);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals, 0);
+  const range = max - min || 1;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const x = (i) => padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+  const y = (v) => padT + innerH - ((v - min) / range) * innerH;
+  const zeroY = y(0);
+  const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.eur).toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H, display: "block" }}>
+      {/* zero baseline */}
+      {min < 0 && max > 0 && (
+        <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke={C.border} strokeWidth="1" strokeDasharray="3 3" />
+      )}
+      {points.length >= 2 && (
+        <polyline points={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {points.map((p, i) => (
+        <circle key={i} cx={x(i)} cy={y(p.eur)} r={i === points.length - 1 ? 3 : 2} fill={color} />
+      ))}
+      {/* x-axis end labels */}
+      <text x={padL} y={H - 4} fontSize="9" fill={C.textTertiary}>{shortLabel(points[0].label)}</text>
+      {points.length > 1 && (
+        <text x={W - padR} y={H - 4} fontSize="9" fill={C.textTertiary} textAnchor="end">{shortLabel(last.label)}</text>
+      )}
+    </svg>
+  );
+}
+
+function ChartCard({ card, total, series, isOpen, onClick }) {
+  const bg = tint(card.color, isOpen ? 0.1 : 0.05);
+  const border = tint(card.color, isOpen ? 0.55 : 0.25);
   return (
     <div
       onClick={onClick}
       role="button"
       tabIndex={0}
       style={{
-        background: isOpen ? bgOpen : bgRest,
-        border: `0.5px solid ${isOpen ? borderOpen : borderRest}`,
+        background: bg,
+        border: `0.5px solid ${border}`,
         borderLeft: `2px solid ${card.color}`,
         borderRadius: 8,
-        padding: "8px 10px",
+        padding: "10px 12px",
         cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        minHeight: 60,
+        marginBottom: 8,
       }}
     >
-      <span style={{ fontSize: 11, color: C.textSecondary, fontWeight: 500 }}>{card.label}</span>
-      <span
-        style={{
-          fontSize: 16,
-          fontWeight: 500,
-          color: card.invert && total > 0 ? C.danger : C.text,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {eur(total)}
-      </span>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontSize: 12, color: C.textSecondary, fontWeight: 500 }}>{card.label}</span>
+        <span
+          style={{
+            fontSize: 16,
+            fontWeight: 500,
+            color: card.invert && total > 0 ? C.danger : C.text,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {eur(total)}
+          {card.kind === "revenue" ? <span style={{ fontSize: 11, color: C.textTertiary }}>/mo</span> : null}
+        </span>
+      </div>
+      <LineChart points={series} color={card.color} />
     </div>
   );
 }
@@ -295,8 +347,11 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
   const totals = Object.fromEntries(
     CARDS.map((c) => [c.key, lists[c.key].reduce((a, b) => a + b.value, 0)])
   );
-
-  const opened = CARDS.find((c) => c.key === openKey) || null;
+  // Time series per category: revenue by month, balances by snapshot date.
+  const seriesFor = (card) =>
+    card.kind === "revenue"
+      ? revenueSeries(data).map((p) => ({ label: p.month, eur: p.eur }))
+      : balanceSeries(data, card.type);
 
   return (
     <Project
@@ -317,30 +372,23 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
           marginBottom: 6,
         }}
       >
-        Money · tap to edit
+        Money over time · tap a category to edit
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${CARDS.length}, 1fr)`,
-          gap: 8,
-        }}
-      >
-        {CARDS.map((c) => (
-          <Tile
-            key={c.key}
+      {CARDS.map((c) => (
+        <React.Fragment key={c.key}>
+          <ChartCard
             card={c}
             total={totals[c.key]}
+            series={seriesFor(c)}
             isOpen={openKey === c.key}
             onClick={() => setOpenKey(openKey === c.key ? null : c.key)}
           />
-        ))}
-      </div>
-
-      {opened && (
-        <ItemList card={opened} items={lists[opened.key]} handlers={handlersFor(opened)} />
-      )}
+          {openKey === c.key && (
+            <ItemList card={c} items={lists[c.key]} handlers={handlersFor(c)} />
+          )}
+        </React.Fragment>
+      ))}
     </Project>
   );
 }

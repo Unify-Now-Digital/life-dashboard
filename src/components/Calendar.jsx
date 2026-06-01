@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { C, CHIP_STYLES } from "../lib/tokens";
+import { C, CHIP_STYLES, styles } from "../lib/tokens";
 import SectionShell, { SystemIcon } from "./SectionShell.jsx";
+import { EditableText, IconBtn, EditModeToggle } from "./Editable.jsx";
 import "./Calendar.css";
 
 // Calendar — three views (list / week / quarter) over a single event source.
@@ -525,7 +526,53 @@ function QuarterView({ dated, onOpenProject }) {
 
 // ---- Calendar shell --------------------------------------------------------
 
-export default function Calendar({ state, onOpenProject }) {
+// Inline editor for one-off `state.upcoming` events. Dates use a native date
+// picker so they're always valid ISO and land on the grid.
+function UpcomingEditor({ state, setState }) {
+  const [editing, setEditing] = useState(false);
+  const items = state.upcoming || [];
+
+  const update = (updater) => setState((s) => ({ ...s, upcoming: updater(s.upcoming || []) }));
+  const onAdd = () =>
+    update((u) => [
+      ...u,
+      { id: (u.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1, date: new Date().toISOString().slice(0, 10), text: "", cat: "personal" },
+    ]);
+  const onUpdate = (id, patch) => update((u) => u.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const onRemove = (id) => update((u) => u.filter((x) => x.id !== id));
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: `0.5px solid ${C.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 500, color: C.textTertiary, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Upcoming events
+        </span>
+        <EditModeToggle editing={editing} onToggle={() => setEditing(!editing)} />
+      </div>
+      {editing && (
+        <>
+          {items.map((u) => (
+            <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `0.5px solid ${C.border}` }}>
+              <span style={{ fontSize: 11, color: C.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+                <EditableText value={u.date || ""} onChange={(v) => onUpdate(u.id, { date: v || null })} type="date" placeholder="date" style={{ fontSize: 11 }} />
+              </span>
+              <span style={{ flex: 1, fontSize: 13 }}>
+                <EditableText value={u.text} onChange={(v) => onUpdate(u.id, { text: v })} placeholder="what's happening" style={{ fontSize: 13 }} />
+              </span>
+              <span style={{ fontSize: 11, color: C.textTertiary }}>
+                <EditableText value={u.cat || ""} onChange={(v) => onUpdate(u.id, { cat: v })} placeholder="cat" style={{ fontSize: 11 }} />
+              </span>
+              <IconBtn onClick={() => onRemove(u.id)} danger label="Remove">×</IconBtn>
+            </div>
+          ))}
+          <button onClick={onAdd} style={{ ...styles.addBtn, marginTop: 8 }}>+ Add event</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function Calendar({ state, setState, onOpenProject }) {
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState("fortnight");
   const { dated, free } = collectEvents(state);
@@ -552,6 +599,7 @@ export default function Calendar({ state, onOpenProject }) {
       {tab === "quarter" && (
         <QuarterView dated={dated} onOpenProject={onOpenProject} />
       )}
+      {setState && <UpcomingEditor state={state} setState={setState} />}
     </SectionShell>
   );
 }

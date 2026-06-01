@@ -224,7 +224,8 @@ function ReadingList({ items, onAdd, onUpdate, onRemove }) {
                   <EditableText
                     value={b.reviewedAt || ""}
                     onChange={(v) => onUpdate(b.id, "reviewedAt", v || null)}
-                    placeholder="YYYY-MM-DD"
+                    type="date"
+                    placeholder="date"
                     style={{ fontSize: 11 }}
                   />
                 </span>

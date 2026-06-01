@@ -9,6 +9,23 @@ const eur = (n) =>
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => todayISO().slice(0, 7);
 
+// Tiny inline trend for a single line's history. Hidden until ≥2 points.
+function MiniSparkline({ values, color, width = 48, height = 14 }) {
+  if (!Array.isArray(values) || values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = width / (values.length - 1);
+  const pts = values
+    .map((v, i) => `${(i * stepX).toFixed(1)},${(height - ((v - min) / range) * (height - 2) - 1).toFixed(1)}`)
+    .join(" ");
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: "block", flexShrink: 0, opacity: 0.7 }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Current value of a line = its latest history snapshot. History is appended
 // chronologically; pick the entry with the highest date/month key.
 function latestEur(history, key) {
@@ -151,6 +168,7 @@ function ItemList({ card, items, handlers }) {
               style={{ fontSize: 13 }}
             />
           </span>
+          <MiniSparkline values={it.series} color={card.color} />
           <span
             style={{
               fontSize: 13,
@@ -206,11 +224,17 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
         id: r.id,
         name: r.name,
         value: latestEur(r.history, "month"),
+        series: (r.history || []).map((h) => h.eur),
       }));
     }
     return (data.accounts || [])
       .filter((a) => a.type === card.type)
-      .map((a) => ({ id: a.id, name: a.name, value: latestEur(a.history, "date") }));
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        value: latestEur(a.history, "date"),
+        series: (a.history || []).map((h) => h.eur),
+      }));
   };
 
   const handlersFor = (card) => {

@@ -112,7 +112,7 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
                 {editing ? (
                   <>
                     Last:{" "}
-                    <EditableText value={r.lastContact || ""} onChange={(v) => onUpdate(r.id, "lastContact", v || null)} placeholder="YYYY-MM-DD" style={{ fontSize: 11 }} />
+                    <EditableText value={r.lastContact || ""} onChange={(v) => onUpdate(r.id, "lastContact", v || null)} type="date" placeholder="date" style={{ fontSize: 11 }} />
                     {" · "}
                     <EditableText value={r.channel || ""} onChange={(v) => onUpdate(r.id, "channel", v)} placeholder="channel" style={{ fontSize: 11 }} />
                   </>
@@ -137,6 +137,24 @@ export default function RelationshipsProject({ state, setState, meta, onClose, g
                   />
                 )}
               </span>
+              {!editing && (
+                <button
+                  onClick={() => onUpdate(r.id, "lastContact", new Date().toISOString().slice(0, 10))}
+                  title="Mark contacted today"
+                  style={{
+                    background: "transparent",
+                    border: `0.5px solid ${C.border}`,
+                    borderRadius: 4,
+                    padding: "2px 8px",
+                    fontSize: 10,
+                    color: C.textSecondary,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  ✓ today
+                </button>
+              )}
               {editing && (
                 <label style={{ fontSize: 10, color: C.textTertiary, fontWeight: 400 }}>
                   every{" "}

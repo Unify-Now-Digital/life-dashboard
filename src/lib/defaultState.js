@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,
@@ -97,41 +97,26 @@ export const defaultState = {
 
     finance: {
       goals: [],
-      // Weekly net-worth snapshots in EUR. Powers the sparkline on the
-      // Finance dashboard card. Dashboard reads the last 7 entries.
-      netWorthHistory: [
-        { date: "2026-03-29", eur: -8200 },
-        { date: "2026-04-05", eur: -7600 },
-        { date: "2026-04-12", eur: -6900 },
-        { date: "2026-04-19", eur: -6100 },
-        { date: "2026-04-26", eur: -5700 },
-        { date: "2026-05-03", eur: -5300 },
-        { date: "2026-05-09", eur: -4806 },
-      ],
-      // Monthly revenue snapshots in EUR — sum of all `revenue` lines for that
-      // month. Powers the Δ-vs-last-month figure on the Finance rail card.
-      revenueHistory: [
-        { month: "2026-04", eur: 10500 },
-        { month: "2026-05", eur: 10833 },
-      ],
       // Balance accounts — savings, investments, debts — all in EUR. Each
       // carries its own snapshot history so any account can be charted over
       // time. Current balance = latest history entry. Net worth on a date =
       // sum of each account's latest snapshot on/before it (debts subtract).
+      // The net-worth + revenue *trends* are derived from these histories in
+      // lib/finance.js — no stored rollup to drift out of sync.
       accounts: [
-        { id: 1, name: "Revolut", type: "saving", history: [{ date: "2026-05-09", eur: 8000 }] },
-        { id: 2, name: "eToro", type: "investment", history: [{ date: "2026-05-09", eur: 12000 }] },
-        { id: 3, name: "Student loan", type: "debt", history: [{ date: "2026-05-09", eur: 25806 }] },
-        { id: 4, name: "Tax debt", type: "debt", history: [{ date: "2026-05-09", eur: 5000 }] },
+        { id: 1, name: "Revolut", type: "saving", history: [{ date: "2026-04-12", eur: 5000 }, { date: "2026-05-09", eur: 8000 }] },
+        { id: 2, name: "eToro", type: "investment", history: [{ date: "2026-04-12", eur: 10000 }, { date: "2026-05-09", eur: 12000 }] },
+        { id: 3, name: "Student loan", type: "debt", history: [{ date: "2026-04-12", eur: 27000 }, { date: "2026-05-09", eur: 25806 }] },
+        { id: 4, name: "Tax debt", type: "debt", history: [{ date: "2026-04-12", eur: 5000 }, { date: "2026-05-09", eur: 5000 }] },
       ],
       // Revenue sources — per project, monthly figures over time. `project`
       // is a loose label (not a hard link to Work). MTD / Δ-vs-last-month
       // derive from each source's latest history entries.
       revenue: [
-        { id: 1, name: "Unify Digital", project: "unify", history: [{ month: "2026-05", eur: 8343 }] },
-        { id: 2, name: "Sears Melvin", project: "searsMelvin", history: [{ month: "2026-05", eur: 0 }] },
-        { id: 3, name: "BODDY", project: "boddy", history: [{ month: "2026-05", eur: 2250 }] },
-        { id: 4, name: "Personal training", project: null, history: [{ month: "2026-05", eur: 240 }] },
+        { id: 1, name: "Unify Digital", project: "unify", history: [{ month: "2026-04", eur: 8000 }, { month: "2026-05", eur: 8343 }] },
+        { id: 2, name: "Sears Melvin", project: "searsMelvin", history: [{ month: "2026-04", eur: 0 }, { month: "2026-05", eur: 0 }] },
+        { id: 3, name: "BODDY", project: "boddy", history: [{ month: "2026-04", eur: 2250 }, { month: "2026-05", eur: 2250 }] },
+        { id: 4, name: "Personal training", project: null, history: [{ month: "2026-04", eur: 250 }, { month: "2026-05", eur: 240 }] },
       ],
     },
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { C, tint } from "../lib/tokens";
+import { netWorthSeries, revenueSeries } from "../lib/finance";
 
 const PROJECT_META = [
   { key: "work", label: "Work", color: "#534AB7" },
@@ -167,13 +168,12 @@ function deltaFinance(state, meta) {
   const net = sav + inv - debt;
   const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
 
-  // Sparkline of last 7 weekly net-worth snapshots — visualises net position
-  // over time, per the "vs net position" requirement.
-  const history = (f.netWorthHistory || []).slice(-7).map((p) => p.eur);
-  const series = history.length >= 2 ? history : [net, net];
+  // Net-worth + revenue trends are derived from the per-line histories (see
+  // lib/finance.js) so they can't drift from the underlying accounts.
+  const nw = netWorthSeries(f).slice(-7).map((p) => p.eur);
+  const series = nw.length >= 2 ? nw : [net, net];
 
-  // Revenue Δ vs last month from revenueHistory.
-  const rev = f.revenueHistory || [];
+  const rev = revenueSeries(f);
   const cur = rev.length > 0 ? rev[rev.length - 1].eur : null;
   const prev = rev.length > 1 ? rev[rev.length - 2].eur : null;
   const revDelta = cur != null && prev != null ? cur - prev : null;

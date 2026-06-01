@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { C, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
-import { loadFromCache, loadFromCloud, saveState, flushQueue } from "./lib/storage";
+import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
 
 import Header from "./components/Header.jsx";
 import NorthStar from "./components/NorthStar.jsx";
@@ -174,7 +174,7 @@ function useViewport() {
 }
 
 export default function Dashboard() {
-  const [state, setStateRaw] = useState(() => loadFromCache() || defaultState);
+  const [state, setStateRaw] = useState(() => rollDaily(loadFromCache() || defaultState));
   const { isDesktop, isWide } = useViewport();
   // On-demand drilldown for projects without a permanent MainSection (Travel).
   const [openProject, setOpenProjectRaw] = useState(null);
@@ -205,11 +205,17 @@ export default function Dashboard() {
   const toggleSection = (key) =>
     setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // Hydrate from cloud once on mount, reconcile if newer.
+  // Hydrate from cloud once on mount, reconcile if newer. Persist on mount too,
+  // so a daily rollover applied at init is written through (stamps todayDate).
   useEffect(() => {
     let alive = true;
+    saveState(state);
     loadFromCloud().then((cloud) => {
-      if (alive && cloud) setStateRaw(cloud);
+      if (alive && cloud) {
+        const rolled = rollDaily(cloud);
+        setStateRaw(rolled);
+        saveState(rolled);
+      }
     });
     flushQueue();
     const onFocus = () => flushQueue();
@@ -296,7 +302,7 @@ export default function Dashboard() {
         onOpenProject={setOpenProject}
       />
       <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-      <Calendar state={state} onOpenProject={setOpenProject} />
+      <Calendar state={state} setState={setState} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
     </div>
@@ -335,7 +341,7 @@ export default function Dashboard() {
         onOpenProject={setOpenProject}
       />
       <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
-      <Calendar state={state} onOpenProject={setOpenProject} />
+      <Calendar state={state} setState={setState} onOpenProject={setOpenProject} />
       {mainSections}
       {drilldownPanel}
       <Projects

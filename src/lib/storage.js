@@ -30,6 +30,7 @@ export function migrate(raw) {
   if (v < 3) s = migrateV2toV3(s);
   if (v < 4) s = migrateV3toV4(s);
   if (v < 5) s = migrateV4toV5(s);
+  if (v < 6) s = migrateV5toV6(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -458,6 +459,40 @@ function migrateV4toV5(s) {
   }
 
   return out;
+}
+
+// v5 → v6: drop the stored finance rollups. netWorthHistory / revenueHistory
+// are now derived from the per-line account/revenue histories (lib/finance.js),
+// so the stored copies are dead weight that could only drift.
+function migrateV5toV6(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (out.projects?.finance) {
+    delete out.projects.finance.netWorthHistory;
+    delete out.projects.finance.revenueHistory;
+  }
+  return out;
+}
+
+// Daily rollover. Runs on every load (not version-gated): when the stored
+// `todayDate` isn't today, reset the day-scoped fields and stamp the new date.
+// Today's Top 3 are ad-hoc daily priorities, so they clear each morning; the
+// originating Work todos keep their stars. Dated data (journal, habits, food,
+// finance history) is untouched.
+export function rollDaily(state) {
+  if (!state || typeof state !== "object") return state;
+  const today = new Date().toISOString().slice(0, 10);
+  if (state.todayDate === today) return state;
+  return {
+    ...state,
+    todayDate: today,
+    topThree: (state.topThree || []).map((slot) => ({
+      ...slot,
+      title: "",
+      projectKey: null,
+      business: null,
+      done: false,
+    })),
+  };
 }
 
 // ----- load ----------------------------------------------------------------

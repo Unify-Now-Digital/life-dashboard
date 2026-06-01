@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { C, styles, tint } from "../../lib/tokens";
 import { EditableText, IconBtn } from "../Editable.jsx";
 import Project from "./Project.jsx";
-import { financeMonths, balanceTotalAsOf, revenueByMonth } from "../../lib/finance";
+import { balanceAtMonth, revenueByMonth } from "../../lib/finance";
 
 const eur = (n) =>
   `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
@@ -11,6 +11,18 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => todayISO().slice(0, 7);
 // Finance figures are recorded monthly, dated the 15th.
 const monthFifteen = () => `${currentMonth()}-15`;
+
+// Fixed chart window: the 6 months up to and including now (stable, with data),
+// plus the next 2 months ahead (future — shown empty for planning headroom).
+function monthsWindow(back = 6, fwd = 2) {
+  const now = new Date();
+  const out = [];
+  for (let i = -(back - 1); i <= fwd; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
 
 // Tiny inline trend for a single line's history. Hidden until ≥2 points.
 function MiniSparkline({ values, color, width = 48, height = 14 }) {
@@ -69,7 +81,7 @@ function monthLabel(m) {
 // Combined chart: every category as its own line on a shared monthly x-axis
 // and a single y-scale spanning all values, so they sit together and stay
 // readable. lines: [{ key, label, color, values:[number|null] }].
-function MultiLineChart({ months, lines }) {
+function MultiLineChart({ months, lines, nowIndex }) {
   const W = 320;
   const H = 150;
   const padL = 6;
@@ -89,26 +101,40 @@ function MultiLineChart({ months, lines }) {
   const y = (v) => padT + innerH - ((v - min) / range) * innerH;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H, display: "block" }}>
+      {/* "now" divider — everything to its right is the future window */}
+      {nowIndex >= 0 && nowIndex < months.length - 1 && (
+        <line x1={x(nowIndex)} y1={padT - 4} x2={x(nowIndex)} y2={padT + innerH} stroke={C.border} strokeWidth="1" strokeDasharray="2 3" />
+      )}
       {min < 0 && max > 0 && (
         <line x1={padL} y1={y(0)} x2={W - padR} y2={y(0)} stroke={C.border} strokeWidth="1" strokeDasharray="3 3" />
       )}
       {lines.map((l) => {
         const pts = l.values.map((v, i) => (v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
+        const lastIdx = l.values.reduce((acc, v, i) => (v != null ? i : acc), -1);
         return (
           <g key={l.key}>
             {pts.length >= 2 && (
               <polyline points={pts.join(" ")} fill="none" stroke={l.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             )}
             {l.values.map((v, i) =>
-              v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={i === l.values.length - 1 ? 3 : 2} fill={l.color} />
+              v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={i === lastIdx ? 3 : 2} fill={l.color} />
             )}
           </g>
         );
       })}
-      <text x={padL} y={H - 5} fontSize="9" fill={C.textTertiary}>{monthLabel(months[0])}</text>
-      {months.length > 1 && (
-        <text x={W - padR} y={H - 5} fontSize="9" fill={C.textTertiary} textAnchor="end">{monthLabel(months[months.length - 1])}</text>
-      )}
+      {/* one tick label per month across the axis */}
+      {months.map((m, i) => (
+        <text
+          key={m}
+          x={x(i)}
+          y={H - 5}
+          fontSize="8"
+          fill={i > nowIndex ? C.textTertiary : C.textSecondary}
+          textAnchor={i === 0 ? "start" : i === months.length - 1 ? "end" : "middle"}
+        >
+          {monthLabel(m)}
+        </text>
+      ))}
     </svg>
   );
 }
@@ -351,18 +377,22 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
     CARDS.map((c) => [c.key, lists[c.key].reduce((a, b) => a + b.value, 0)])
   );
 
-  // Combined chart: shared monthly x-axis, one line per category.
-  const months = financeMonths(data);
+  // Combined chart over a fixed 6-back + 2-ahead month window. Past/current
+  // months carry their data; future months stay blank.
+  const months = monthsWindow();
+  const cm = currentMonth();
+  const nowIndex = months.indexOf(cm);
   const revByMonth = revenueByMonth(data);
   const lines = CARDS.map((c) => ({
     key: c.key,
     label: c.label,
     color: c.color,
-    values: months.map((m) =>
-      c.kind === "revenue"
+    values: months.map((m) => {
+      if (m > cm) return null; // future — no data yet
+      return c.kind === "revenue"
         ? (m in revByMonth ? revByMonth[m] : null)
-        : balanceTotalAsOf(data, c.type, m)
-    ),
+        : balanceAtMonth(data, c.type, m);
+    }),
   }));
 
   return (
@@ -387,7 +417,7 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
         Money over time · set monthly · tap a category to edit
       </div>
 
-      <MultiLineChart months={months} lines={lines} />
+      <MultiLineChart months={months} lines={lines} nowIndex={nowIndex} />
 
       <div style={{ marginTop: 10 }}>
         {CARDS.map((c) => (

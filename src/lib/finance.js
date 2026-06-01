@@ -85,6 +85,33 @@ export function balanceTotalAsOf(finance, type, month) {
     .reduce((s, a) => s + valueAsOf(a.history, "date", asOf), 0);
 }
 
+// EUR of the latest history entry on/before `asOf`, or null if there is none.
+function eurAsOf(history, key, asOf) {
+  let best = null;
+  for (const h of history || []) {
+    if ((h[key] || "") <= asOf && (!best || (h[key] || "") >= (best[key] || ""))) best = h;
+  }
+  return best ? best.eur || 0 : null;
+}
+
+// Balance total of a type as of the end of `month`, or null if no account of
+// that type has any snapshot on/before it (so the chart leaves it blank rather
+// than drawing a misleading zero).
+export function balanceAtMonth(finance, type, month) {
+  const asOf = `${month}-31`;
+  const accts = (finance?.accounts || []).filter((a) => a.type === type);
+  let any = false;
+  let sum = 0;
+  for (const a of accts) {
+    const v = eurAsOf(a.history, "date", asOf);
+    if (v != null) {
+      any = true;
+      sum += v;
+    }
+  }
+  return any ? sum : null;
+}
+
 // Revenue total keyed by month.
 export function revenueByMonth(finance) {
   const map = {};

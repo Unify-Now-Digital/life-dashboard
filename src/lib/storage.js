@@ -29,6 +29,7 @@ export function migrate(raw) {
   if (v < 2) s = migrateV1toV2(s);
   if (v < 3) s = migrateV2toV3(s);
   if (v < 4) s = migrateV3toV4(s);
+  if (v < 5) s = migrateV4toV5(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -40,20 +41,6 @@ export function migrate(raw) {
     "Build Sears Melvin into the UK's most trusted memorial mason while running a healthy, multilingual, well-travelled life from Barcelona.";
   if (s.northStar === LEGACY_NORTH_STAR) {
     s.northStar = defaultState.northStar;
-  }
-
-  // Run regardless of source version: drop food images older than 30 days so
-  // localStorage stays under quota. Macros + text + date all stay forever;
-  // only the base64 image data gets cleared.
-  if (s.projects?.health?.food?.length) {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffISO = cutoff.toISOString().slice(0, 10);
-    s.projects.health.food = s.projects.health.food.map((entry) =>
-      entry.images?.length && entry.date < cutoffISO
-        ? { ...entry, images: [] }
-        : entry
-    );
   }
 
   return s;
@@ -291,6 +278,184 @@ function migrateV3toV4(s) {
 
   // Drop fields the new component doesn't render. Schema cleanliness.
   delete h.lifts;
+
+  return out;
+}
+
+// v4 → v5: schema finalisation pass.
+// - Remove unused `metrics` and `routines` (habits now data-defined; the
+//   `habits` definitions array is backfilled by mergeDefaults).
+// - Work: drop per-business `value`.
+// - Health: drop stored food `images` (photo→macro estimation still works,
+//   the photo just isn't persisted).
+// - Finance: fold debts/savings/investments → `accounts` (each with a 1-entry
+//   history) and monthlyRevenue → `revenue` (tagged by project, with history).
+//   The netWorthHistory / revenueHistory rollups are kept as-is.
+// - Travel: drop trip `sub`/`days` and the `recommender` slot; sublet income
+//   money-object → plain EUR number.
+// - Journal: rename entry image `dataUrl` → `url`; wrap `topOfMind` strings as
+//   `{ id, text }`.
+// - Relationships: parse legacy `last` string → `lastContact` (ISO) +
+//   `channel`; drop `stale`; default `cadenceDays`.
+function migrateV4toV5(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const currentMonth = todayISO.slice(0, 7);
+
+  // Always-EUR coercion, tolerating legacy money snapshots.
+  const toEur = (v) => {
+    if (typeof v === "number") return v;
+    if (v && typeof v === "object") return v.eur ?? v.amount ?? 0;
+    return parseFloat(v) || 0;
+  };
+
+  delete out.metrics;
+  delete out.routines;
+
+  // ----- Work: drop per-business value -----
+  if (out.projects?.work?.businesses) {
+    out.projects.work.businesses = out.projects.work.businesses.map((b) => {
+      const { value, ...rest } = b;
+      return rest;
+    });
+  }
+
+  // ----- Health: drop stored food images -----
+  const food = out.projects?.health?.food;
+  if (Array.isArray(food)) {
+    out.projects.health.food = food.map((e) => {
+      const { images, ...rest } = e;
+      return rest;
+    });
+  }
+
+  // ----- Finance: accounts + revenue -----
+  const fin = out.projects?.finance;
+  if (fin && !Array.isArray(fin.accounts)) {
+    const snapDate =
+      fin.netWorthHistory?.[fin.netWorthHistory.length - 1]?.date || todayISO;
+    const accounts = [];
+    let aid = 1;
+    const carry = (list, type) => {
+      for (const it of list || []) {
+        accounts.push({
+          id: aid++,
+          name: it.name ?? it.account ?? it.label ?? "Account",
+          type,
+          history: [{ date: snapDate, eur: toEur(it.amount ?? it.balance ?? it.value) }],
+        });
+      }
+    };
+    carry(fin.savings, "saving");
+    carry(fin.investments, "investment");
+    carry(fin.debts, "debt");
+    fin.accounts = accounts;
+
+    const snapMonth =
+      fin.revenueHistory?.[fin.revenueHistory.length - 1]?.month || currentMonth;
+    const projectFor = (name) =>
+      ({
+        "Unify Digital": "unify",
+        "Sears Melvin": "searsMelvin",
+        BODDY: "boddy",
+        Churchill: "churchill",
+        "Churchill Memorials": "churchill",
+      }[name] ?? null);
+    fin.revenue = (fin.monthlyRevenue || []).map((r, i) => ({
+      id: r.id ?? i + 1,
+      name: r.name ?? "Revenue",
+      project: projectFor(r.name),
+      history: [{ month: snapMonth, eur: toEur(r.amount) }],
+    }));
+
+    delete fin.savings;
+    delete fin.investments;
+    delete fin.debts;
+    delete fin.monthlyRevenue;
+  }
+
+  // ----- Travel -----
+  const travel = out.projects?.travel;
+  if (travel) {
+    if (Array.isArray(travel.trips)) {
+      travel.trips = travel.trips.map((t) => {
+        const { sub, days, ...rest } = t;
+        return rest;
+      });
+    }
+    if (Array.isArray(travel.sublets)) {
+      travel.sublets = travel.sublets.map((sl) => ({
+        ...sl,
+        income: toEur(sl.income),
+      }));
+    }
+    delete travel.recommender;
+  }
+
+  // ----- Journal -----
+  const journal = out.projects?.journal;
+  if (journal) {
+    if (Array.isArray(journal.entries)) {
+      journal.entries = journal.entries.map((e) =>
+        Array.isArray(e.images)
+          ? {
+              ...e,
+              images: e.images.map((img) => ({
+                id: img.id,
+                url: img.url ?? img.dataUrl ?? "",
+              })),
+            }
+          : e
+      );
+    }
+    if (Array.isArray(journal.topOfMind)) {
+      journal.topOfMind = journal.topOfMind.map((t, i) =>
+        typeof t === "string" ? { id: i + 1, text: t } : t
+      );
+    }
+  }
+
+  // ----- Relationships -----
+  const rel = out.projects?.relationships;
+  if (rel && Array.isArray(rel.contacts)) {
+    rel.contacts = rel.contacts.map((c) => {
+      if (c.lastContact !== undefined) return c; // already v5
+      const { last, stale, ...rest } = c;
+      let channel = "";
+      let daysAgo = null;
+      if (typeof last === "string") {
+        const parts = last.split("·").map((p) => p.trim());
+        const recency = parts[0] || "";
+        channel = parts[1] || "";
+        if (/today/i.test(recency)) daysAgo = 0;
+        else if (/yesterday/i.test(recency)) daysAgo = 1;
+        else {
+          const m = recency.match(/(\d+)\s*day/i);
+          if (m) daysAgo = parseInt(m[1], 10);
+        }
+      }
+      let lastContact = null;
+      if (daysAgo != null) {
+        const d = new Date();
+        d.setDate(d.getDate() - daysAgo);
+        lastContact = d.toISOString().slice(0, 10);
+      }
+      return { ...rest, lastContact, channel, cadenceDays: 7 };
+    });
+  }
+
+  // ----- Upcoming: best-effort date → ISO -----
+  if (Array.isArray(out.upcoming)) {
+    out.upcoming = out.upcoming.map((u) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(u.date || "")) return u;
+      const dayMatch = String(u.date || "").match(/(\d{1,2})/);
+      if (dayMatch) {
+        const day = String(parseInt(dayMatch[1], 10)).padStart(2, "0");
+        return { ...u, date: `${currentMonth}-${day}` };
+      }
+      return { ...u, date: null };
+    });
+  }
 
   return out;
 }

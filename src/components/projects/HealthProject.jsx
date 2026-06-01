@@ -245,7 +245,6 @@ function MetricCard({ label, unit, valueKey, entries, target, goodDirection, onA
 
 function FoodDiary({ entries, targets, onAdd, onRemove }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [previewImg, setPreviewImg] = useState(null);
 
   const todayISO = isoDate();
   const todayEntries = entries.filter((e) => e.date === todayISO);
@@ -315,15 +314,6 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
               <div className="hl-food-body">
                 <div className="hl-food-text">
                   {entry.text}
-                  {entry.images && entry.images.length > 0 && (
-                    <button
-                      className="hl-food-img-icon"
-                      onClick={() => setPreviewImg(entry.images[0])}
-                      title="View attached photo"
-                    >
-                      📎{entry.images.length > 1 ? ` ${entry.images.length}` : ""}
-                    </button>
-                  )}
                 </div>
                 <div className="hl-food-macros">
                   P {entry.protein || 0}g · C {entry.carbs || 0}g · F {entry.fat || 0}g
@@ -354,14 +344,6 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
         />
       )}
 
-      {previewImg && (
-        <div className="hl-img-preview" onClick={() => setPreviewImg(null)}>
-          <img src={previewImg} alt="meal" />
-          <button className="hl-img-close" onClick={() => setPreviewImg(null)}>
-            ×
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -370,6 +352,8 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
 
 function AddFoodModal({ onCancel, onSave }) {
   const [text, setText] = useState("");
+  // Photos are used only as input to macro estimation — they are NOT saved on
+  // the entry (schema v5 dropped stored food images to keep the blob lean).
   const [images, setImages] = useState([]);
   const [estimating, setEstimating] = useState(false);
   const [macros, setMacros] = useState({ kcal: "", protein: "", carbs: "", fat: "" });
@@ -409,7 +393,6 @@ function AddFoodModal({ onCancel, onSave }) {
       date: isoDate(),
       time,
       text: text.trim(),
-      images,
       kcal: parseInt(macros.kcal) || 0,
       protein: parseInt(macros.protein) || 0,
       carbs: parseInt(macros.carbs) || 0,

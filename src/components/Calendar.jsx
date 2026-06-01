@@ -84,13 +84,16 @@ function collectEvents(state) {
       projectKey: "journal",
     });
   }
-  const free = (state.upcoming || []).map((u) => ({
-    date: u.date,
-    label: u.text,
-    kind: "personal",
-    projectKey: null,
-    cat: u.cat,
-  }));
+  // Upcoming items with a real ISO date go on the grid; anything that didn't
+  // parse (date === null) stays in the list-only `free` bucket.
+  const free = [];
+  for (const u of state.upcoming || []) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(u.date || "")) {
+      dated.push({ isoDate: u.date, kind: "personal", label: u.text, projectKey: null, cat: u.cat });
+    } else {
+      free.push({ date: u.date, label: u.text, kind: "personal", projectKey: null, cat: u.cat });
+    }
+  }
   return { dated, free };
 }
 

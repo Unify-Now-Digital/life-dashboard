@@ -3,28 +3,39 @@ import { C, styles, tint } from "../../lib/tokens";
 import { EditableText, IconBtn } from "../Editable.jsx";
 import Project from "./Project.jsx";
 
-// Defensive money read — handles the new plain-EUR-number shape AND the
-// legacy `{amount, ccy, eur, ...}` snapshot shape that older state blobs
-// may still carry. Always returns an EUR number.
-function moneyEur(item) {
-  const v = item?.amount ?? item?.balance ?? item?.value;
-  if (typeof v === "number") return v;
-  if (v && typeof v === "object") return v.eur ?? v.amount ?? 0;
-  return 0;
-}
-function itemName(item) {
-  return item?.name ?? item?.account ?? item?.label ?? "—";
-}
 const eur = (n) =>
   `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const currentMonth = () => todayISO().slice(0, 7);
+
+// Current value of a line = its latest history snapshot. History is appended
+// chronologically; pick the entry with the highest date/month key.
+function latestEur(history, key) {
+  if (!Array.isArray(history) || history.length === 0) return 0;
+  let best = history[0];
+  for (const h of history) if ((h[key] || "") >= (best[key] || "")) best = h;
+  return best.eur || 0;
+}
+
+// Upsert a snapshot for the given period key (today for accounts, this month
+// for revenue), so editing the current value updates the latest point and
+// records history going forward.
+function upsertSnapshot(history, key, keyVal, value) {
+  const arr = Array.isArray(history) ? [...history] : [];
+  const idx = arr.findIndex((h) => h[key] === keyVal);
+  if (idx >= 0) arr[idx] = { ...arr[idx], eur: value };
+  else arr.push({ [key]: keyVal, eur: value });
+  return arr;
+}
+
 // Subcard meta — one per finance area. Color used for tint + accent.
-// Order: Revenue · Savings · Investments · Debts (most-active inflow → debt).
+// Revenue reads from `revenue`; the rest read from `accounts` filtered by type.
 const CARDS = [
-  { key: "revenue", label: "Revenue", color: "#534AB7", listKey: "monthlyRevenue", addLabel: "+ Add line" },
-  { key: "savings", label: "Savings", color: "#3B6D11", listKey: "savings", addLabel: "+ Add account" },
-  { key: "investments", label: "Investments", color: "#185FA5", listKey: "investments", addLabel: "+ Add account" },
-  { key: "debts", label: "Debts", color: "#791F1F", listKey: "debts", addLabel: "+ Add debt", invert: true },
+  { key: "revenue", label: "Revenue", color: "#534AB7", kind: "revenue", addLabel: "+ Add line" },
+  { key: "savings", label: "Savings", color: "#3B6D11", kind: "account", type: "saving", addLabel: "+ Add account" },
+  { key: "investments", label: "Investments", color: "#185FA5", kind: "account", type: "investment", addLabel: "+ Add account" },
+  { key: "debts", label: "Debts", color: "#791F1F", kind: "account", type: "debt", addLabel: "+ Add debt", invert: true },
 ];
 
 function Tile({ card, total, isOpen, onClick }) {
@@ -65,7 +76,7 @@ function Tile({ card, total, isOpen, onClick }) {
   );
 }
 
-function ItemList({ card, items, listHandlers }) {
+function ItemList({ card, items, handlers }) {
   const [editing, setEditing] = useState(false);
   return (
     <div
@@ -95,6 +106,7 @@ function ItemList({ card, items, listHandlers }) {
           }}
         >
           {card.label}
+          {card.kind === "revenue" ? ` · ${currentMonth()}` : ""}
         </span>
         <button
           onClick={() => setEditing(!editing)}
@@ -120,57 +132,52 @@ function ItemList({ card, items, listHandlers }) {
         </div>
       )}
 
-      {items.map((it) => {
-        const amount = moneyEur(it);
-        return (
-          <div
-            key={it.id}
+      {items.map((it) => (
+        <div
+          key={it.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "6px 0",
+            borderBottom: `0.5px solid ${C.border}`,
+          }}
+        >
+          <span style={{ flex: 1, fontSize: 13, color: C.text }}>
+            <EditableText
+              value={it.name}
+              onChange={(v) => handlers.onUpdateName(it.id, v)}
+              placeholder="name"
+              style={{ fontSize: 13 }}
+            />
+          </span>
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "6px 0",
-              borderBottom: `0.5px solid ${C.border}`,
+              fontSize: 13,
+              fontWeight: 500,
+              color: C.text,
+              fontVariantNumeric: "tabular-nums",
             }}
           >
-            <span style={{ flex: 1, fontSize: 13, color: C.text }}>
-              <EditableText
-                value={itemName(it)}
-                onChange={(v) => listHandlers.onUpdate(it.id, { name: v })}
-                placeholder="name"
-                style={{ fontSize: 13 }}
-              />
-            </span>
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: C.text,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              €
-              <EditableText
-                value={String(amount)}
-                onChange={(v) =>
-                  listHandlers.onUpdate(it.id, { amount: parseFloat(v) || 0 })
-                }
-                type="number"
-                style={{ fontSize: 13, fontWeight: 500 }}
-              />
-            </span>
-            {editing && (
-              <IconBtn onClick={() => listHandlers.onRemove(it.id)} danger label="Remove">
-                ×
-              </IconBtn>
-            )}
-          </div>
-        );
-      })}
+            €
+            <EditableText
+              value={String(it.value)}
+              onChange={(v) => handlers.onUpdateValue(it.id, parseFloat(v) || 0)}
+              type="number"
+              style={{ fontSize: 13, fontWeight: 500 }}
+            />
+          </span>
+          {editing && (
+            <IconBtn onClick={() => handlers.onRemove(it.id)} danger label="Remove">
+              ×
+            </IconBtn>
+          )}
+        </div>
+      ))}
 
       {editing && (
         <button
-          onClick={listHandlers.onAdd}
+          onClick={handlers.onAdd}
           style={{ ...styles.addBtn, marginTop: 6, fontSize: 11, padding: "5px 10px" }}
         >
           {card.addLabel}
@@ -191,36 +198,78 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
       projects: { ...s.projects, finance: updater(s.projects.finance) },
     }));
 
-  const handlersFor = (listKey, factoryName) => ({
-    onAdd: () =>
-      updateFinance((f) => {
-        const arr = f[listKey] || [];
-        const nextId = (arr.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1;
-        return { ...f, [listKey]: [...arr, { id: nextId, name: factoryName, amount: 0 }] };
-      }),
-    onUpdate: (id, patch) =>
-      updateFinance((f) => ({
-        ...f,
-        [listKey]: (f[listKey] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
-      })),
-    onRemove: (id) =>
-      updateFinance((f) => ({
-        ...f,
-        [listKey]: (f[listKey] || []).filter((x) => x.id !== id),
-      })),
-  });
-
-  const handlersByKey = {
-    debts: handlersFor("debts", "New debt"),
-    savings: handlersFor("savings", "New account"),
-    investments: handlersFor("investments", "New account"),
-    revenue: handlersFor("monthlyRevenue", "New line"),
+  // Map a card to its display items: { id, name, value } where value is the
+  // latest history snapshot in EUR.
+  const itemsFor = (card) => {
+    if (card.kind === "revenue") {
+      return (data.revenue || []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        value: latestEur(r.history, "month"),
+      }));
+    }
+    return (data.accounts || [])
+      .filter((a) => a.type === card.type)
+      .map((a) => ({ id: a.id, name: a.name, value: latestEur(a.history, "date") }));
   };
 
-  // Read each list once + sum.
-  const lists = Object.fromEntries(CARDS.map((c) => [c.key, data[c.listKey] || []]));
+  const handlersFor = (card) => {
+    if (card.kind === "revenue") {
+      const month = currentMonth();
+      return {
+        onUpdateName: (id, name) =>
+          updateFinance((f) => ({
+            ...f,
+            revenue: (f.revenue || []).map((r) => (r.id === id ? { ...r, name } : r)),
+          })),
+        onUpdateValue: (id, value) =>
+          updateFinance((f) => ({
+            ...f,
+            revenue: (f.revenue || []).map((r) =>
+              r.id === id ? { ...r, history: upsertSnapshot(r.history, "month", month, value) } : r
+            ),
+          })),
+        onAdd: () =>
+          updateFinance((f) => {
+            const arr = f.revenue || [];
+            const id = (arr.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1;
+            return { ...f, revenue: [...arr, { id, name: "New line", project: null, history: [{ month, eur: 0 }] }] };
+          }),
+        onRemove: (id) =>
+          updateFinance((f) => ({ ...f, revenue: (f.revenue || []).filter((r) => r.id !== id) })),
+      };
+    }
+    const date = todayISO();
+    return {
+      onUpdateName: (id, name) =>
+        updateFinance((f) => ({
+          ...f,
+          accounts: (f.accounts || []).map((a) => (a.id === id ? { ...a, name } : a)),
+        })),
+      onUpdateValue: (id, value) =>
+        updateFinance((f) => ({
+          ...f,
+          accounts: (f.accounts || []).map((a) =>
+            a.id === id ? { ...a, history: upsertSnapshot(a.history, "date", date, value) } : a
+          ),
+        })),
+      onAdd: () =>
+        updateFinance((f) => {
+          const arr = f.accounts || [];
+          const id = (arr.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1;
+          return {
+            ...f,
+            accounts: [...arr, { id, name: "New account", type: card.type, history: [{ date, eur: 0 }] }],
+          };
+        }),
+      onRemove: (id) =>
+        updateFinance((f) => ({ ...f, accounts: (f.accounts || []).filter((a) => a.id !== id) })),
+    };
+  };
+
+  const lists = Object.fromEntries(CARDS.map((c) => [c.key, itemsFor(c)]));
   const totals = Object.fromEntries(
-    CARDS.map((c) => [c.key, lists[c.key].reduce((a, b) => a + moneyEur(b), 0)])
+    CARDS.map((c) => [c.key, lists[c.key].reduce((a, b) => a + b.value, 0)])
   );
 
   const opened = CARDS.find((c) => c.key === openKey) || null;
@@ -266,11 +315,7 @@ export default function FinanceProject({ state, setState, meta, onClose, goalHan
       </div>
 
       {opened && (
-        <ItemList
-          card={opened}
-          items={lists[opened.key]}
-          listHandlers={handlersByKey[opened.key]}
-        />
+        <ItemList card={opened} items={lists[opened.key]} handlers={handlersFor(opened)} />
       )}
     </Project>
   );

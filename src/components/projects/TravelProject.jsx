@@ -2,9 +2,30 @@ import React from "react";
 import { C, styles } from "../../lib/tokens";
 import { EditableText, IconBtn } from "../Editable.jsx";
 import Project from "./Project.jsx";
-import { fmt, toMoneySync } from "../../lib/money";
 
 const CHECK_KEYS = ["flights", "accommodation", "activities", "gym", "coworking", "eSIM", "insurance"];
+
+// Derive a trip subtitle ("4 nights · in 3 days") from start/end + today.
+// Replaces the old hand-typed `sub`/`days` fields.
+function tripMeta(trip) {
+  if (!trip.start) return "";
+  const start = new Date(trip.start + "T00:00:00");
+  const parts = [];
+  if (trip.end) {
+    const end = new Date(trip.end + "T00:00:00");
+    const nights = Math.max(0, Math.round((end - start) / 86400000));
+    if (nights) parts.push(`${nights} night${nights === 1 ? "" : "s"}`);
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const until = Math.round((start - today) / 86400000);
+  if (until > 1) parts.push(`in ${until} days`);
+  else if (until === 1) parts.push("tomorrow");
+  else if (until === 0) parts.push("today");
+  else if (trip.end && new Date(trip.end + "T00:00:00") >= today) parts.push("now");
+  else parts.push("past");
+  return parts.join(" · ");
+}
 
 export default function TravelProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.travel;
@@ -24,12 +45,12 @@ export default function TravelProject({ state, setState, meta, onClose, goalHand
   });
 
   const trips = tripList("trips", (id) => ({
-    id, name: "New trip", start: "", end: "", sub: "", days: null,
+    id, name: "New trip", start: "", end: "",
     checklist: Object.fromEntries(CHECK_KEYS.map((k) => [k, false])),
     notes: "",
   }));
   const wishlist = tripList("wishlist", (id) => ({ id, place: "New place", season: "", status: "researched", notes: "" }));
-  const sublets = tripList("sublets", (id) => ({ id, dateRange: "", income: toMoneySync(0, "EUR"), source: "" }));
+  const sublets = tripList("sublets", (id) => ({ id, dateRange: "", income: 0, source: "" }));
 
   const updatePoints = (key, value) =>
     updateTravel((t) => ({ ...t, points: { ...t.points, [key]: parseFloat(value) || 0, lastUpdated: new Date().toISOString().slice(0, 10) } }));
@@ -51,6 +72,9 @@ export default function TravelProject({ state, setState, meta, onClose, goalHand
             </span>
             <IconBtn onClick={() => trips.onRemove(trip.id)} danger label="Remove">×</IconBtn>
           </div>
+          {tripMeta(trip) && (
+            <div style={{ marginTop: 2, fontSize: 11, color: C.textTertiary }}>{tripMeta(trip)}</div>
+          )}
           {(trip.notes || true) && (
             <div style={{ marginTop: 4, fontSize: 11, color: C.textTertiary }}>
               <EditableText value={trip.notes || ""} onChange={(v) => trips.onUpdate(trip.id, { notes: v })} placeholder="notes…" style={{ fontSize: 11 }} />
@@ -122,16 +146,19 @@ export default function TravelProject({ state, setState, meta, onClose, goalHand
                 <EditableText value={sl.source || ""} onChange={(v) => sublets.onUpdate(sl.id, { source: v })} placeholder="source" style={{ fontSize: 11 }} />
               </span>
             </span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{fmt(sl.income)}</span>
+            <span style={{ fontSize: 13, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+              €
+              <EditableText
+                value={String(sl.income || 0)}
+                onChange={(v) => sublets.onUpdate(sl.id, { income: parseFloat(v) || 0 })}
+                type="number"
+                style={{ fontSize: 13, fontWeight: 500 }}
+              />
+            </span>
             <IconBtn onClick={() => sublets.onRemove(sl.id)} danger label="Remove">×</IconBtn>
           </div>
         ))}
         <button onClick={sublets.onAdd} style={{ ...styles.addBtn, marginTop: 8 }}>+ Add sublet</button>
-      </div>
-
-      {/* Recommender placeholder */}
-      <div style={{ marginTop: 22, fontSize: 11, color: C.textTertiary, fontStyle: "italic" }}>
-        Recommender (places, events, restaurants) — coming next.
       </div>
     </Project>
   );

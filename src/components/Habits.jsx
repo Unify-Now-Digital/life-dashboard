@@ -6,10 +6,10 @@ import SectionShell, { SystemIcon } from "./SectionShell.jsx";
 import { isoYesterday, isoDate, statusFor, streakFor, hasUnanswered } from "../lib/habits";
 import "./Habits.css";
 
-// Habits taxonomy + targets. `target` hits expected per `period` days. Sub
-// renders below the name. Inline so the file stays self-contained; can be
-// promoted into defaultState.js later if Arin wants to edit targets in-app.
-const HABITS = [
+// Fallback habits taxonomy used only if state.habits is missing. The live
+// definitions come from state.habits (see defaultState.js); `target` hits
+// expected per `period` days, `sub` renders below the name.
+const DEFAULT_HABITS = [
   { key: "spanish", label: "Spanish", target: 7, period: 7, sub: "daily" },
   { key: "gym", label: "Gym", target: 5, period: 7, sub: "5x / week" },
   { key: "clean", label: "Clean", target: 3, period: 7, sub: "3x / week" },
@@ -50,10 +50,14 @@ function hitsInPeriod(habit, habitLog, days) {
   return n;
 }
 
-export default function Habits({ habitLog, habitNoLog, onConfirm }) {
+export default function Habits({ habits, habitLog, habitNoLog, onConfirm }) {
   const [expanded, setExpanded] = useState(false);
   const [pop, setPop] = useState(null); // { habit, dateISO, x, y }
   const [confirmOpen, setConfirmOpen] = useState(null);
+  // Live habit definitions from state; fall back to the built-in list.
+  const HABITS = (habits && habits.length ? habits : DEFAULT_HABITS).filter(
+    (h) => h.active !== false
+  );
   const yesISO = isoYesterday();
   const anyUnanswered = HABITS.some((h) => hasUnanswered(h.key, habitLog, habitNoLog));
   const meta = expanded
@@ -92,7 +96,7 @@ export default function Habits({ habitLog, habitNoLog, onConfirm }) {
       onToggle={() => setExpanded((v) => !v)}
     >
       {!expanded ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${HABITS.length || 1}, 1fr)`, gap: 8 }}>
           {HABITS.map((h) => {
             const status = statusFor(h.key, yesISO, habitLog, habitNoLog);
             const streak = streakFor(h.key, habitLog, habitNoLog);

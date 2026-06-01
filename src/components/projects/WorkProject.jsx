@@ -34,9 +34,8 @@ function makeTodoHandlers(setState, businessId) {
 }
 
 // Single business tile. Compact horizontal card. Read-only display; tap to
-// expand. Editable name/value/meta lives in the expansion below — keeps the
-// tile click-target clean so the expansion always switches. The financial
-// `value` field stays in state but isn't rendered here.
+// expand. Editable name/meta lives in the expansion below — keeps the
+// tile click-target clean so the expansion always switches.
 function BusinessTile({ business, isExpanded, onClick }) {
   const bgRest = tint(business.color, 0.06);
   const bgOpen = tint(business.color, 0.12);
@@ -207,20 +206,6 @@ function TodoList({ business, setState }) {
             style={{ fontSize: 14, fontWeight: 500 }}
           />
         </span>
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 500,
-            color: C.text,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          <EditableText
-            value={business.value}
-            onChange={(v) => updateBusiness({ value: v })}
-            style={{ fontSize: 14, fontWeight: 500 }}
-          />
-        </span>
       </div>
       <div style={{ fontSize: 11, color: C.textSecondary, marginBottom: 10 }}>
         <EditableText
@@ -371,7 +356,6 @@ export default function WorkProject({ state, setState, meta, onClose, goalHandle
               key: `biz${Date.now().toString(36).slice(-4)}`,
               name: "New",
               color: BIZ_COLORS[s.projects.work.businesses.length % BIZ_COLORS.length],
-              value: "—",
               meta: "—",
               goals: [],
               todos: [],

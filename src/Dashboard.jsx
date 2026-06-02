@@ -152,6 +152,112 @@ function MainSection({ projectKey, expanded, onToggle, state, setState }) {
   );
 }
 
+// Small pill that flips the side-panel between docked and floating modes.
+function RailModeToggle({ mode, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={mode === "dock" ? "Float the panel (full-width page)" : "Dock the panel"}
+      style={{
+        background: "transparent",
+        border: `0.5px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "3px 9px",
+        fontSize: 11,
+        color: C.textSecondary,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {mode === "dock" ? "float ▸" : "◂ dock"}
+    </button>
+  );
+}
+
+// Floating side panel: collapsed to a thin handle on the right edge, expands
+// on hover. Click the handle to pin it open. The page's main column runs
+// full-width underneath.
+function FloatingRail({ children, onDock, width = 300 }) {
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const show = hover || pinned;
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "fixed",
+        top: 84,
+        right: 0,
+        height: "calc(100vh - 104px)",
+        display: "flex",
+        alignItems: "flex-start",
+        zIndex: 90,
+      }}
+    >
+      {/* Edge handle — always visible, click to pin/unpin */}
+      <button
+        onClick={() => setPinned((p) => !p)}
+        title={pinned ? "Unpin panel" : "Pin panel open"}
+        style={{
+          alignSelf: "center",
+          width: 24,
+          height: 72,
+          border: `0.5px solid ${C.border}`,
+          borderRight: "none",
+          borderRadius: "8px 0 0 8px",
+          background: C.bg,
+          color: pinned ? C.accent : C.textSecondary,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: 13,
+          boxShadow: "-2px 2px 10px rgba(0,0,0,0.05)",
+          flexShrink: 0,
+        }}
+      >
+        {show ? "›" : "‹"}
+      </button>
+
+      {/* Sliding panel */}
+      <div
+        style={{
+          width: show ? width : 0,
+          height: "100%",
+          overflow: "hidden",
+          transition: "width 0.18s ease",
+        }}
+      >
+        <div
+          style={{
+            width,
+            height: "100%",
+            boxSizing: "border-box",
+            overflowY: "auto",
+            background: C.bg,
+            border: `0.5px solid ${C.border}`,
+            borderRight: "none",
+            borderRadius: "10px 0 0 10px",
+            boxShadow: "-6px 0 20px rgba(0,0,0,0.07)",
+            padding: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              {pinned ? "pinned" : "hover panel"}
+            </span>
+            <RailModeToggle mode="float" onClick={onDock} />
+          </div>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function useViewport() {
   const [width, setWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1024
@@ -186,6 +292,24 @@ export default function Dashboard() {
       return acc;
     }, {})
   );
+
+  // Desktop side-panel mode: "float" (main full-width, rail pops out on hover)
+  // or "dock" (classic two-column). Persisted as a UI preference.
+  const [railMode, setRailModeRaw] = useState(() => {
+    try {
+      return localStorage.getItem("lifeDashboard:railMode") || "float";
+    } catch {
+      return "float";
+    }
+  });
+  const setRailMode = (m) => {
+    setRailModeRaw(m);
+    try {
+      localStorage.setItem("lifeDashboard:railMode", m);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Project navigation: tapping a rail card or floating pill should expand
   // the matching MainSection (if it has one) and scroll to it; otherwise it
@@ -308,18 +432,10 @@ export default function Dashboard() {
     </div>
   );
 
-  const rightRail = (
-    <aside
-      style={{
-        // Let the rail flow naturally — it scrolls with the page once it
-        // exceeds the viewport, so all 8 cards (incl. Learning at the bottom)
-        // remain reachable.
-        alignSelf: "start",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
+  // Shared rail content, reused by both the docked column and the floating
+  // pop-out panel.
+  const railContent = (
+    <>
       <NorthStar value={state.northStar} onChange={setNorthStar} compact />
       <GoalsRollup state={state} onOpenProject={setOpenProject} />
       <Projects
@@ -328,6 +444,22 @@ export default function Dashboard() {
         setOpenOverride={setOpenProject}
         layout="rail"
       />
+    </>
+  );
+
+  const dockedRail = (
+    <aside
+      style={{
+        alignSelf: "start",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <RailModeToggle mode="dock" onClick={() => setRailMode("float")} />
+      </div>
+      {railContent}
     </aside>
   );
 
@@ -360,17 +492,26 @@ export default function Dashboard() {
         <Header today={today} dayOfYear={dayOfYear} quote={quote} />
 
         {isDesktop ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `minmax(0, 1fr) ${isWide ? 300 : 260}px`,
-              gap: isWide ? 24 : 16,
-              alignItems: "start",
-            }}
-          >
-            {mainColumn}
-            {rightRail}
-          </div>
+          railMode === "dock" ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `minmax(0, 1fr) ${isWide ? 300 : 260}px`,
+                gap: isWide ? 24 : 16,
+                alignItems: "start",
+              }}
+            >
+              {mainColumn}
+              {dockedRail}
+            </div>
+          ) : (
+            <>
+              {mainColumn}
+              <FloatingRail width={isWide ? 320 : 280} onDock={() => setRailMode("dock")}>
+                {railContent}
+              </FloatingRail>
+            </>
+          )
         ) : (
           mobileLayout
         )}

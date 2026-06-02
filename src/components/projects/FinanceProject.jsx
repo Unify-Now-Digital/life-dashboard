@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { C, styles, tint } from "../../lib/tokens";
 import { EditableText, IconBtn } from "../Editable.jsx";
 import Project from "./Project.jsx";
@@ -82,60 +82,79 @@ function monthLabel(m) {
 // and a single y-scale spanning all values, so they sit together and stay
 // readable. lines: [{ key, label, color, values:[number|null] }].
 function MultiLineChart({ months, lines, nowIndex }) {
-  const W = 320;
-  const H = 150;
-  const padL = 6;
-  const padR = 6;
-  const padT = 10;
-  const padB = 18;
+  // Render at the container's true pixel width (1:1) so circles stay round and
+  // labels aren't horizontally stretched — the old fixed-viewBox + stretch made
+  // the chart look squashed once the page went full-width.
+  const ref = useRef(null);
+  const [w, setW] = useState(720);
+  useEffect(() => {
+    if (!ref.current || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect?.width;
+      if (cw) setW(cw);
+    });
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const W = Math.max(280, Math.round(w));
+  const H = 190;
+  const padL = 8;
+  const padR = 8;
+  const padT = 14;
+  const padB = 22;
   const all = lines.flatMap((l) => l.values.filter((v) => v != null));
-  if (months.length === 0 || all.length === 0) {
-    return <div style={{ fontSize: 11, color: C.textTertiary, padding: "8px 0" }}>No history yet.</div>;
-  }
   const min = Math.min(...all, 0);
   const max = Math.max(...all, 0);
   const range = max - min || 1;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
-  const x = (i) => padL + (months.length === 1 ? innerW / 2 : (i / (months.length - 1)) * innerW);
+  const x = (i) => padL + (months.length <= 1 ? innerW / 2 : (i / (months.length - 1)) * innerW);
   const y = (v) => padT + innerH - ((v - min) / range) * innerH;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H, display: "block" }}>
-      {/* "now" divider — everything to its right is the future window */}
-      {nowIndex >= 0 && nowIndex < months.length - 1 && (
-        <line x1={x(nowIndex)} y1={padT - 4} x2={x(nowIndex)} y2={padT + innerH} stroke={C.border} strokeWidth="1" strokeDasharray="2 3" />
+    <div ref={ref} style={{ width: "100%" }}>
+      {all.length === 0 ? (
+        <div style={{ fontSize: 11, color: C.textTertiary, padding: "8px 0" }}>No history yet.</div>
+      ) : (
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+          {/* "now" divider — everything to its right is the future window */}
+          {nowIndex >= 0 && nowIndex < months.length - 1 && (
+            <line x1={x(nowIndex)} y1={padT - 4} x2={x(nowIndex)} y2={padT + innerH} stroke={C.border} strokeWidth="1" strokeDasharray="2 3" />
+          )}
+          {min < 0 && max > 0 && (
+            <line x1={padL} y1={y(0)} x2={W - padR} y2={y(0)} stroke={C.border} strokeWidth="1" strokeDasharray="3 3" />
+          )}
+          {lines.map((l) => {
+            const pts = l.values.map((v, i) => (v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
+            const lastIdx = l.values.reduce((acc, v, i) => (v != null ? i : acc), -1);
+            return (
+              <g key={l.key}>
+                {pts.length >= 2 && (
+                  <polyline points={pts.join(" ")} fill="none" stroke={l.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+                {l.values.map((v, i) =>
+                  v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={i === lastIdx ? 3.5 : 2.5} fill={l.color} />
+                )}
+              </g>
+            );
+          })}
+          {/* one tick label per month across the axis */}
+          {months.map((m, i) => (
+            <text
+              key={m}
+              x={x(i)}
+              y={H - 6}
+              fontSize="11"
+              fill={i > nowIndex ? C.textTertiary : C.textSecondary}
+              textAnchor={i === 0 ? "start" : i === months.length - 1 ? "end" : "middle"}
+            >
+              {monthLabel(m)}
+            </text>
+          ))}
+        </svg>
       )}
-      {min < 0 && max > 0 && (
-        <line x1={padL} y1={y(0)} x2={W - padR} y2={y(0)} stroke={C.border} strokeWidth="1" strokeDasharray="3 3" />
-      )}
-      {lines.map((l) => {
-        const pts = l.values.map((v, i) => (v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
-        const lastIdx = l.values.reduce((acc, v, i) => (v != null ? i : acc), -1);
-        return (
-          <g key={l.key}>
-            {pts.length >= 2 && (
-              <polyline points={pts.join(" ")} fill="none" stroke={l.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            )}
-            {l.values.map((v, i) =>
-              v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={i === lastIdx ? 3 : 2} fill={l.color} />
-            )}
-          </g>
-        );
-      })}
-      {/* one tick label per month across the axis */}
-      {months.map((m, i) => (
-        <text
-          key={m}
-          x={x(i)}
-          y={H - 5}
-          fontSize="8"
-          fill={i > nowIndex ? C.textTertiary : C.textSecondary}
-          textAnchor={i === 0 ? "start" : i === months.length - 1 ? "end" : "middle"}
-        >
-          {monthLabel(m)}
-        </text>
-      ))}
-    </svg>
+    </div>
   );
 }
 

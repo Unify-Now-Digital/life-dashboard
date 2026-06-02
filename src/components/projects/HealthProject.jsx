@@ -10,8 +10,9 @@
 //   - FoodDiary — today bar + scrollable rows + add entry modal
 //   - SettingsModal — set targets and goal direction
 //
-// Macros estimation calls /api/estimate-macros if available, falls back to
-// manual entry.
+// Food identification calls /api/analyze-food if available (splits the meal
+// into dishes, verifies each against the user's diary history or the web with
+// a confidence score, then estimates macros), falls back to manual entry.
 
 import React, { useState, useRef, useMemo } from "react";
 import { C } from "../../lib/tokens";
@@ -63,20 +64,37 @@ function compressImage(file, maxDim = 800, quality = 0.7) {
   });
 }
 
-// Call serverless function for macro estimation. Falls back gracefully.
-async function estimateMacros({ text, image }) {
+// Call serverless function to identify + verify + estimate the meal. Returns
+// { items, total, confidence } or null (caller falls back to manual entry).
+// `known` is the user's own prior food entries — the "with us" source the
+// analyzer prefers before reaching for the web.
+async function analyzeFood({ text, image, known }) {
   try {
-    const res = await fetch("/api/estimate-macros", {
+    const res = await fetch("/api/analyze-food", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, image }),
+      body: JSON.stringify({ text, image, known }),
     });
-    if (!res.ok) throw new Error("estimation failed");
+    if (!res.ok) throw new Error("analysis failed");
     const data = await res.json();
-    return data; // { kcal, protein, carbs, fat }
+    if (!data || !Array.isArray(data.items) || data.items.length === 0) return null;
+    return data;
   } catch (err) {
     return null; // caller falls back to manual entry
   }
+}
+
+// Small helpers for rendering a source/confidence on an analysed item.
+const SOURCE_META = {
+  diary: { label: "Your diary", cls: "diary" },
+  web: { label: "Web", cls: "web" },
+  estimate: { label: "Estimate", cls: "estimate" },
+};
+
+function confidenceClass(c) {
+  if (c >= 80) return "high";
+  if (c >= 50) return "mid";
+  return "low";
 }
 
 // ---- Sparkline ------------------------------------------------------------
@@ -269,6 +287,21 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
   const targetCal = targets?.calories || 2200;
   const overTarget = todayTotals.kcal > targetCal;
 
+  // Distinct prior entries with real macros — passed to the analyzer as the
+  // user's own "known foods" so repeat meals resolve instantly and reliably.
+  const knownFoods = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const e of sortedDesc) {
+      const key = (e.text || "").trim().toLowerCase();
+      if (!key || seen.has(key) || !(e.kcal > 0)) continue;
+      seen.add(key);
+      out.push({ text: e.text, kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat });
+      if (out.length >= 40) break;
+    }
+    return out;
+  }, [sortedDesc]);
+
   return (
     <div className="hl-card">
       <div className="hl-h">
@@ -317,8 +350,21 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
                 </div>
                 <div className="hl-food-macros">
                   P {entry.protein || 0}g · C {entry.carbs || 0}g · F {entry.fat || 0}g
-                  {entry.estimatedAt && !entry.manualEdit && (
-                    <span className="hl-food-estimated">· est.</span>
+                  {typeof entry.confidence === "number" ? (
+                    <span
+                      className={"hl-food-conf " + confidenceClass(entry.confidence)}
+                      title={
+                        entry.items?.length
+                          ? `${entry.items.length} item${entry.items.length === 1 ? "" : "s"} · ${entry.confidence}% confidence`
+                          : `${entry.confidence}% confidence`
+                      }
+                    >
+                      · {entry.confidence}%
+                    </span>
+                  ) : (
+                    entry.estimatedAt && !entry.manualEdit && (
+                      <span className="hl-food-estimated">· est.</span>
+                    )
                   )}
                 </div>
               </div>
@@ -336,6 +382,7 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
 
       {showAdd && (
         <AddFoodModal
+          known={knownFoods}
           onCancel={() => setShowAdd(false)}
           onSave={(entry) => {
             onAdd(entry);
@@ -350,14 +397,15 @@ function FoodDiary({ entries, targets, onAdd, onRemove }) {
 
 // ---- Add food modal ------------------------------------------------------
 
-function AddFoodModal({ onCancel, onSave }) {
+function AddFoodModal({ known, onCancel, onSave }) {
   const [text, setText] = useState("");
   // Photos are used only as input to macro estimation — they are NOT saved on
   // the entry (schema v5 dropped stored food images to keep the blob lean).
   const [images, setImages] = useState([]);
-  const [estimating, setEstimating] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null); // { items, total, confidence }
+  const [analyzeFailed, setAnalyzeFailed] = useState(false);
   const [macros, setMacros] = useState({ kcal: "", protein: "", carbs: "", fat: "" });
-  const [estimateFailed, setEstimateFailed] = useState(false);
   const fileRef = useRef();
 
   const handleFiles = async (files) => {
@@ -366,22 +414,56 @@ function AddFoodModal({ onCancel, onSave }) {
     setImages([...images, ...compressed]);
   };
 
-  const handleEstimate = async () => {
+  const handleAnalyze = async () => {
     if (!text.trim()) return;
-    setEstimating(true);
-    setEstimateFailed(false);
-    const result = await estimateMacros({ text, image: images[0] || null });
-    setEstimating(false);
+    setAnalyzing(true);
+    setAnalyzeFailed(false);
+    const result = await analyzeFood({ text, image: images[0] || null, known });
+    setAnalyzing(false);
     if (result) {
+      setAnalysis(result);
+      const t = result.total || {};
       setMacros({
-        kcal: String(result.kcal || ""),
-        protein: String(result.protein || ""),
-        carbs: String(result.carbs || ""),
-        fat: String(result.fat || ""),
+        kcal: String(t.kcal || ""),
+        protein: String(t.protein || ""),
+        carbs: String(t.carbs || ""),
+        fat: String(t.fat || ""),
       });
     } else {
-      setEstimateFailed(true);
+      setAnalysis(null);
+      setAnalyzeFailed(true);
     }
+  };
+
+  // Drop a single identified item from the breakdown and re-roll the totals
+  // back into the editable macro fields.
+  const removeItem = (idx) => {
+    if (!analysis) return;
+    const items = analysis.items.filter((_, i) => i !== idx);
+    if (items.length === 0) {
+      setAnalysis(null);
+      return;
+    }
+    const total = items.reduce(
+      (acc, it) => ({
+        kcal: acc.kcal + (it.kcal || 0),
+        protein: acc.protein + (it.protein || 0),
+        carbs: acc.carbs + (it.carbs || 0),
+        fat: acc.fat + (it.fat || 0),
+      }),
+      { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+    const confidence =
+      total.kcal > 0
+        ? Math.round(items.reduce((s, it) => s + it.confidence * it.kcal, 0) / total.kcal)
+        : Math.round(items.reduce((s, it) => s + it.confidence, 0) / items.length);
+    setAnalysis({ items, total, confidence });
+    setMacros({
+      kcal: String(total.kcal || ""),
+      protein: String(total.protein || ""),
+      carbs: String(total.carbs || ""),
+      fat: String(total.fat || ""),
+    });
   };
 
   const handleSave = () => {
@@ -397,8 +479,12 @@ function AddFoodModal({ onCancel, onSave }) {
       protein: parseInt(macros.protein) || 0,
       carbs: parseInt(macros.carbs) || 0,
       fat: parseInt(macros.fat) || 0,
-      estimatedAt: !estimateFailed && macros.kcal ? new Date().toISOString() : null,
-      manualEdit: estimateFailed || !macros.kcal,
+      // Verified breakdown + confidence (additive fields; absent on manual rows).
+      ...(analysis
+        ? { items: analysis.items, confidence: analysis.confidence }
+        : {}),
+      estimatedAt: analysis ? new Date().toISOString() : null,
+      manualEdit: !analysis,
     });
   };
 
@@ -409,7 +495,7 @@ function AddFoodModal({ onCancel, onSave }) {
 
         <textarea
           className="hl-modal-textarea"
-          placeholder="What did you eat? (e.g. 'chicken breast 200g + rice 150g + broccoli')"
+          placeholder="What did you eat? (e.g. 'honest greens açai bowl + large americano')"
           value={text}
           onChange={(e) => setText(e.target.value)}
           autoFocus
@@ -444,14 +530,51 @@ function AddFoodModal({ onCancel, onSave }) {
         <div className="hl-modal-section">
           <div className="hl-modal-section-h">
             <span>Macros</span>
-            <button className="hl-modal-estimate" onClick={handleEstimate} disabled={!text.trim() || estimating}>
-              {estimating ? "Estimating..." : "Estimate with AI"}
+            <button className="hl-modal-estimate" onClick={handleAnalyze} disabled={!text.trim() || analyzing}>
+              {analyzing ? "Analysing…" : analysis ? "Re-analyse" : "Identify & estimate"}
             </button>
           </div>
 
-          {estimateFailed && (
+          {analyzeFailed && (
             <div className="hl-modal-warn">
-              Estimation unavailable — enter macros manually below or save with kcal=0.
+              Couldn't reach the analyser — enter macros manually below or save with kcal=0.
+            </div>
+          )}
+
+          {analysis && (
+            <div className="hl-analysis">
+              <div className="hl-analysis-h">
+                <span>Identified {analysis.items.length} item{analysis.items.length === 1 ? "" : "s"}</span>
+                <span className={"hl-conf-chip " + confidenceClass(analysis.confidence)}>
+                  {analysis.confidence}% confidence
+                </span>
+              </div>
+              <div className="hl-analysis-items">
+                {analysis.items.map((it, i) => {
+                  const meta = SOURCE_META[it.source] || SOURCE_META.estimate;
+                  return (
+                    <div key={i} className="hl-aitem">
+                      <div className="hl-aitem-main">
+                        <div className="hl-aitem-name">{it.name}</div>
+                        <div className="hl-aitem-sub">
+                          <span className={"hl-src-badge " + meta.cls}>{meta.label}</span>
+                          {it.sourceLabel && <span className="hl-aitem-srclbl">{it.sourceLabel}</span>}
+                          {it.portion && <span className="hl-aitem-portion">{it.portion}</span>}
+                          <span className={"hl-aitem-conf " + confidenceClass(it.confidence)}>{it.confidence}%</span>
+                        </div>
+                        <div className="hl-aitem-macros">
+                          P {it.protein}g · C {it.carbs}g · F {it.fat}g
+                        </div>
+                      </div>
+                      <div className="hl-aitem-cal">{it.kcal}<span> kcal</span></div>
+                      <button className="hl-rm hl-aitem-rm" onClick={() => removeItem(i)} title="Remove item">
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="hl-analysis-foot">Totals below — adjust any number before saving.</div>
             </div>
           )}
 

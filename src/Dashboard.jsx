@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { C, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
+import { isSupabaseEnabled } from "./lib/supabase";
 
 import Header from "./components/Header.jsx";
 import NorthStar from "./components/NorthStar.jsx";
@@ -329,16 +330,21 @@ export default function Dashboard() {
   const toggleSection = (key) =>
     setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // Hydrate from cloud once on mount, reconcile if newer. Persist on mount too,
-  // so a daily rollover applied at init is written through (stamps todayDate).
+  // Hydrate from cloud once on mount. The cloud row is the source of truth:
+  // adopt it if present, and only seed the cloud from local state when no row
+  // exists yet. Critically, we never write to the cloud BEFORE reading it —
+  // doing so could clobber existing data with the local (possibly seed) state.
   useEffect(() => {
     let alive = true;
-    saveState(state);
     loadFromCloud().then((cloud) => {
-      if (alive && cloud) {
+      if (!alive) return;
+      if (cloud) {
         const rolled = rollDaily(cloud);
         setStateRaw(rolled);
-        saveState(rolled);
+        if (rolled !== cloud) saveState(rolled); // persist only if rollover changed it
+      } else {
+        // No cloud row yet — back up whatever we have locally from now on.
+        saveState(state);
       }
     });
     flushQueue();
@@ -490,6 +496,23 @@ export default function Dashboard() {
     <AuthGate>
       <div style={styles.page}>
         <Header today={today} dayOfYear={dayOfYear} quote={quote} />
+
+        {!isSupabaseEnabled() && (
+          <div
+            style={{
+              background: "#FDF6E3",
+              border: "0.5px solid #E6D9A8",
+              color: "#7A5C00",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontSize: 12,
+              marginBottom: 12,
+            }}
+          >
+            Local only — changes are saved on this device but <strong>not backed up</strong>.
+            Set the Supabase env vars to sync across devices.
+          </div>
+        )}
 
         {isDesktop ? (
           railMode === "dock" ? (

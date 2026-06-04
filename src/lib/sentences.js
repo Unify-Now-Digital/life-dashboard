@@ -50,15 +50,47 @@ function clamp01(n) {
 }
 
 // ----- word-diff feedback ----------------------------------------------------
-// Positional comparison of the user's answer against the target. Good enough
-// for these short sentences and far more useful than just dumping the answer:
-// each target word is flagged ok/missed, and any surplus typed words returned.
+// Compares the user's answer against the target using a longest-common-
+// subsequence alignment, so a single missing or extra word doesn't cascade and
+// wrongly flag everything after it. Each target word is marked ok (matched in
+// order) or missed; any surplus typed words are returned separately.
 export function diffWords(input, target) {
   const got = normalizeSentence(input).split(" ").filter(Boolean);
   const want = normalizeSentence(target).split(" ").filter(Boolean);
   const display = (target || "").split(/\s+/).filter(Boolean);
-  const words = display.map((w, i) => ({ word: w, ok: got[i] != null && got[i] === want[i] }));
-  const extra = got.length > want.length ? got.slice(want.length) : [];
+  const n = got.length;
+  const m = want.length;
+
+  // LCS table over got × want.
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      dp[i][j] = got[i - 1] === want[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack to find which positions on each side are part of the match.
+  const wantMatched = new Array(m).fill(false);
+  const gotMatched = new Array(n).fill(false);
+  let i = n;
+  let j = m;
+  while (i > 0 && j > 0) {
+    if (got[i - 1] === want[j - 1]) {
+      wantMatched[j - 1] = true;
+      gotMatched[i - 1] = true;
+      i--;
+      j--;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  const words = display.map((w, idx) => ({ word: w, ok: wantMatched[idx] || false }));
+  const extra = got.filter((_, idx) => !gotMatched[idx]);
   return { words, extra };
 }
 

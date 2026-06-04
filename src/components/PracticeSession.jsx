@@ -251,7 +251,7 @@ function ProduceTask({ sentence, speechLang, onDone }) {
         <div style={{ fontSize: 13, color: C.success, fontWeight: 500, marginTop: 12 }}>¡Correcto!</div>
       )}
 
-      {/* Smart feedback: positional word diff instead of just dumping the answer. */}
+      {/* Smart feedback: word-by-word diff (LCS-aligned) instead of just dumping the answer. */}
       {diff && (
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -475,7 +475,6 @@ function ComprehendTask({ sentence, sentences, speechLang, onDone }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
         {options.map((opt) => {
           const isWrong = wrongPicks.includes(opt);
-          const isChosen = chosen === opt;
           const showAsAnswer = (revealed || chosen != null) && opt === sentence.en;
           return (
             <button

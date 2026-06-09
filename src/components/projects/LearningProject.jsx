@@ -3,7 +3,9 @@ import { C, styles } from "../../lib/tokens";
 import { EditableText, IconBtn, EditModeToggle } from "../Editable.jsx";
 import Project from "./Project.jsx";
 import LanguageDeck from "../LanguageDeck.jsx";
+import PracticeSession from "../PracticeSession.jsx";
 import { nextId } from "../../lib/defaultState";
+import { nextRate } from "../../lib/sentences";
 
 // Per-language deck handlers. `langSlot` is the key under
 // state.projects.learning that holds the deck (e.g. "spanish" / "turkish").
@@ -25,8 +27,20 @@ function makeDeckHandlers(setState, langSlot) {
         if (seen.includes(phraseId)) return sp;
         return { ...sp, phrasesSeen: [...seen, phraseId] };
       }),
-    onCycleSentence: () =>
-      update((sp) => ({ ...sp, sentenceIndex: ((sp.sentenceIndex || 0) + 1) % ((sp.sentences || []).length || 1) })),
+    onGradeSentence: (id, score) =>
+      update((sp) => ({
+        ...sp,
+        sentences: (sp.sentences || []).map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                attempts: (s.attempts || 0) + 1,
+                rate: nextRate(s.rate || 0, s.attempts || 0, score),
+                lastSeen: Date.now(),
+              }
+            : s
+        ),
+      })),
     onMarkSentenceSeen: (sentenceId) =>
       update((sp) => {
         const seen = sp.sentencesSeen || [];
@@ -56,6 +70,7 @@ function makeDeckHandlers(setState, langSlot) {
 export default function LearningProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.learning;
   const [tab, setTab] = useState("spanish");
+  const [practiceOpen, setPracticeOpen] = useState(false);
 
   const spanishHandlers = makeDeckHandlers(setState, "spanish");
   const turkishHandlers = makeDeckHandlers(setState, "turkish");
@@ -88,7 +103,17 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
           title="Spanish"
           subtitle="B1 → B2 · vos"
           pronoun="yo"
+          onStartPractice={() => setPracticeOpen(true)}
           {...spanishHandlers}
+        />
+      )}
+      {practiceOpen && (
+        <PracticeSession
+          sentences={data.spanish.sentences || []}
+          speechLang="es-AR"
+          onGrade={spanishHandlers.onGradeSentence}
+          onMarkSeen={spanishHandlers.onMarkSentenceSeen}
+          onClose={() => setPracticeOpen(false)}
         />
       )}
       {tab === "turkish" && (

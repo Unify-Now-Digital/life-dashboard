@@ -70,10 +70,17 @@ function makeDeckHandlers(setState, langSlot) {
 export default function LearningProject({ state, setState, meta, onClose, goalHandlers, hideHeader }) {
   const data = state.projects.learning;
   const [tab, setTab] = useState("spanish");
-  const [practiceOpen, setPracticeOpen] = useState(false);
+  // null when closed, otherwise the deck slot being practised ("spanish" | "turkish").
+  const [practiceLang, setPracticeLang] = useState(null);
 
   const spanishHandlers = makeDeckHandlers(setState, "spanish");
   const turkishHandlers = makeDeckHandlers(setState, "turkish");
+
+  const PRACTICE = {
+    spanish: { langKey: "es", speechLang: "es-AR", handlers: spanishHandlers },
+    turkish: { langKey: "tr", speechLang: "tr-TR", handlers: turkishHandlers },
+  };
+  const practiceCfg = practiceLang ? PRACTICE[practiceLang] : null;
 
   // Reading list handlers
   const updateReading = (updater) =>
@@ -103,17 +110,8 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
           title="Spanish"
           subtitle="B1 → B2 · vos"
           pronoun="yo"
-          onStartPractice={() => setPracticeOpen(true)}
+          onStartPractice={() => setPracticeLang("spanish")}
           {...spanishHandlers}
-        />
-      )}
-      {practiceOpen && (
-        <PracticeSession
-          sentences={data.spanish.sentences || []}
-          speechLang="es-AR"
-          onGrade={spanishHandlers.onGradeSentence}
-          onMarkSeen={spanishHandlers.onMarkSentenceSeen}
-          onClose={() => setPracticeOpen(false)}
         />
       )}
       {tab === "turkish" && (
@@ -123,7 +121,18 @@ export default function LearningProject({ state, setState, meta, onClose, goalHa
           title="Turkish"
           subtitle="A1 · informal sen"
           pronoun="ben"
+          onStartPractice={() => setPracticeLang("turkish")}
           {...turkishHandlers}
+        />
+      )}
+      {practiceCfg && (
+        <PracticeSession
+          sentences={data[practiceLang].sentences || []}
+          langKey={practiceCfg.langKey}
+          speechLang={practiceCfg.speechLang}
+          onGrade={practiceCfg.handlers.onGradeSentence}
+          onMarkSeen={practiceCfg.handlers.onMarkSentenceSeen}
+          onClose={() => setPracticeLang(null)}
         />
       )}
       {tab === "reading" && <ReadingList items={data.reading} {...readingH} />}

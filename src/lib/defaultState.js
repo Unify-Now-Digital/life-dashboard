@@ -469,6 +469,20 @@ export const defaultState = {
           { id: 11, infinitive: "edebilmek", en: "to be able to", forms: { past: "edebildim", present: "edebiliyorum", future: "edebileceğim" }, rule: "ability suffix -Abil; commonly attached to other verbs", correctPasses: 0 },
           { id: 12, infinitive: "durmak", en: "to stop / stand", forms: { past: "durdum", present: "duruyorum", future: "duracağım" }, rule: "regular -mak; o→u harmony in -Iyor", correctPasses: 0 },
         ],
+        // Sentence-builder drill: everyday A1/A2 sentences, informal sen, mixing
+        // past + future. `tr` is the reference answer; `tenses` labels the focus.
+        sentences: [
+          { id: 1, en: "Yesterday I worked a lot, but tomorrow I'll rest.", tr: "Dün çok çalıştım ama yarın dinleneceğim.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+          { id: 2, en: "I already ate, so later I'll go out.", tr: "Zaten yemek yedim, sonra dışarı çıkacağım.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+          { id: 3, en: "Last night I couldn't sleep, tonight I'll go to bed early.", tr: "Dün gece uyuyamadım, bu gece erken yatacağım.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+          { id: 4, en: "I went to the gym this morning and I'll go again tomorrow.", tr: "Bu sabah spora gittim ve yarın yine gideceğim.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+          { id: 5, en: "I told you I was going to come.", tr: "Sana geleceğimi söyledim.", tenses: "future participle + past", rate: 0, attempts: 0, lastSeen: null },
+          { id: 6, en: "We saw each other yesterday and we'll talk next week.", tr: "Dün görüştük, haftaya konuşacağız.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+          { id: 7, en: "I bought the tickets, now we just have to wait.", tr: "Biletleri aldım, şimdi sadece beklememiz lazım.", tenses: "past + necessity", rate: 0, attempts: 0, lastSeen: null },
+          { id: 8, en: "I couldn't finish it today, but I'll send it to you tomorrow.", tr: "Bugün bitiremedim ama yarın sana göndereceğim.", tenses: "past + future", rate: 0, attempts: 0, lastSeen: null },
+        ],
+        sentenceIndex: 0,
+        sentencesSeen: [],
         phraseIndex: 0,
         chunkIndex: 0,
         phrasesSeen: [],

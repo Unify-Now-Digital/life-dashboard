@@ -100,8 +100,9 @@ function TenseTag({ children }) {
 }
 
 // ----- produce: EN → ES typing ----------------------------------------------
-function ProduceTask({ sentence, speechLang, onDone }) {
-  const words = sentence.es.split(/\s+/);
+function ProduceTask({ sentence, langKey, speechLang, onDone }) {
+  const target = sentence[langKey];
+  const words = target.split(/\s+/);
   const [input, setInput] = useState("");
   const [hintCount, setHintCount] = useState(0);
   const [checkCount, setCheckCount] = useState(0);
@@ -113,7 +114,7 @@ function ProduceTask({ sentence, speechLang, onDone }) {
     if (ref.current) ref.current.focus();
   }, []);
 
-  const correct = normalizeSentence(input) === normalizeSentence(sentence.es);
+  const correct = normalizeSentence(input) === normalizeSentence(target);
   const fullyRevealed = hintCount >= words.length;
   const resolved = checked === true || revealed;
 
@@ -154,13 +155,13 @@ function ProduceTask({ sentence, speechLang, onDone }) {
     }
   };
 
-  const diff = checked === false ? diffWords(input, sentence.es) : null;
+  const diff = checked === false ? diffWords(input, target) : null;
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <TenseTag>produce · {sentence.tenses}</TenseTag>
-        <ListenBtn text={sentence.es} lang={speechLang} />
+        <ListenBtn text={target} lang={speechLang} />
       </div>
 
       <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.4, marginTop: 12 }}>{sentence.en}</div>
@@ -190,7 +191,7 @@ function ProduceTask({ sentence, speechLang, onDone }) {
         value={input}
         onChange={(e) => { setInput(e.target.value); setChecked(null); }}
         onKeyDown={onKeyDown}
-        placeholder="Write it in Spanish…"
+        placeholder="Write it…"
         autoCapitalize="none"
         spellCheck={false}
         rows={2}
@@ -280,7 +281,7 @@ function ProduceTask({ sentence, speechLang, onDone }) {
       {revealed && (
         <div style={{ fontSize: 13, color: C.text, marginTop: 12 }}>
           <span style={{ color: C.accentDark, fontWeight: 500 }}>Answer: </span>
-          {sentence.es}
+          {target}
         </div>
       )}
     </div>
@@ -297,8 +298,9 @@ function shuffled(arr) {
   return a;
 }
 
-function ScrambleTask({ sentence, speechLang, onDone }) {
-  const target = useMemo(() => sentence.es.split(/\s+/), [sentence.id]);
+function ScrambleTask({ sentence, langKey, speechLang, onDone }) {
+  const targetText = sentence[langKey];
+  const target = useMemo(() => targetText.split(/\s+/), [sentence.id]);
   // Tiles carry a stable key so duplicate words don't collide.
   const [bank, setBank] = useState(() =>
     shuffled(target.map((w, i) => ({ key: i, word: w })))
@@ -310,7 +312,7 @@ function ScrambleTask({ sentence, speechLang, onDone }) {
   const [checked, setChecked] = useState(null); // null | true | false
 
   const built = placed.map((t) => t.word).join(" ");
-  const correct = normalizeSentence(built) === normalizeSentence(sentence.es);
+  const correct = normalizeSentence(built) === normalizeSentence(targetText);
   const resolved = checked === true || revealed;
 
   const place = (tile) => {
@@ -354,7 +356,7 @@ function ScrambleTask({ sentence, speechLang, onDone }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <TenseTag>arrange · {sentence.tenses}</TenseTag>
-        <ListenBtn text={sentence.es} lang={speechLang} />
+        <ListenBtn text={targetText} lang={speechLang} />
       </div>
 
       <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.4, marginTop: 12 }}>{sentence.en}</div>
@@ -409,7 +411,7 @@ function ScrambleTask({ sentence, speechLang, onDone }) {
       {revealed && (
         <div style={{ fontSize: 13, color: C.text, marginTop: 12 }}>
           <span style={{ color: C.accentDark, fontWeight: 500 }}>Answer: </span>
-          {sentence.es}
+          {targetText}
         </div>
       )}
     </div>
@@ -437,7 +439,8 @@ function Tile({ children, onClick, active }) {
 }
 
 // ----- comprehend: ES → EN multiple choice -----------------------------------
-function ComprehendTask({ sentence, sentences, speechLang, onDone }) {
+function ComprehendTask({ sentence, sentences, langKey, speechLang, onDone }) {
+  const targetText = sentence[langKey];
   const options = useMemo(() => {
     const distractors = shuffled(
       sentences.filter((s) => s.id !== sentence.id).map((s) => s.en)
@@ -464,11 +467,11 @@ function ComprehendTask({ sentence, sentences, speechLang, onDone }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <TenseTag>understand · {sentence.tenses}</TenseTag>
-        <ListenBtn text={sentence.es} lang={speechLang} />
+        <ListenBtn text={targetText} lang={speechLang} />
       </div>
 
       <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.4, marginTop: 12, color: C.accentDark }}>
-        {sentence.es}
+        {targetText}
       </div>
       <div style={{ fontSize: 12, color: C.textTertiary, marginTop: 6 }}>What does it mean?</div>
 
@@ -575,7 +578,7 @@ function Stat({ label, value }) {
 }
 
 // ----- session shell ---------------------------------------------------------
-export default function PracticeSession({ sentences, speechLang = "es-ES", onGrade, onMarkSeen, onClose }) {
+export default function PracticeSession({ sentences, langKey = "es", speechLang = "es-ES", onGrade, onMarkSeen, onClose }) {
   const [queue, setQueue] = useState(() => buildSession(sentences));
   const [pos, setPos] = useState(0);
   const [results, setResults] = useState([]);
@@ -675,15 +678,16 @@ export default function PracticeSession({ sentences, speechLang = "es-ES", onGra
         ) : (
           <div key={pos} style={{ animation: "practiceSlide 0.3s ease" }}>
             {current.task === "produce" && (
-              <ProduceTask sentence={current.sentence} speechLang={speechLang} onDone={handleDone} />
+              <ProduceTask sentence={current.sentence} langKey={langKey} speechLang={speechLang} onDone={handleDone} />
             )}
             {current.task === "scramble" && (
-              <ScrambleTask sentence={current.sentence} speechLang={speechLang} onDone={handleDone} />
+              <ScrambleTask sentence={current.sentence} langKey={langKey} speechLang={speechLang} onDone={handleDone} />
             )}
             {current.task === "comprehend" && (
               <ComprehendTask
                 sentence={current.sentence}
                 sentences={sentences}
+                langKey={langKey}
                 speechLang={speechLang}
                 onDone={handleDone}
               />

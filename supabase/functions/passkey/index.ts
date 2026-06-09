@@ -67,7 +67,14 @@ Deno.serve(async (req) => {
 
   let rpID = "";
   try {
-    rpID = new URL(origin).hostname;
+    const host = new URL(origin).hostname;
+    // Scope passkeys to the registrable parent domain so ONE credential works
+    // across every subdomain (arin-melvin, spanish-arin-melvin, the apex).
+    // Other hosts (localhost, *.pages.dev previews) keep their exact hostname.
+    rpID =
+      host === "lifedashboard.live" || host.endsWith(".lifedashboard.live")
+        ? "lifedashboard.live"
+        : host;
   } catch {
     return json({ error: "missing/invalid Origin" }, 400);
   }

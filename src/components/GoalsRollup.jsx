@@ -8,6 +8,7 @@ function gatherGoals(state) {
   const out = [];
   const projects = state.projects || {};
   for (const [pk, p] of Object.entries(projects)) {
+    if (pk === "learning") continue; // Spanish learning lives on its own subdomain
     for (const g of p.goals || []) out.push({ projectKey: pk, goal: g });
     if (pk === "work") {
       for (const b of p.businesses || []) {

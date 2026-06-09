@@ -520,7 +520,6 @@ function AddFoodModal({ known, onCancel, onSave }) {
             type="file"
             ref={fileRef}
             accept="image/*"
-            capture="environment"
             multiple
             onChange={(e) => handleFiles(e.target.files)}
             style={{ display: "none" }}

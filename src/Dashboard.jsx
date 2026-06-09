@@ -3,6 +3,7 @@ import { C, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
 import { isSupabaseEnabled } from "./lib/supabase";
+import { isSpanishHost } from "./lib/host.js";
 
 import Header from "./components/Header.jsx";
 import NorthStar from "./components/NorthStar.jsx";
@@ -15,29 +16,39 @@ import PhotoQuickAdd from "./components/PhotoQuickAdd.jsx";
 import TopThree from "./components/TopThree.jsx";
 import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
-import Projects, { PROJECT_META } from "./components/Projects.jsx";
+import Projects, { PROJECT_META, makeGoalHandlers } from "./components/Projects.jsx";
 import ProjectDrilldown from "./components/ProjectDrilldown.jsx";
+import LearningProject from "./components/projects/LearningProject.jsx";
 import JumpNav from "./components/JumpNav.jsx";
 import SectionShell from "./components/SectionShell.jsx";
 
-// Projects that get always-rendered sections in the main column, in display
-// order beneath the Calendar. Outer card is white with a coloured
-// left-border; inner subcards carry the project tint. Travel is the only
-// project still rendered as an on-demand drilldown.
+// Always-rendered collapsible sections in the main column, in display order.
+// Learning (Spanish/Turkish/reading) intentionally lives on its own focused
+// subdomain (spanish-arin-melvin.lifedashboard.live), so it is not a section
+// here. Travel is the lone on-demand drilldown.
 const SECTIONS = [
   { key: "finance", defaultOpen: true },
   { key: "work", defaultOpen: true },
   { key: "health", defaultOpen: true },
-  { key: "learning", defaultOpen: false },
   { key: "journal", defaultOpen: false },
   { key: "relationships", defaultOpen: false },
   { key: "charity", defaultOpen: false },
 ];
 const SECTION_KEYS = SECTIONS.map((s) => s.key);
 
+// Learning meta for the focused Spanish view (kept out of PROJECT_META so it
+// no longer appears anywhere on the dashboard).
+const LEARNING_META = { key: "learning", label: "Learning", color: "#854F0B" };
 
-// Inline SVG icon per project. Used as the section identifier instead of a
-// text label so the MainSection header takes minimal vertical space.
+// Resolve the saved section order against the current section set: keep the
+// user's order for keys that still exist, append any new sections, drop stale.
+function reconcileOrder(saved) {
+  const valid = (Array.isArray(saved) ? saved : []).filter((k) => SECTION_KEYS.includes(k));
+  const missing = SECTION_KEYS.filter((k) => !valid.includes(k));
+  return [...valid, ...missing];
+}
+
+// Inline SVG icon per project.
 function ProjectIcon({ projectKey, color, size = 18 }) {
   const stroke = color || C.text;
   const common = {
@@ -82,13 +93,6 @@ function ProjectIcon({ projectKey, color, size = 18 }) {
           <path d="M2 12l9 2 4 7 2-1-2-7 5-5a2 2 0 0 0-3-3l-5 5-7-2-1 2 7 4z" />
         </svg>
       );
-    case "learning":
-      return (
-        <svg {...common}>
-          <path d="M3 6a2 2 0 0 1 2-2h6v15H5a2 2 0 0 1-2-2z" />
-          <path d="M21 6a2 2 0 0 0-2-2h-6v15h6a2 2 0 0 0 2-2z" />
-        </svg>
-      );
     case "journal":
       return (
         <svg {...common}>
@@ -130,7 +134,37 @@ function ProjectIcon({ projectKey, color, size = 18 }) {
   }
 }
 
-function MainSection({ projectKey, expanded, onToggle, state, setState }) {
+// Up/down control shown in a section header while in reorder mode.
+function ReorderBtn({ dir, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={dir === "up" ? "Move up" : "Move down"}
+      aria-label={dir === "up" ? "Move section up" : "Move section down"}
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        border: `0.5px solid ${C.border}`,
+        background: C.bg,
+        color: disabled ? C.textTertiary : C.textSecondary,
+        cursor: disabled ? "default" : "pointer",
+        fontFamily: "inherit",
+        fontSize: 13,
+        lineHeight: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      {dir === "up" ? "↑" : "↓"}
+    </button>
+  );
+}
+
+function MainSection({ projectKey, expanded, onToggle, state, setState, controlsRight }) {
   const meta = PROJECT_META.find((m) => m.key === projectKey);
   const color = meta?.color || C.accent;
   return (
@@ -141,6 +175,7 @@ function MainSection({ projectKey, expanded, onToggle, state, setState }) {
       color={color}
       expanded={expanded}
       onToggle={onToggle}
+      controlsRight={controlsRight}
     >
       <ProjectDrilldown
         projectKey={projectKey}
@@ -177,8 +212,7 @@ function RailModeToggle({ mode, onClick }) {
 }
 
 // Floating side panel: collapsed to a thin handle on the right edge, expands
-// on hover. Click the handle to pin it open. The page's main column runs
-// full-width underneath.
+// on hover. Click the handle to pin it open.
 function FloatingRail({ children, onDock, width = 300 }) {
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -197,7 +231,6 @@ function FloatingRail({ children, onDock, width = 300 }) {
         zIndex: 90,
       }}
     >
-      {/* Edge handle — always visible, click to pin/unpin */}
       <button
         onClick={() => setPinned((p) => !p)}
         title={pinned ? "Unpin panel" : "Pin panel open"}
@@ -220,7 +253,6 @@ function FloatingRail({ children, onDock, width = 300 }) {
         {show ? "›" : "‹"}
       </button>
 
-      {/* Sliding panel */}
       <div
         style={{
           width: show ? width : 0,
@@ -283,19 +315,16 @@ function useViewport() {
 export default function Dashboard() {
   const [state, setStateRaw] = useState(() => rollDaily(loadFromCache() || defaultState));
   const { isDesktop, isWide } = useViewport();
-  // On-demand drilldown for projects without a permanent MainSection (Travel).
   const [openProject, setOpenProjectRaw] = useState(null);
-  // Per-section expanded state for the always-visible MainSections, keyed by
-  // project key. Initialised from each section's defaultOpen flag.
   const [sectionOpen, setSectionOpen] = useState(() =>
     SECTIONS.reduce((acc, s) => {
       acc[s.key] = !!s.defaultOpen;
       return acc;
     }, {})
   );
+  // Section reorder mode (per session, not persisted — the ORDER is persisted).
+  const [reordering, setReordering] = useState(false);
 
-  // Desktop side-panel mode: "float" (main full-width, rail pops out on hover)
-  // or "dock" (classic two-column). Persisted as a UI preference.
   const [railMode, setRailModeRaw] = useState(() => {
     try {
       return localStorage.getItem("lifeDashboard:railMode") || "float";
@@ -312,9 +341,6 @@ export default function Dashboard() {
     }
   };
 
-  // Project navigation: tapping a rail card or floating pill should expand
-  // the matching MainSection (if it has one) and scroll to it; otherwise it
-  // opens the on-demand drilldown.
   const setOpenProject = (key) => {
     if (key && SECTION_KEYS.includes(key)) {
       setSectionOpen((prev) => ({ ...prev, [key]: true }));
@@ -330,10 +356,6 @@ export default function Dashboard() {
   const toggleSection = (key) =>
     setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // Hydrate from cloud once on mount. The cloud row is the source of truth:
-  // adopt it if present, and only seed the cloud from local state when no row
-  // exists yet. Critically, we never write to the cloud BEFORE reading it —
-  // doing so could clobber existing data with the local (possibly seed) state.
   useEffect(() => {
     let alive = true;
     loadFromCloud().then((cloud) => {
@@ -341,9 +363,8 @@ export default function Dashboard() {
       if (cloud) {
         const rolled = rollDaily(cloud);
         setStateRaw(rolled);
-        if (rolled !== cloud) saveState(rolled); // persist only if rollover changed it
+        if (rolled !== cloud) saveState(rolled);
       } else {
-        // No cloud row yet — back up whatever we have locally from now on.
         saveState(state);
       }
     });
@@ -353,7 +374,6 @@ export default function Dashboard() {
     return () => { alive = false; window.removeEventListener("focus", onFocus); };
   }, []);
 
-  // Wrap setState so every change persists.
   const setState = (updater) => {
     setStateRaw((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -361,6 +381,19 @@ export default function Dashboard() {
       return next;
     });
   };
+
+  // Persisted section order (reconciled against the current section set).
+  const sectionOrder = reconcileOrder(state.ui?.sectionOrder);
+  const moveSection = (key, dir) =>
+    setState((s) => {
+      const order = reconcileOrder(s.ui?.sectionOrder);
+      const i = order.indexOf(key);
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= order.length) return s;
+      const next = [...order];
+      [next[i], next[j]] = [next[j], next[i]];
+      return { ...s, ui: { ...(s.ui || {}), sectionOrder: next } };
+    });
 
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
@@ -397,10 +430,56 @@ export default function Dashboard() {
 
   // ---- Render -------------------------------------------------------------
 
+  const localOnlyBanner = !isSupabaseEnabled() ? (
+    <div
+      style={{
+        background: "#FDF6E3",
+        border: "0.5px solid #E6D9A8",
+        color: "#7A5C00",
+        borderRadius: 8,
+        padding: "8px 12px",
+        fontSize: 12,
+        marginBottom: 12,
+      }}
+    >
+      Local only — changes are saved on this device but <strong>not backed up</strong>.
+      Set the Supabase env vars to sync across devices.
+    </div>
+  ) : null;
+
+  // Focused Spanish-practice view, served on spanish-arin-melvin.lifedashboard.live.
+  // Reuses the same cloud-synced state; renders only the Learning project.
+  if (isSpanishHost()) {
+    return (
+      <LocalLock>
+        <AuthGate>
+          <div style={styles.page}>
+            <Header today={today} dayOfYear={dayOfYear} quote={quote} />
+            {localOnlyBanner}
+            <div
+              style={{
+                background: C.bg,
+                border: `0.5px solid ${C.border}`,
+                borderRadius: 12,
+                padding: "16px 18px",
+              }}
+            >
+              <LearningProject
+                state={state}
+                setState={setState}
+                meta={LEARNING_META}
+                goalHandlers={makeGoalHandlers(setState, ["projects", "learning", "goals"])}
+              />
+            </div>
+            {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
+          </div>
+        </AuthGate>
+      </LocalLock>
+    );
+  }
+
   const closeDrilldown = () => setOpenProjectRaw(null);
 
-  // Only render the on-demand drilldown for projects that DON'T have a
-  // permanent collapsible MainSection. Travel is the lone holdout.
   const drilldownPanel =
     openProject && !SECTION_KEYS.includes(openProject) ? (
       <div id="project-drilldown-anchor">
@@ -413,14 +492,44 @@ export default function Dashboard() {
       </div>
     ) : null;
 
-  const mainSections = SECTIONS.map((s) => (
+  const reorderToggle = (
+    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <button
+        onClick={() => setReordering((r) => !r)}
+        title="Reorder sections"
+        style={{
+          background: reordering ? C.accentLight : "transparent",
+          color: reordering ? C.accentDark : C.textSecondary,
+          border: `0.5px solid ${reordering ? C.accent : C.border}`,
+          borderRadius: 6,
+          padding: "3px 10px",
+          fontSize: 11,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {reordering ? "Done" : "⇅ Reorder"}
+      </button>
+    </div>
+  );
+
+  const mainSections = sectionOrder.map((key, idx) => (
     <MainSection
-      key={s.key}
-      projectKey={s.key}
-      expanded={!!sectionOpen[s.key]}
-      onToggle={() => toggleSection(s.key)}
+      key={key}
+      projectKey={key}
+      expanded={!!sectionOpen[key]}
+      onToggle={() => toggleSection(key)}
       state={state}
       setState={setState}
+      controlsRight={
+        reordering ? (
+          <span style={{ display: "flex", gap: 4 }}>
+            <ReorderBtn dir="up" disabled={idx === 0} onClick={() => moveSection(key, "up")} />
+            <ReorderBtn dir="down" disabled={idx === sectionOrder.length - 1} onClick={() => moveSection(key, "down")} />
+          </span>
+        ) : null
+      }
     />
   ));
 
@@ -433,13 +542,12 @@ export default function Dashboard() {
       />
       <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <Calendar state={state} setState={setState} onOpenProject={setOpenProject} />
+      {reorderToggle}
       {mainSections}
       {drilldownPanel}
     </div>
   );
 
-  // Shared rail content, reused by both the docked column and the floating
-  // pop-out panel.
   const railContent = (
     <>
       <NorthStar value={state.northStar} onChange={setNorthStar} compact />
@@ -480,6 +588,7 @@ export default function Dashboard() {
       />
       <Habits habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} />
       <Calendar state={state} setState={setState} onOpenProject={setOpenProject} />
+      {reorderToggle}
       {mainSections}
       {drilldownPanel}
       <Projects
@@ -497,22 +606,7 @@ export default function Dashboard() {
       <div style={styles.page}>
         <Header today={today} dayOfYear={dayOfYear} quote={quote} />
 
-        {!isSupabaseEnabled() && (
-          <div
-            style={{
-              background: "#FDF6E3",
-              border: "0.5px solid #E6D9A8",
-              color: "#7A5C00",
-              borderRadius: 8,
-              padding: "8px 12px",
-              fontSize: 12,
-              marginBottom: 12,
-            }}
-          >
-            Local only — changes are saved on this device but <strong>not backed up</strong>.
-            Set the Supabase env vars to sync across devices.
-          </div>
-        )}
+        {localOnlyBanner}
 
         {isDesktop ? (
           railMode === "dock" ? (

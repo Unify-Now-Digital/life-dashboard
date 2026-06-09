@@ -1,13 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { C, tint } from "../lib/tokens";
 import { netWorthSeries, revenueSeries } from "../lib/finance";
 
+// Learning (Spanish/Turkish/reading) was moved to its own focused subdomain
+// (spanish-arin-melvin.lifedashboard.live), so it is intentionally NOT in the
+// dashboard project list. Its meta still exists for the focused view, defined
+// locally in Dashboard.jsx.
 const PROJECT_META = [
   { key: "work", label: "Work", color: "#534AB7" },
   { key: "health", label: "Health", color: "#3B6D11" },
   { key: "finance", label: "Finance", color: "#185FA5" },
   { key: "travel", label: "Travel", color: "#0F6E56" },
-  { key: "learning", label: "Learning", color: "#854F0B" },
   { key: "journal", label: "Journal", color: "#791F1F" },
   { key: "relationships", label: "Relationships", color: "#3C3489" },
   { key: "charity", label: "Charity", color: "#0C447C" },
@@ -119,14 +122,10 @@ function deltaBlock({ value, sub, accent, sparkline }) {
 
 function deltaHealth(state, meta) {
   const h = state.projects?.health || {};
-  // v4 stores weight at health.weight; older blobs may still have it under
-  // markers.weight before migration runs.
   const w = h.weight || h.markers?.weight || [];
   if (w.length === 0) return deltaBlock({ value: "—", sub: "no weight logged" });
-  // Sort ascending by date to be safe — entries can land out of order.
   const sorted = [...w].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const last = sorted[sorted.length - 1].kg;
-  // Weekly Δ — closest entry on or before 7 days ago.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const cutoff = new Date(today);
@@ -137,7 +136,6 @@ function deltaHealth(state, meta) {
   const arrow = diff == null ? "" : diff < 0 ? "↓" : diff > 0 ? "↑" : "·";
   const diffStr = diff == null ? "" : `${arrow}${Math.abs(diff).toFixed(1)} / wk`;
   const series = sorted.slice(-7).map((r) => r.kg);
-  // Optional waist line — show if available.
   const waist = (h.waist || []).slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const waistLast = waist[waist.length - 1]?.cm;
   const waistLine = waistLast != null ? ` · waist ${waistLast} cm` : "";
@@ -149,7 +147,6 @@ function deltaHealth(state, meta) {
   });
 }
 
-// Latest snapshot (by date/month key) of an account/revenue history, in EUR.
 const latestEur = (history, key) => {
   if (!Array.isArray(history) || history.length === 0) return 0;
   let best = history[0];
@@ -168,8 +165,6 @@ function deltaFinance(state, meta) {
   const net = sav + inv - debt;
   const fmt = (n) => `${n < 0 ? "-" : ""}€${Math.abs(Math.round(n)).toLocaleString()}`;
 
-  // Net-worth + revenue trends are derived from the per-line histories (see
-  // lib/finance.js) so they can't drift from the underlying accounts.
   const nw = netWorthSeries(f).slice(-7).map((p) => p.eur);
   const series = nw.length >= 2 ? nw : [net, net];
 
@@ -214,8 +209,6 @@ function deltaTravel(state) {
 function deltaWork(state) {
   const biz = state.projects?.work?.businesses || [];
   if (biz.length === 0) return deltaBlock({ value: "—", sub: "no businesses" });
-  // First incomplete todo across businesses, in business order. No financial
-  // figures — we surface the top actionable task instead.
   for (const b of biz) {
     const todo = (b.todos || []).find((t) => !t.done);
     if (todo && (todo.title || "").trim()) {
@@ -228,17 +221,6 @@ function deltaWork(state) {
   return deltaBlock({
     value: `${biz.length} businesses`,
     sub: "all tasks done",
-  });
-}
-
-function deltaLearning(state) {
-  const l = state.projects?.learning || {};
-  const esPhrases = l.spanish?.phrases?.length || 0;
-  const trPhrases = l.turkish?.phrases?.length || 0;
-  const seenES = (l.spanish?.phrasesSeen || []).length;
-  return deltaBlock({
-    value: `ES ${esPhrases} · TR ${trPhrases}`,
-    sub: seenES > 0 ? `${seenES} phrases seen` : "tap to study",
   });
 }
 
@@ -259,7 +241,6 @@ function deltaJournal(state) {
 
 function deltaRelationships(state) {
   const c = state.projects?.relationships?.contacts || [];
-  // Overdue derives from lastContact + cadenceDays (stale is no longer stored).
   const overdue = c.filter((x) => {
     if (!x.lastContact) return false;
     const days = Math.round((Date.now() - new Date(x.lastContact + "T00:00:00")) / 86400000);
@@ -286,7 +267,6 @@ const DELTA_BY_KEY = {
   finance: deltaFinance,
   travel: deltaTravel,
   work: deltaWork,
-  learning: deltaLearning,
   journal: deltaJournal,
   relationships: deltaRelationships,
   charity: deltaCharity,
@@ -295,7 +275,6 @@ const DELTA_BY_KEY = {
 // ---- card -----------------------------------------------------------------
 
 function Card({ meta, onClick, children, isOpen }) {
-  // Soft per-project tint. Slightly stronger when the card is the open one.
   const bgRest = tint(meta.color, 0.04);
   const bgHover = tint(meta.color, 0.08);
   const bgOpen = tint(meta.color, 0.10);
@@ -389,6 +368,99 @@ function FloatingPill({ meta, isOpen, onClick }) {
   );
 }
 
+// Small round handle used both to hide and to re-show the floating pill column.
+function FloatHandle({ symbol, title, onClick, big }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      style={{
+        alignSelf: "flex-end",
+        width: big ? 34 : 34,
+        height: big ? 34 : 24,
+        borderRadius: big ? 17 : 12,
+        background: "rgba(255,255,255,0.92)",
+        color: C.textTertiary,
+        border: `0.5px solid ${big ? C.borderStrong : C.border}`,
+        boxShadow: "0 2px 6px rgba(0,0,0,0.07)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: big ? 16 : 13,
+        lineHeight: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+      }}
+    >
+      {symbol}
+    </button>
+  );
+}
+
+const FLOAT_HIDDEN_KEY = "lifeDashboard:floatPillsHidden";
+
+// Mobile: compact pills floating bottom-right, stacked upward. A tap on the
+// top ✕ hides the whole column down to a small handle; tapping the handle
+// brings it back. The hidden/shown choice is remembered per device.
+function FloatingPillColumn({ projects, open, onTap }) {
+  const [hidden, setHiddenRaw] = useState(() => {
+    try {
+      return localStorage.getItem(FLOAT_HIDDEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setHidden = (v) => {
+    setHiddenRaw(v);
+    try {
+      localStorage.setItem(FLOAT_HIDDEN_KEY, v ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (hidden) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          right: 8,
+          bottom: 120,
+          zIndex: 40,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <FloatHandle big symbol="›" title="Show projects" onClick={() => setHidden(false)} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 8,
+        bottom: 120,
+        display: "flex",
+        flexDirection: "column-reverse",
+        gap: 5,
+        zIndex: 40,
+        pointerEvents: "auto",
+      }}
+    >
+      {projects.map((m) => (
+        <FloatingPill key={m.key} meta={m} isOpen={open === m.key} onClick={() => onTap(m.key)} />
+      ))}
+      {/* Rendered last → with column-reverse it sits at the visual top. */}
+      <FloatHandle symbol="✕" title="Hide projects" onClick={() => setHidden(true)} />
+    </div>
+  );
+}
+
 // ---- rail / row / float --------------------------------------------------
 
 export default function Projects({ state, openOverride, setOpenOverride, layout = "rail" }) {
@@ -396,35 +468,14 @@ export default function Projects({ state, openOverride, setOpenOverride, layout 
   const setOpen = setOpenOverride;
 
   if (layout === "float") {
-    // Mobile: compact pills floating on the bottom-right, stacked upward.
-    // Reverse iteration so PROJECT_META[0] (Work) sits at the bottom — the
-    // most reachable spot for a thumb. column-reverse handles the visual flip.
     const onTap = (key) => {
       setOpen(open === key ? null : key);
-      // Scroll to the drilldown so the user sees the result immediately.
       setTimeout(() => {
         const drill = document.getElementById("project-drilldown-anchor");
         if (drill) drill.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 30);
     };
-    return (
-      <div
-        style={{
-          position: "fixed",
-          right: 8,
-          bottom: 120, // sits clear of StickyHabits and home-indicator safe area
-          display: "flex",
-          flexDirection: "column-reverse",
-          gap: 5,
-          zIndex: 40,
-          pointerEvents: "auto",
-        }}
-      >
-        {PROJECT_META.map((m) => (
-          <FloatingPill key={m.key} meta={m} isOpen={open === m.key} onClick={() => onTap(m.key)} />
-        ))}
-      </div>
-    );
+    return <FloatingPillColumn projects={PROJECT_META} open={open} onTap={onTap} />;
   }
 
   const isRow = layout === "row";

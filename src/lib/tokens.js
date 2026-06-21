@@ -62,6 +62,17 @@ export const PILL = {
 export const WORK_PILLS = ["SM", "CM", "UD"];
 export const PERSONAL_PILLS = ["Money", "Admin", "Health", "Home"];
 
+// Wisdom-phrase category pills (soft fill + dark same-family text). Categories
+// come from the Supabase `wisdom_phrases` table.
+export const WISDOM_PILL = {
+  drive: { bg: "#E7EAF8", color: "#283C86" }, // royal
+  work: { bg: "#EEEDFE", color: "#3C3489" }, // purple
+  sales: { bg: "#FAEEDA", color: "#854F0B" }, // amber
+  people: { bg: "#EAF3DE", color: "#3B6D11" }, // green
+  health: { bg: "#E1F5EE", color: "#0F6E56" }, // teal
+  dating: { bg: "#FBE9EC", color: "#9B2D44" }, // rose
+};
+
 export const CAT_STYLES = {
   CM: { bg: "#E6F1FB", color: "#0C447C" },
   Fitness: { bg: "#EAF3DE", color: "#3B6D11" },

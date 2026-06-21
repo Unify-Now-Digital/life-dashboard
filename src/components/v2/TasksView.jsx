@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { C, ACCENT, PILL, WORK_PILLS, PERSONAL_PILLS } from "../../lib/tokens";
-import Segmented from "./Segmented.jsx";
 import { PillSelect, Pill } from "./Pill.jsx";
 import { todayISO } from "../../lib/taskDates.js";
 
@@ -191,9 +190,7 @@ function Column({ title, accent, column, tasks, sortBy, groupMode, today, onOpen
 
 // Tasks view — Work | Personal columns with sort, group-by (due / label), list
 // limits, importance (1–3), and click-to-defer on each row. Spec §4.
-export default function TasksView({ tasks, decisionsActive, isDesktop, onOpen, onRecategorise, onAdd, onDefer }) {
-  const [sortBy, setSortBy] = useState("importance");
-  const [groupMode, setGroupMode] = useState("none");
+export default function TasksView({ tasks, decisionsActive, isDesktop, sortBy = "importance", groupMode = "none", onOpen, onRecategorise, onAdd, onDefer }) {
   const today = todayISO();
 
   const open = tasks.filter((t) => t.status !== "done");
@@ -206,23 +203,10 @@ export default function TasksView({ tasks, decisionsActive, isDesktop, onOpen, o
   );
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12.5, color: C.textTertiary }}>Sort</span>
-          <Segmented options={[{ value: "importance", label: "Importance" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]} value={sortBy} onChange={setSortBy} accent={C.accent} size="sm" />
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12.5, color: C.textTertiary }}>Group</span>
-          <Segmented options={[{ value: "none", label: "Off" }, { value: "due", label: "Due" }, { value: "label", label: "Label" }]} value={groupMode} onChange={setGroupMode} accent={C.accent} size="sm" />
-        </span>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 36 : 24, alignItems: "flex-start" }}>
-        {col("Work", ACCENT.work, "work", work)}
-        {isDesktop && <div style={{ width: 0.5, alignSelf: "stretch", background: C.border }} />}
-        {col("Personal", ACCENT.personal, "personal", personal)}
-      </div>
+    <div style={{ display: "flex", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 36 : 24, alignItems: "flex-start" }}>
+      {col("Work", ACCENT.work, "work", work)}
+      {isDesktop && <div style={{ width: 0.5, alignSelf: "stretch", background: C.border }} />}
+      {col("Personal", ACCENT.personal, "personal", personal)}
     </div>
   );
 }

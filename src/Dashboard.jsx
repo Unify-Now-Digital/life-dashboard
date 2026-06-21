@@ -6,6 +6,7 @@ import { isSupabaseEnabled } from "./lib/supabase";
 import { isSpanishHost } from "./lib/host.js";
 import { getTheme, setTheme as persistTheme } from "./lib/theme.js";
 import { addDays, metaFromDue } from "./lib/taskDates.js";
+import { loadWisdom } from "./lib/wisdom.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -54,6 +55,23 @@ export default function Dashboard() {
 
   const [decisionsActive, setDecisionsActive] = useState(false);
   const [focusId, setFocusId] = useState(null);
+  const [sortBy, setSortBy] = useState("importance");
+  const [groupMode, setGroupMode] = useState("none");
+  const [phrases, setPhrases] = useState([]);
+  const [qIndex, setQIndex] = useState(0);
+
+  // Load rotating wisdom phrases from Supabase; seed the daily one by day-of-year.
+  useEffect(() => {
+    loadWisdom().then((list) => {
+      setPhrases(list || []);
+      const pool = (list || []).filter((p) => p.rotation !== false);
+      if (pool.length) {
+        const now = new Date();
+        const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+        setQIndex(doy % pool.length);
+      }
+    });
+  }, []);
   const [spanishMode, setSpanishMode] = useState("calma");
   const [undo, setUndo] = useState(null);
 
@@ -195,6 +213,15 @@ export default function Dashboard() {
   const start = new Date(today.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((today - start) / 86400000);
 
+  // Header wisdom phrase: from Supabase when available, else the static QUOTES.
+  const wisdomPool = phrases.filter((p) => p.rotation !== false);
+  const wisdom = wisdomPool.length
+    ? { text: wisdomPool[qIndex % wisdomPool.length].text, category: wisdomPool[qIndex % wisdomPool.length].category }
+    : { text: QUOTES[dayOfYear % QUOTES.length].replace(/^["“]|["”]$/g, ""), category: null };
+  const rotateWisdom = () => {
+    if (wisdomPool.length) setQIndex((i) => (i + 1) % wisdomPool.length);
+  };
+
   const localOnlyBanner = !isSupabaseEnabled() ? (
     <div
       style={{
@@ -245,7 +272,7 @@ export default function Dashboard() {
     <LocalLock>
       <AuthGate>
         <div style={{ ...styles.page, paddingBottom: isDesktop ? 190 : 270 }}>
-          <Header today={today} dayOfYear={dayOfYear} quote={QUOTES[dayOfYear % QUOTES.length]} />
+          <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} />
 
           {localOnlyBanner}
 
@@ -259,14 +286,38 @@ export default function Dashboard() {
             compact={isCompact}
           />
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-            <Segmented
-              options={[{ value: "tasks", label: "Tasks" }, { value: "finance", label: "Finance" }]}
-              value={view}
-              onChange={setView}
-              accent={C.accent}
-            />
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, rowGap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+            {/* Left: task sort / group controls (Tasks view only) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minHeight: 30 }}>
+              {view === "tasks" && (
+                <>
+                  <Segmented
+                    options={[{ value: "importance", label: "Priority" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]}
+                    value={sortBy}
+                    onChange={setSortBy}
+                    accent={C.accent}
+                    size="sm"
+                  />
+                  <Segmented
+                    options={[{ value: "none", label: "Flat" }, { value: "due", label: "Due" }, { value: "label", label: "Category" }]}
+                    value={groupMode}
+                    onChange={setGroupMode}
+                    accent={C.accent}
+                    size="sm"
+                  />
+                </>
+              )}
+            </div>
+            {/* Right: view tabs + theme */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Segmented
+                options={[{ value: "tasks", label: "Tasks" }, { value: "finance", label: "Finance" }]}
+                value={view}
+                onChange={setView}
+                accent={C.accent}
+              />
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            </div>
           </div>
 
           {view === "tasks" ? (
@@ -274,6 +325,8 @@ export default function Dashboard() {
               tasks={tasks}
               decisionsActive={decisionsActive}
               isDesktop={isDesktop}
+              sortBy={sortBy}
+              groupMode={groupMode}
               onOpen={(id) => setFocusId(id)}
               onRecategorise={recategorise}
               onAdd={addTask}

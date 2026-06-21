@@ -80,6 +80,7 @@ export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden
       </div>
       {wisdom?.text && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+          <CategoryPill category={wisdom.category} />
           <span
             style={{
               fontFamily: "Georgia, 'Times New Roman', serif",
@@ -91,7 +92,7 @@ export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden
           >
             {"“"}{wisdom.text}{"”"}
           </span>
-          <CategoryPill category={wisdom.category} />
+          <span style={{ flex: 1, minWidth: 8 }} />
           {onRotate && <RotateBtn onClick={onRotate} />}
         </div>
       )}

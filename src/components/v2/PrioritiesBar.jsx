@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { C, ACCENT, PILL } from "../../lib/tokens";
 
-// Permanent priorities bar (spec §3). Renders each flagged, open task as a
-// compact chip (category-pill colour + short text), a dashed "+ add" chip, and
-// a "Decisions · N" toggle on the right. On mobile it collapses to a single
-// summary line with a count.
+// Permanent priorities bar (spec §3, "version B" — slim inline chips). A left
+// amber rail + star, then each flagged task as a compact category-tinted chip
+// showing its pill code + short text. A dashed "+ add" chip and a
+// "Decisions · N" toggle on the right. Collapses to a count line on mobile.
 export default function PrioritiesBar({
   priorities,
   decisionsCount,
@@ -17,15 +17,21 @@ export default function PrioritiesBar({
   const [expanded, setExpanded] = useState(false);
   const amber = ACCENT.priorities;
 
+  const star = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M12 2.5l2.9 6 6.6.6-5 4.3 1.5 6.4L12 16.9 6 19.8l1.5-6.4-5-4.3 6.6-.6z" />
+    </svg>
+  );
+
   const decisionsBtn = (
     <button
       onClick={onToggleDecisions}
       style={{
-        border: `0.5px solid ${decisionsActive ? ACCENT.work : C.border}`,
-        background: decisionsActive ? PILL.UD.bg : "transparent",
-        color: decisionsActive ? PILL.UD.color : C.textSecondary,
+        border: `0.5px solid ${decisionsActive ? amber : "transparent"}`,
+        background: decisionsActive ? "rgba(229,145,42,0.12)" : "transparent",
+        color: amber,
         borderRadius: 999,
-        padding: "6px 13px",
+        padding: "5px 12px",
         fontSize: 12.5,
         fontWeight: 500,
         cursor: "pointer",
@@ -48,31 +54,21 @@ export default function PrioritiesBar({
         style={{
           display: "inline-flex",
           alignItems: "center",
-          gap: 8,
-          background: C.card,
-          border: `0.5px solid ${C.border}`,
-          borderRadius: 999,
-          padding: "6px 13px",
+          gap: 7,
+          background: s.bg,
+          border: "none",
+          borderRadius: 8,
+          padding: "5px 11px",
           fontSize: 13,
-          color: C.text,
+          color: s.color,
           cursor: "pointer",
           fontFamily: "inherit",
           maxWidth: 260,
           flexShrink: 0,
         }}
       >
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: s.color,
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {t.text}
-        </span>
+        <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.01em", flexShrink: 0 }}>{t.pill}</span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{t.text}</span>
       </button>
     );
   };
@@ -86,10 +82,10 @@ export default function PrioritiesBar({
         alignItems: "center",
         border: `0.5px dashed ${C.borderStrong}`,
         background: "transparent",
-        color: amber,
-        borderRadius: 999,
-        padding: "6px 14px",
-        fontSize: 13,
+        color: C.textSecondary,
+        borderRadius: 8,
+        padding: "5px 12px",
+        fontSize: 12.5,
         fontWeight: 500,
         cursor: "pointer",
         fontFamily: "inherit",
@@ -100,34 +96,25 @@ export default function PrioritiesBar({
     </button>
   );
 
-  const dot = (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: amber }} />
-      <span style={{ fontSize: 11, fontWeight: 600, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        Priorities
-      </span>
-    </span>
-  );
+  const shell = {
+    background: C.bgSecondary,
+    border: `0.5px solid ${C.border}`,
+    borderLeft: `3px solid ${amber}`,
+    borderRadius: 10,
+    marginBottom: 12,
+  };
 
-  // Mobile: collapse to a single line with a count, expandable.
+  // Mobile: collapse to a single line with a count.
   if (compact) {
     return (
-      <div
-        style={{
-          background: C.bgSecondary,
-          border: `0.5px solid ${C.border}`,
-          borderRadius: 12,
-          padding: "8px 12px",
-          marginBottom: 10,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ ...shell, padding: "8px 12px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <button
             onClick={() => setExpanded((e) => !e)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", color: C.text }}
           >
-            {dot}
-            <span style={{ fontSize: 12.5, color: C.text }}>{priorities.length}</span>
+            {star}
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{priorities.length} priorities</span>
             <span style={{ color: C.textTertiary, fontSize: 12 }}>{expanded ? "▴" : "▾"}</span>
           </button>
           {decisionsBtn}
@@ -143,20 +130,9 @@ export default function PrioritiesBar({
   }
 
   return (
-    <div
-      style={{
-        background: C.bgSecondary,
-        border: `0.5px solid ${C.border}`,
-        borderRadius: 12,
-        padding: "10px 14px",
-        marginBottom: 12,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
-      {dot}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflowX: "auto", paddingBottom: 1 }}>
+    <div style={{ ...shell, padding: "9px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+      {star}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflowX: "auto" }}>
         {priorities.length === 0 && (
           <span style={{ fontSize: 12.5, color: C.textTertiary }}>No priorities flagged.</span>
         )}

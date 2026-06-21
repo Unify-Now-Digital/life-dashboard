@@ -40,8 +40,11 @@ export const EXCLUDED_FROM_SPEND = new Set([
   "income_unify",
   "income_other",
 ]);
-// Counted as real income on the Income stat card.
-export const INCOME_CATEGORIES = new Set(["income_boddy", "income_unify"]);
+// Counted as real income on the Income stat card from the Revolut statement.
+// Unify income comes from invoices (lib/unifyIncome.js), NOT the CSV — the
+// statement only caught partial/lagged Unify payments — so income_unify is
+// excluded here (it stays in EXCLUDED_FROM_SPEND, i.e. ignored).
+export const INCOME_CATEGORIES = new Set(["income_boddy"]);
 
 // Confirmed overrides (Arin's manual decisions — extend as he confirms more).
 export const OVERRIDES = {
@@ -54,6 +57,9 @@ export const OVERRIDES = {
 const INTERNAL_KEYS = ["revpoints", "spare change", "exchanged to", "exchanged from", "round-up", "round up", "vault", "pocket", "on hold", "release"];
 
 // Spend-only keyword rules (income/rent/transfers handled explicitly below).
+// Order matters: groceries / transport / health / subscriptions sit BEFORE
+// eating_out so a supermarket, taxi, salon or streaming service isn't swept up
+// by a food keyword. Generic patterns first, then named local spots.
 const RULES = [
   // business / deductible
   ["software_biz", ["highlevel", "clickup", "clay", "connectcentre", "openai", "anthropic",
@@ -61,26 +67,46 @@ const RULES = [
     "n8n", "namecheap", "godaddy", "apollo", "supabase", "zapier", "airtable",
     "hostinger", "google workspace", "xai", "notion", "replit", "lovable",
     "cursor", "linear", "roam research", "readwise", "adblock", "twilio",
-    "digitalocean", "render.com", "railway", "1global"]],
+    "digitalocean", "render.com", "railway", "1global", "zerobounce"]],
   ["insurance", ["assurant"]],
-  // personal spend
-  ["subscriptions", ["amazon prime", "spotify", "netflix", "youtube", "icloud", "apple.com", "disney"]],
+  // streaming / subscriptions (before shopping so "amazon prime" beats "amazon")
+  ["subscriptions", ["amazon prime", "spotify", "netflix", "youtube", "icloud", "apple.com", "disney", "hbo", "audible"]],
+  // groceries / supermarkets (before eating_out)
   ["groceries", ["bonpreu", "mercadona", "carrefour", "lidl", "dia ", "condis", "consum",
-    "ametller", "sainsbury", "marks & spencer", "aldi", "picardia"]],
-  ["health_fitness", ["classpass", "farmacia", "pharmacy", "clinica", "dentist", "salon", "hair",
-    "sundy", "massage", "physio", "gym", "puregym"]],
-  ["eating_out", ["honest greens", "glovo", "taberna", "restaurante", "cafe", "café", "coffee",
-    "costa", " bar", "la principal", "ramses", "gouda", "guitart", "vermut", "brunch", "pizz",
-    "sushi", "kebab", "burger", "goiko", "starbucks", "mcdonald", "big penny",
-    "jack horner", "hokka", "80 grados", "weicheng", "norrsken", "phoshfood", "fantail"]],
+    "ametller", "sainsbury", "marks & spencer", "aldi", "picardia", "caprabo", "spar ",
+    "supermerc", "supermercat", "supermarket", "super ", "mercat", "alcampo", "coaliment",
+    "suma ", "tradys", "eco market", "premmia", "linverd", "bazar aliment", "grocer", "alimentacion"]],
+  // transport (before eating_out — taxis/metro never food)
   ["transport", ["uber", "free now", "freenow", "cabify", "bolt.eu", "tmb", "renfe",
-    "greater anglia", "aena", "transport for london", "tfl"]],
+    "greater anglia", "aena", "transport for london", "tfl", "taxi", "licencia", "llic",
+    "lic.", "ferrocarril", "metro ", "rodalies"]],
+  // health / grooming / fitness (before eating_out — salons/barbers/gyms)
+  ["health_fitness", ["classpass", "farmacia", "pharmacy", "clinica", "dentist", "salon", "hair",
+    "sundy", "massage", "physio", "gym", "puregym", "barber", "barbershop", "tattoo",
+    "ink and needles", "nails", "aesthetic"]],
+  // eating out — restaurants, cafés, bars, delivery
+  ["eating_out", [
+    // generic patterns
+    "cafe", "café", "coffee", "brunch", "restauran", "restauració", "taberna", "tapas",
+    "pizz", "sushi", "ramen", "kebab", "burger", "brasserie", "bistro", " grill", "bakery",
+    "panaderia", "pasteleria", "heladeria", "gelat", "vermut", " bar", "bar ", "bar-",
+    "pub ", "comida", "cocina", "eatery", "hospitality", "fooding", "phoshfood", "fantail",
+    // named spots
+    "honest greens", "glovo", "celebreak", "big penny", "norrsken", "vivari", "dokoan",
+    "don patricio", "mcdonald", "kfc", "delacrem", "blighty", "slow barcelona", "club 23",
+    "starbucks", "hokka", "jack horner", "seventy barcelona", "guitart", "weicheng",
+    "delhiras", "boa-bao", "casa leopoldo", "takumi", "mirandoalmar", "belushis", "stereo 18",
+    "marlowe", "45/33", "ramses", "80 grados", "alto el fuego", "la principal", "la mechada",
+    "massamara", "4latas", "área 62", "area 62", "charrito", "cachitos", "velódromo",
+    "velodromo", "goiko", "gouda", "criollo"]],
+  // travel
   ["travel", ["airbnb", "hotel", "vueling", "ryanair", "booking.com", "stoketravel",
     "duty free", "easyjet", "enterticket", "costa rica", "trip.com", "agoda",
-    "la molina", "lloguer", "iberia", "cottage"]],
+    "la molina", "lloguer", "iberia", "cottage", "novotel", "hostel", "generator", "h10",
+    "airport", "el prat", "ferries", "flixbus"]],
   ["shopping", ["amazon", "temu", "zara", "decathlon", "nespresso", "perfumeria", "aliexpress",
     "nike", "druni", "amevista", "vanquish", "prorider", "pretty shiny",
-    "sheepskin", "dhl"]],
+    "sheepskin", "dhl", "h&m", "flying tiger", "ale-hop", "primark", "shein"]],
   ["cash", ["cash withdrawal"]],
   // refined so "coffee" no longer matches the bare "fee" keyword
   ["fees", [" fee", "plan fee", "metal plan", "pastdue"]],

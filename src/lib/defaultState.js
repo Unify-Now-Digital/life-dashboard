@@ -4,23 +4,38 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 // Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
 // carries a category `pill`, an optional `meta` urgency flag, and the
 // `priority` / `isDecision` flags that drive the priorities bar and the
 // Decisions filter. Dates are illustrative defaults.
+const T = (id, text, column, pill, due, meta, extra = {}) => ({
+  id, text, column, pill,
+  priority: !!extra.priority, isDecision: !!extra.isDecision,
+  due, meta, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: extra.notes || "",
+});
 const seedTasks = () => [
-  { id: "tsk_1", text: "Reply to 2 unanswered enquiries", column: "work", pill: "SM", priority: false, isDecision: false, due: "2026-06-23", meta: "48h", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_2", text: "Chase 2 stale permits", column: "work", pill: "CM", priority: false, isDecision: false, due: null, meta: "14d+", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_3", text: "Unblock Giorgi — Mason App", column: "work", pill: "UD", priority: true, isDecision: true, due: "2026-06-19", meta: "overdue", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_4", text: "Send permit form — Highgate", column: "work", pill: "CM", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_5", text: "Quote follow-up — Mrs Doyle", column: "work", pill: "SM", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_6", text: "Confirm rent account + Dan split", column: "personal", pill: "Money", priority: true, isDecision: true, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_7", text: "NIE renewal paperwork", column: "personal", pill: "Admin", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_8", text: "Book 3 gym sessions this week", column: "personal", pill: "Health", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_9", text: "Order replacement for kitchen", column: "personal", pill: "Home", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
-  { id: "tsk_10", text: "Weekly review — W19", column: "personal", pill: "Admin", priority: false, isDecision: false, due: null, meta: "Sun", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  // Work
+  T("tsk_1", "Mason App: next steps", "work", "UD", "2026-06-19", "overdue", { priority: true, notes: "Revolut api, permit database, inbox functionality, invoice creation, clean dead wood" }),
+  T("tsk_3", "CM — balances & permits", "work", "CM", "2026-06-22", "Mon"),
+  T("tsk_4", "SEO for Sears Melvin", "work", "SM", "2026-06-24", "Wed"),
+  T("tsk_5", "Sears Melvin management agreement", "work", "SM", "2026-06-24", "Wed"),
+  T("tsk_6", "Add IG posting schedule", "work", "SM", "2026-06-25", "Thu"),
+  // Personal
+  T("tsk_7", "Iberia compensation: AI check", "personal", "Admin", "2026-06-21", "today"),
+  T("tsk_8", "Confirm rent account + Dan split", "personal", "Money", null, null, { priority: true, isDecision: true }),
+  T("tsk_9", "Training barefoot shoes", "personal", "Health", "2026-06-24", "Wed"),
+  T("tsk_10", "Spanish eSIM", "personal", "Admin", "2026-06-26", "Fri"),
+  T("tsk_11", "Home improvements", "personal", "Home", "2026-06-26", "Fri", { notes: "Sink splash, blinds, soft lamp auto, fan, bed, table, sink drain shelf" }),
+  T("tsk_12", "Delete my internet footprint", "personal", "Admin", "2026-06-26", "Fri", { priority: true }),
+  T("tsk_13", "Close BBVA", "personal", "Money", "2026-06-26", "Fri"),
+  T("tsk_14", "Add TBC card to Celfie account", "personal", "Money", "2026-06-27", "Sat"),
+  T("tsk_15", "TV / LG dedicated VPN IP", "personal", "Home", "2026-06-27", "Sat"),
+  T("tsk_16", "Watch Tom Hardy on Jonathan Ross", "personal", "Home", "2026-06-27", "Sat"),
+  T("tsk_17", "Clothes to charity", "personal", "Home", "2026-06-27", "Sat"),
+  T("tsk_18", "Close Vodafone", "personal", "Money", "2026-06-29", "Mon"),
+  T("tsk_19", "NIE renewal paperwork", "personal", "Admin", null, null),
 ];
 
 const seedGoal = (id, label, target, priorities = []) => ({

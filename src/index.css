@@ -14,9 +14,12 @@
   --c-text-tertiary: #9a9a9a;
   --c-border: rgba(0, 0, 0, 0.08);
   --c-border-strong: rgba(0, 0, 0, 0.15);
-  --c-accent-light: #e6f1fb;
-  --c-overlay: rgba(0, 0, 0, 0.32);
-  --c-footer-bg: #f1efea;
+  /* dark royal blue — the hero accent */
+  --c-accent: #2a3f9d;
+  --c-accent-strong: #1d2c74;
+  --c-accent-light: #ebedfa;
+  --c-overlay: rgba(20, 24, 48, 0.34);
+  --c-footer-bg: #f2f1ec;
 }
 
 :root[data-theme="dark"] {
@@ -30,8 +33,11 @@
   --c-text-tertiary: #6e7177;
   --c-border: rgba(255, 255, 255, 0.1);
   --c-border-strong: rgba(255, 255, 255, 0.18);
-  --c-accent-light: rgba(55, 138, 221, 0.18);
-  --c-overlay: rgba(0, 0, 0, 0.55);
+  /* lighter royal so it stays legible on the dark canvas */
+  --c-accent: #7d92ec;
+  --c-accent-strong: #9fb0f3;
+  --c-accent-light: rgba(125, 146, 236, 0.18);
+  --c-overlay: rgba(0, 0, 0, 0.58);
   --c-footer-bg: #1b1c20;
 }
 

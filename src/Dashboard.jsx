@@ -250,7 +250,7 @@ export default function Dashboard() {
               options={[{ value: "tasks", label: "Tasks" }, { value: "finance", label: "Finance" }]}
               value={view}
               onChange={setView}
-              accent={view === "finance" ? ACCENT.finance : ACCENT.work}
+              accent={C.accent}
             />
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
           </div>

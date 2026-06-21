@@ -11,44 +11,56 @@ Arin's personal life dashboard. Single-page React app, mobile-first, designed to
 - Vite + React 18 (no TypeScript by choice — keep it light)
 - No CSS framework — inline styles using design tokens from `src/lib/tokens.js`
 - No state library — plain `useState` in `Dashboard.jsx`
-- No persistence yet — adding `localStorage` is the next priority
+- Persistence: localStorage write-through cache + optional Supabase sync (`src/lib/storage.js`), with versioned `migrate()` (currently schema v8)
+- **Light + dark mode.** Neutral colours (bg/text/border) are CSS variables defined in `src/index.css` and exposed through `tokens.js` as `C.bg`, `C.text`, etc. Accent hexes stay literal in `tokens.js` (they read in both modes). Theme is applied via a `data-theme` attribute on `<html>` (see `src/lib/theme.js` + the anti-flash script in `index.html`).
+
+## V2 shell (current)
+
+The dashboard is a **two-view app**, wired in `Dashboard.jsx`. Components live in `src/components/v2/`:
+
+- **Priorities bar** (`PrioritiesBar.jsx`) — permanent, top of every view. Derived from `tasks.filter(t => t.priority && t.status !== 'done')`. Includes a `Decisions · N` toggle.
+- **View tabs** — `Tasks` | `Finance` (`Segmented.jsx`), active tab stored in `state.ui.view`.
+- **Tasks view** (`TasksView.jsx`) — flat task list in Work | Personal columns; category pills (`Pill.jsx`); tap a row → `TaskFocus.jsx`. The Decisions filter shows only `isDecision` tasks.
+- **Finance lens** (`FinanceLens.jsx`) — Revolut **spend** analyzer (not net-worth). Pipeline: `parseRevolutCsv.js → categorise.js → financeStats.js`. Defaults to the seeded 6-month export (`financeSeed.js`) until a CSV is imported. Merchant logos via Clearbit with letter-avatar fallback (`MerchantLogo.jsx`, `merchants.js`).
+- **Habit footer** (`HabitFooter.jsx`) — docked across all views; three horizons per habit (`habitStats.js`).
+
+Retired in V2 (data still in state, no longer rendered on the main host): the old collapsible project sections (health, journal, relationships, charity, travel, calendar), the rail (north star, goals rollup, projects nav), TopThree, and the old `Habits`/`StickyHabits` bars. The **Spanish subdomain** (`spanish-arin-melvin.lifedashboard.live`) is untouched.
 
 ## Conventions
 
-- **Inline styles only.** Don't add CSS files, Tailwind, or styled-components. Use the `C` color object and `styles` helpers from `tokens.js`.
-- **One component per file** in `src/components/`.
-- **Editable fields** wrap values in the shared `<EditableText />` component from `Editable.jsx`. Don't reinvent inline-editing.
-- **Edit mode toggles** use the shared `<EditModeToggle />` and follow the pattern in `Goals.jsx` / `Upcoming.jsx`: a `useState(false)` on the section, with `+ Add` and `×` controls revealed when `editing === true`.
+- **Inline styles only.** Don't add Tailwind or styled-components. Use the `C` colour object, `ACCENT`/`PILL`/`HABIT` maps, and `styles` helpers from `tokens.js`. The single `index.css` exists only to host the theme CSS variables + keyframes — don't add component CSS files.
+- **One component per file**; new V2 components go in `src/components/v2/`.
 - **Numbers display with tabular-nums** for clean alignment: `fontVariantNumeric: "tabular-nums"`.
-- **Soft-blue accent** is `C.accent` (#185FA5). Don't introduce new accent colors without asking Arin.
+- **Accent colours** are the V2 set in `tokens.js` `ACCENT` (work purple `#534AB7`, personal green `#639922`, finance blue `#378ADD`, priorities amber `#EF9F27`). Don't introduce new accent colours without asking Arin.
 
 ## Aesthetic
 
-Notion-clean. White background, 0.5px subtle borders, generous whitespace, sentence case throughout. No gradients, no shadows, no emoji in the UI. Italic serif (Georgia) only for the daily quote and the north star block.
+Notion-clean. 0.5px subtle borders, generous whitespace, sentence case throughout. No gradients, no emoji in the UI. Must read correctly in both light and dark mode — drive neutrals from the CSS variables, never hardcode a bg/text hex.
 
 ## Data shape
 
-Defined in `src/lib/defaultState.js`. The shape matters because it'll become the schema when persistence is added. Don't restructure casually — additive changes only (new fields fine, renames break things).
+Defined in `src/lib/defaultState.js`; `migrate()` in `storage.js` upgrades older blobs (additive only — new fields fine, renames break things). V2 keys:
+
+- `tasks: [{ id, text, column:'work'|'personal', pill, priority, isDecision, due, meta, status:'open'|'done', notes, createdAt }]` — flat list for the Tasks view. Priorities bar and Decisions filter both derive from this.
+- `finance: { transactions, range:{start,end}, overrides, importedAt }` — the imported Revolut statement for the lens. Empty `transactions` ⇒ the seeded fallback (`financeSeed.js`) renders.
+- `ui: { view:'tasks'|'finance' }` — active tab.
+- Habits: `habits` (definitions, with `target`/`period`), plus `habitLog`/`habitNoLog` (see below).
 
 ## Common tasks
 
-- **Add a new section**: create a component in `src/components/`, import in `Dashboard.jsx`, add to the stack in render order. Add any new data to `defaultState.js`.
-- **Add a new drill-down panel**: create a file in `src/components/drilldowns/`, register it in `Drilldowns.jsx` (tile + render block), add data to `defaultState.js` under `drilldowns`.
-- **Change colors / spacing**: edit `src/lib/tokens.js`. Don't hardcode hex values in components.
+- **Add a task category (pill)**: extend `WORK_PILLS`/`PERSONAL_PILLS` + `PILL` in `tokens.js`.
+- **Tune finance categorisation**: edit rules/overrides in `categorise.js`; add merchant→domain entries in `merchants.js`.
+- **Change colours / spacing**: edit `src/lib/tokens.js` (accents) or `src/index.css` (light/dark neutrals). Don't hardcode hex values in components.
 
 ## Habit logic (important — not obvious)
 
-Habits are confirmed **retrospectively, one day late**. Each morning you confirm what you did "yesterday" — never "today". This is by design (you can't honestly know what you did today before the day is over, so the streak would be a guess).
-
 Data shape:
-- `habitLog: { gym: ["2026-05-03", "2026-05-02"], ... }` — ISO dates of confirmed YES days
+- `habitLog: { gym: ["2026-05-03", ...], ... }` — ISO dates of confirmed YES days
 - `habitNoLog: { gym: ["2026-05-01"], ... }` — ISO dates of confirmed NO days
 
-Streak calculation lives in `src/lib/habits.js` (`streakFor`). It walks backwards from yesterday counting consecutive YES days, stopping on first NO or first unanswered (where unanswered isn't yesterday — yesterday being unanswered just means "haven't checked in yet today", it shouldn't break the streak yet).
+The footer (`HabitFooter.jsx` + `habitStats.js`) shows three horizons per habit: a rolling 7-day dot strip, a 28-day run-rate vs target occurrences (`weeklyTarget × 4`), and a 28-day smoothed sparkline.
 
-The floating bar (`StickyHabits.jsx`) shows a pulsing ring for any habit with unanswered yesterday. Tap → tiny popover with Yes / No / clear answer. Once answered, the ring solidifies and the streak updates.
-
-Don't refactor this to "did you do it today?" — Arin specifically chose retrospective confirmation.
+Confirmation was historically **retrospective** (you confirmed "yesterday", never "today"). As of V2, Arin asked to be able to log **today *or* yesterday** — so every dot in the footer (including today's, which carries the outline ring) is tappable and cycles unanswered → yes → no → clear. The legacy retrospective streak helpers still live in `src/lib/habits.js` if needed.
 
 ## Things Arin will probably ask for next
 

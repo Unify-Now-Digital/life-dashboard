@@ -1,0 +1,73 @@
+/* Theme tokens — light + dark. Neutrals (bg/text/border) flip per theme via
+   these CSS variables; accent hexes are hardcoded in tokens.js because they
+   read correctly in both modes (per the V2 design spec §2). */
+
+:root,
+:root[data-theme="light"] {
+  --c-bg: #ffffff;
+  --c-bg-secondary: #f7f7f5;
+  --c-bg-tertiary: #efefec;
+  --c-card: #ffffff;
+  --c-stat-bg: #f1efea;
+  --c-text: #1f1f1f;
+  --c-text-secondary: #6b6b6b;
+  --c-text-tertiary: #9a9a9a;
+  --c-border: rgba(0, 0, 0, 0.08);
+  --c-border-strong: rgba(0, 0, 0, 0.15);
+  --c-accent-light: #e6f1fb;
+  --c-overlay: rgba(0, 0, 0, 0.32);
+  --c-footer-bg: #f1efea;
+}
+
+:root[data-theme="dark"] {
+  --c-bg: #16171a;
+  --c-bg-secondary: #1e2024;
+  --c-bg-tertiary: #26282d;
+  --c-card: #1b1c20;
+  --c-stat-bg: #222428;
+  --c-text: #ececec;
+  --c-text-secondary: #a8a8a8;
+  --c-text-tertiary: #6e7177;
+  --c-border: rgba(255, 255, 255, 0.1);
+  --c-border-strong: rgba(255, 255, 255, 0.18);
+  --c-accent-light: rgba(55, 138, 221, 0.18);
+  --c-overlay: rgba(0, 0, 0, 0.55);
+  --c-footer-bg: #1b1c20;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  overflow-x: hidden;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@media (max-width: 380px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@keyframes habitPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.82;
+  }
+}

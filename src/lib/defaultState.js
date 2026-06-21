@@ -4,7 +4,24 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
+
+// Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
+// carries a category `pill`, an optional `meta` urgency flag, and the
+// `priority` / `isDecision` flags that drive the priorities bar and the
+// Decisions filter. Dates are illustrative defaults.
+const seedTasks = () => [
+  { id: "tsk_1", text: "Reply to 2 unanswered enquiries", column: "work", pill: "SM", priority: false, isDecision: false, due: "2026-06-23", meta: "48h", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_2", text: "Chase 2 stale permits", column: "work", pill: "CM", priority: false, isDecision: false, due: null, meta: "14d+", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_3", text: "Unblock Giorgi — Mason App", column: "work", pill: "UD", priority: true, isDecision: true, due: "2026-06-19", meta: "overdue", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_4", text: "Send permit form — Highgate", column: "work", pill: "CM", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_5", text: "Quote follow-up — Mrs Doyle", column: "work", pill: "SM", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_6", text: "Confirm rent account + Dan split", column: "personal", pill: "Money", priority: true, isDecision: true, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_7", text: "NIE renewal paperwork", column: "personal", pill: "Admin", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_8", text: "Book 3 gym sessions this week", column: "personal", pill: "Health", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_9", text: "Order replacement for kitchen", column: "personal", pill: "Home", priority: false, isDecision: false, due: null, meta: null, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+  { id: "tsk_10", text: "Weekly review — W19", column: "personal", pill: "Admin", priority: false, isDecision: false, due: null, meta: "Sun", status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: "" },
+];
 
 const seedGoal = (id, label, target, priorities = []) => ({
   id,
@@ -41,6 +58,25 @@ export const defaultState = {
   ],
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },
+
+  // V2 Tasks view — a flat task list rendered in two columns (Work | Personal).
+  // The priorities bar = tasks.filter(t => t.priority && t.status === 'open');
+  // the Decisions filter = tasks.filter(t => t.isDecision). See spec §3/§4.
+  tasks: seedTasks(),
+
+  // V2 Finance lens — manual Revolut CSV import. `transactions` holds the
+  // parsed + stored statement; when empty the lens shows the seeded 6-month
+  // fallback (lib/financeSeed.js). `overrides` remembers manual merchant→
+  // category decisions. See spec §5/§7.
+  finance: {
+    transactions: [],
+    range: { start: "2025-10-01", end: "2026-04-30" },
+    overrides: {},
+    importedAt: null,
+  },
+
+  // V2 shell UI state. `view` is the active top-level tab.
+  ui: { view: "tasks", sectionOrder: [] },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
   // TopThree component. Auto-filled when a Work todo is starred (which also

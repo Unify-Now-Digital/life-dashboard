@@ -1,6 +1,7 @@
 import React from "react";
 import { C, WISDOM_PILL } from "../lib/tokens";
 import { lockNow, isLockEnabled } from "../lib/authLocal";
+import UnifyTrend from "./v2/UnifyTrend.jsx";
 
 function CategoryPill({ category }) {
   if (!category) return null;
@@ -28,7 +29,7 @@ function RotateBtn({ onClick }) {
   );
 }
 
-export default function Header({ today, dayOfYear, wisdom, onRotate }) {
+export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden, onToggleUnify }) {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const dateStr = `${days[today.getDay()]}, ${today.getDate()} ${months[today.getMonth()]}`;
@@ -38,14 +39,16 @@ export default function Header({ today, dayOfYear, wisdom, onRotate }) {
 
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 14, rowGap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 13, color: C.textTertiary, fontWeight: 500 }}>{dateStr}</div>
           <div style={{ fontSize: 24, fontWeight: 500, marginTop: 2, letterSpacing: "-0.01em" }}>
             {greet}, Arin.
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 18 }}>
+          {onToggleUnify && <UnifyTrend hidden={unifyHidden} onToggle={onToggleUnify} />}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <button
             type="button"
             onClick={lockNow}
@@ -67,6 +70,7 @@ export default function Header({ today, dayOfYear, wisdom, onRotate }) {
               Day
             </div>
             <div style={{ fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{dayOfYear}</div>
+          </div>
           </div>
         </div>
       </div>

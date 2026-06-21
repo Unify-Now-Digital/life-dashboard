@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { C, ACCENT, PILL, WORK_PILLS, PERSONAL_PILLS } from "../../lib/tokens";
+import React, { useState, useRef } from "react";
+import { C, ACCENT, WORK_PILLS, PERSONAL_PILLS } from "../../lib/tokens";
 import { PillSelect, Pill } from "./Pill.jsx";
 import { todayISO } from "../../lib/taskDates.js";
 
 const META_OVERDUE = new Set(["overdue"]);
 const COLUMN_LIMIT = 10;
+const SWIPE_TRIGGER = 72;
 const dueKey = (t) => t.due || "9999-99-99";
 
 const CMP = {
@@ -28,6 +29,12 @@ const DEFERS = [
   { n: 7, label: "+1 week" },
 ];
 
+// Keep a saved group order in sync with the groups that currently exist.
+function reconcile(saved, natural) {
+  const s = (Array.isArray(saved) ? saved : []).filter((k) => natural.includes(k));
+  return [...s, ...natural.filter((k) => !s.includes(k))];
+}
+
 function ImportanceMark({ level }) {
   if (!level || level <= 1) return null;
   return (
@@ -39,101 +46,169 @@ function ImportanceMark({ level }) {
   );
 }
 
-function TaskRow({ task, onOpen, onRecategorise, onDefer }) {
+function ReorderArrow({ dir, disabled, onClick }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}
+      disabled={disabled}
+      aria-label={dir === "up" ? "Move group up" : "Move group down"}
+      style={{ background: "none", border: "none", padding: 2, cursor: disabled ? "default" : "pointer", color: disabled ? C.border : C.textTertiary, fontSize: 11, lineHeight: 1, fontFamily: "inherit" }}
+    >
+      {dir === "up" ? "▲" : "▼"}
+    </button>
+  );
+}
+
+function TaskRow({ task, hidePill, isDesktop, onOpen, onRecategorise, onDefer, onToggleDone, onDelete }) {
   const [deferOpen, setDeferOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const [dx, setDx] = useState(0);
+  const startX = useRef(0);
+  const swiping = useRef(false);
   const meta = task.meta;
   const overdue = meta && META_OVERDUE.has(String(meta).toLowerCase());
   const done = task.status === "done";
-  return (
-    <div
-      onClick={() => onOpen(task.id)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onOpen(task.id)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `0.5px solid ${C.border}`, cursor: "pointer" }}
-    >
-      <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
-        <PillSelect value={task.pill} column={task.column} onChange={onRecategorise} />
-      </span>
-      <span style={{ flex: 1, fontSize: 14.5, color: done ? C.textTertiary : C.text, textDecoration: done ? "line-through" : "none", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {task.text}
-      </span>
-      <ImportanceMark level={task.importance} />
 
-      {/* Click the urgency flag to defer; rows with no date get a subtle trigger. */}
-      <span style={{ position: "relative", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={() => setDeferOpen((o) => !o)}
-          title="Defer"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "2px 2px",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontSize: 12.5,
-            fontWeight: 500,
-            color: overdue ? C.danger : meta ? C.textTertiary : C.borderStrong,
-            fontVariantNumeric: "tabular-nums",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {meta || (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block" }}>
-              <rect x="3" y="5" width="18" height="16" rx="2" />
-              <path d="M3 9h18M8 3v4M16 3v4" />
-            </svg>
-          )}
-        </button>
-        {deferOpen && (
-          <>
-            <div onClick={() => setDeferOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
-            <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 61, background: C.card, border: `0.5px solid ${C.borderStrong}`, borderRadius: 9, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", minWidth: 110 }}>
-              {DEFERS.map(({ n, label }) => (
-                <button
-                  key={n}
-                  onClick={() => { onDefer(task.id, n); setDeferOpen(false); }}
-                  style={{ background: "transparent", border: "none", textAlign: "left", padding: "7px 10px", borderRadius: 6, fontSize: 13, color: C.text, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </>
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; swiping.current = true; };
+  const onTouchMove = (e) => {
+    if (!swiping.current) return;
+    const d = e.touches[0].clientX - startX.current;
+    setDx(Math.max(-130, Math.min(130, d)));
+  };
+  const onTouchEnd = () => {
+    swiping.current = false;
+    if (dx > SWIPE_TRIGGER) onToggleDone(task.id);
+    else if (dx < -SWIPE_TRIGGER) onDelete(task.id);
+    setDx(0);
+  };
+
+  const quickBtn = (label, color, onClick) => (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={label}
+      style={{ background: "none", border: "none", padding: 2, cursor: "pointer", color, display: "flex", alignItems: "center", flexShrink: 0 }}
+    >
+      {label === "Delete" ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></svg>
+      )}
+    </button>
+  );
+
+  return (
+    <div style={{ position: "relative", overflow: "hidden", borderBottom: `0.5px solid ${C.border}` }}>
+      {/* swipe action backdrops */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", fontSize: 13, fontWeight: 600, pointerEvents: "none" }}>
+        <span style={{ color: C.success, opacity: dx > 8 ? 1 : 0 }}>{done ? "Reopen" : "✓ Done"}</span>
+        <span style={{ color: C.danger, opacity: dx < -8 ? 1 : 0 }}>Delete</span>
+      </div>
+
+      <div
+        onClick={() => onOpen(task.id)}
+        onMouseEnter={() => isDesktop && setHover(true)}
+        onMouseLeave={() => isDesktop && setHover(false)}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onOpen(task.id)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "9px 2px",
+          cursor: "pointer",
+          background: C.bg,
+          transform: `translateX(${dx}px)`,
+          transition: swiping.current ? "none" : "transform 0.16s ease",
+        }}
+      >
+        {isDesktop && hover && quickBtn(done ? "Reopen" : "Done", done ? C.textTertiary : C.success, () => onToggleDone(task.id))}
+        {!hidePill && (
+          <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
+            <PillSelect value={task.pill} column={task.column} onChange={onRecategorise} />
+          </span>
         )}
-      </span>
+        <span style={{ flex: 1, fontSize: 14.5, color: done ? C.textTertiary : C.text, textDecoration: done ? "line-through" : "none", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {task.text}
+        </span>
+        <ImportanceMark level={task.importance} />
+
+        <span style={{ position: "relative", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setDeferOpen((o) => !o)}
+            title="Defer"
+            style={{ background: "transparent", border: "none", padding: "2px", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 500, color: overdue ? C.danger : meta ? C.textTertiary : C.borderStrong, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}
+          >
+            {meta || (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M8 3v4M16 3v4" /></svg>
+            )}
+          </button>
+          {deferOpen && (
+            <>
+              <div onClick={() => setDeferOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 61, background: C.card, border: `0.5px solid ${C.borderStrong}`, borderRadius: 9, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", minWidth: 110 }}>
+                {DEFERS.map(({ n, label }) => (
+                  <button key={n} onClick={() => { onDefer(task.id, n); setDeferOpen(false); }} style={{ background: "transparent", border: "none", textAlign: "left", padding: "7px 10px", borderRadius: 6, fontSize: 13, color: C.text, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </span>
+
+        {isDesktop && hover && quickBtn("Delete", C.textTertiary, () => onDelete(task.id))}
+      </div>
     </div>
   );
 }
 
-function Column({ title, accent, column, tasks, sortBy, groupMode, today, onOpen, onRecategorise, onDefer, onAdd }) {
+function Column({ title, accent, column, tasks, sortBy, groupMode, groupOrder, today, isDesktop, onOpen, onRecategorise, onDefer, onToggleDone, onDelete, onReorderGroups, onAdd }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   const sorted = [...tasks].sort(CMP[sortBy]);
-  const renderRow = (t) => <TaskRow key={t.id} task={t} onOpen={onOpen} onRecategorise={(pill) => onRecategorise(t.id, pill)} onDefer={onDefer} />;
-
-  const groupHeader = (label, danger) => (
-    <div style={{ fontSize: 11, fontWeight: 600, color: danger ? C.danger : C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{label}</div>
+  const renderRow = (t) => (
+    <TaskRow key={t.id} task={t} hidePill={groupMode === "label"} isDesktop={isDesktop} onOpen={onOpen} onRecategorise={(pill) => onRecategorise(t.id, pill)} onDefer={onDefer} onToggleDone={onToggleDone} onDelete={onDelete} />
   );
 
   let body;
-  if (groupMode === "due") {
-    const g = {};
-    for (const t of sorted) (g[dueBucket(t, today)] ||= []).push(t);
-    body = DUE_ORDER.filter((k) => g[k]?.length).map((k) => (
-      <div key={k} style={{ marginTop: 10 }}>{groupHeader(k, k === "Overdue")}{g[k].map(renderRow)}</div>
-    ));
-  } else if (groupMode === "label") {
-    const order = column === "personal" ? PERSONAL_PILLS : WORK_PILLS;
-    const g = {};
-    for (const t of sorted) (g[t.pill] ||= []).push(t);
-    const keys = [...order.filter((p) => g[p]), ...Object.keys(g).filter((p) => !order.includes(p))];
-    body = keys.map((p) => (
-      <div key={p} style={{ marginTop: 10 }}>
-        <div style={{ marginBottom: 4 }}><Pill name={p} size="sm" /></div>
-        {g[p].map(renderRow)}
+  if (groupMode === "due" || groupMode === "label") {
+    const groups = {};
+    let natural;
+    let headerFor;
+    if (groupMode === "due") {
+      for (const t of sorted) (groups[dueBucket(t, today)] ||= []).push(t);
+      natural = DUE_ORDER.filter((k) => groups[k]?.length);
+      headerFor = (k) => <span style={{ fontSize: 11, fontWeight: 600, color: k === "Overdue" ? C.danger : C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k}</span>;
+    } else {
+      const order = column === "personal" ? PERSONAL_PILLS : WORK_PILLS;
+      for (const t of sorted) (groups[t.pill] ||= []).push(t);
+      natural = [...order.filter((p) => groups[p]), ...Object.keys(groups).filter((p) => !order.includes(p))];
+      headerFor = (k) => <Pill name={k} size="sm" />;
+    }
+    const keys = reconcile(groupOrder?.[`${groupMode}:${column}`], natural);
+    const move = (k, dir) => {
+      const i = keys.indexOf(k);
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= keys.length) return;
+      const next = [...keys];
+      [next[i], next[j]] = [next[j], next[i]];
+      onReorderGroups(column, groupMode, next);
+    };
+    body = keys.map((k, idx) => (
+      <div key={k} style={{ marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3 }}>
+          {headerFor(k)}
+          <span style={{ flex: 1 }} />
+          <ReorderArrow dir="up" disabled={idx === 0} onClick={() => move(k, "up")} />
+          <ReorderArrow dir="down" disabled={idx === keys.length - 1} onClick={() => move(k, "down")} />
+        </div>
+        {groups[k].map(renderRow)}
       </div>
     ));
   } else {
@@ -188,25 +263,23 @@ function Column({ title, accent, column, tasks, sortBy, groupMode, today, onOpen
   );
 }
 
-// Tasks view — Work | Personal columns with sort, group-by (due / label), list
-// limits, importance (1–3), and click-to-defer on each row. Spec §4.
-export default function TasksView({ tasks, decisionsActive, isDesktop, sortBy = "importance", groupMode = "none", onOpen, onRecategorise, onAdd, onDefer }) {
+// Tasks view — Work | Personal columns with sort, grouping (due / category) +
+// reorderable groups, list limits, importance, click-to-defer, and quick
+// complete / delete (swipe on mobile). Spec §4.
+export default function TasksView({ tasks, decisionsActive, isDesktop, sortBy = "importance", groupMode = "none", groupOrder = {}, onOpen, onRecategorise, onAdd, onDefer, onToggleDone, onDelete, onReorderGroups }) {
   const today = todayISO();
-
   const open = tasks.filter((t) => t.status !== "done");
   const visible = decisionsActive ? open.filter((t) => t.isDecision) : open;
-  const work = visible.filter((t) => t.column === "work");
-  const personal = visible.filter((t) => t.column === "personal");
 
   const col = (title, accent, column, list) => (
-    <Column title={title} accent={accent} column={column} tasks={list} sortBy={sortBy} groupMode={groupMode} today={today} onOpen={onOpen} onRecategorise={onRecategorise} onDefer={onDefer} onAdd={(text) => onAdd(column, text)} />
+    <Column title={title} accent={accent} column={column} tasks={list} sortBy={sortBy} groupMode={groupMode} groupOrder={groupOrder} today={today} isDesktop={isDesktop} onOpen={onOpen} onRecategorise={onRecategorise} onDefer={onDefer} onToggleDone={onToggleDone} onDelete={onDelete} onReorderGroups={onReorderGroups} onAdd={(text) => onAdd(column, text)} />
   );
 
   return (
     <div style={{ display: "flex", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 36 : 24, alignItems: "flex-start" }}>
-      {col("Work", ACCENT.work, "work", work)}
+      {col("Work", ACCENT.work, "work", visible.filter((t) => t.column === "work"))}
       {isDesktop && <div style={{ width: 0.5, alignSelf: "stretch", background: C.border }} />}
-      {col("Personal", ACCENT.personal, "personal", personal)}
+      {col("Personal", ACCENT.personal, "personal", visible.filter((t) => t.column === "personal"))}
     </div>
   );
 }

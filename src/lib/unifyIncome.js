@@ -21,6 +21,13 @@ export const UNIFY_INVOICES_GBP = {
   "2026-05": 5685.19,
 };
 
+// The last `n` Unify invoice months, ascending — [{ month, gbp }]. Drives the
+// rolling header sparkline.
+export function unifyTrend(n = 6) {
+  const months = Object.keys(UNIFY_INVOICES_GBP).sort();
+  return months.slice(-n).map((m) => ({ month: m, gbp: UNIFY_INVOICES_GBP[m] }));
+}
+
 // Average Unify invoice (EUR) per month across the work-months that fall within
 // [start, end]. Used as the Unify component of the Income stat card.
 export function unifyEurPerMonth(start, end) {

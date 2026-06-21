@@ -501,7 +501,7 @@ function migrateV7toV8(s) {
     out.finance = { ...defaultState.finance };
   }
   if (!Array.isArray(out.finance.transactions)) out.finance.transactions = [];
-  out.ui = { ...(out.ui || {}), view: out.ui?.view || "tasks" };
+  out.ui = { ...(out.ui || {}), view: out.ui?.view || "tasks", theme: out.ui?.theme ?? null };
   return out;
 }
 
@@ -548,7 +548,12 @@ export async function loadFromCloud() {
     .eq("user_id", user.id)
     .maybeSingle();
   if (error || !data) return null;
-  return migrate(data.state);
+  const storedVersion = data.state?.schemaVersion || 1;
+  const migrated = migrate(data.state);
+  // If migrate() upgraded the blob (e.g. v7 → v8 added tasks/finance/ui),
+  // persist the new shape immediately so the stored row never lags the code.
+  if (storedVersion !== migrated.schemaVersion) saveState(migrated);
+  return migrated;
 }
 
 // ----- save ----------------------------------------------------------------

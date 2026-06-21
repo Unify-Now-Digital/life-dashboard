@@ -75,8 +75,10 @@ export const defaultState = {
     importedAt: null,
   },
 
-  // V2 shell UI state. `view` is the active top-level tab.
-  ui: { view: "tasks", sectionOrder: [] },
+  // V2 shell UI state. `view` is the active top-level tab; `theme` is the
+  // synced light/dark preference (null = follow this device's localStorage /
+  // system setting until explicitly toggled).
+  ui: { view: "tasks", theme: null, sectionOrder: [] },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
   // TopThree component. Auto-filled when a Work todo is starred (which also

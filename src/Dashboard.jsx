@@ -47,7 +47,8 @@ export default function Dashboard() {
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setThemeState(next);
-    persistTheme(next);
+    persistTheme(next); // localStorage cache + apply to <html> for this device
+    setState((s) => ({ ...s, ui: { ...(s.ui || {}), theme: next } })); // sync cross-device
   };
 
   const [decisionsActive, setDecisionsActive] = useState(false);
@@ -83,6 +84,17 @@ export default function Dashboard() {
       return next;
     });
   };
+
+  // Adopt the synced theme when cloud state arrives (so the preference follows
+  // the account onto a new device). Local toggles keep state.ui.theme in step,
+  // so this only fires when a different device/session set it.
+  useEffect(() => {
+    const t = state.ui?.theme;
+    if ((t === "light" || t === "dark") && t !== theme) {
+      setThemeState(t);
+      persistTheme(t);
+    }
+  }, [state.ui?.theme]);
 
   // ---- Habits -------------------------------------------------------------
   const confirmHabit = (habit, dateISO, answer) =>

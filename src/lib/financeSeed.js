@@ -33,15 +33,15 @@ export const FINANCE_SEED = {
       "note": "transfers excl."
     },
     "rentNet": {
-      "perMonth": 1174,
-      "perWeek": 271,
-      "gross": 2761,
+      "perMonth": -87,
+      "perWeek": -20,
+      "gross": 1500,
       "offset": 1587,
-      "note": "€2,761 − €1,587 Dan"
+      "note": "€1,500 − €1,587 Dan"
     },
     "net": {
-      "perMonth": 5130,
-      "perWeek": 1184,
+      "perMonth": 6391,
+      "perWeek": 1475,
       "note": "before P2P paybacks"
     }
   },

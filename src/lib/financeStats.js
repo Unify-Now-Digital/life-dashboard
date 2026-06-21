@@ -52,6 +52,7 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
   const cats = {}; // key → { total, count, business, byMonth:{}, merchants:{} }
   let income = 0;
   let rentGross = 0;
+  let danOffset = 0;
   let excludedTotal = 0;
   let businessTotal = 0;
 
@@ -71,6 +72,11 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
     }
     if (category === "transfer_rent") {
       rentGross += abs;
+      excludedTotal += abs;
+      continue;
+    }
+    if (category === "rent_offset") {
+      if (tx.direction === "in") danOffset += abs; // Dan's actual contribution
       excludedTotal += abs;
       continue;
     }
@@ -130,7 +136,9 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
   const incomePerMonth = Math.round(perMonthOf(income));
   const cardSpendPerMonth = Math.round(perMonthOf(cardSpendTotal));
   const rentGrossPerMonth = Math.round(perMonthOf(rentGross));
-  const rentNetPerMonth = rentGrossPerMonth - DAN_OFFSET;
+  // Use Dan's actual contribution when present; fall back to the assumed flat.
+  const danPerMonth = danOffset > 0 ? Math.round(perMonthOf(danOffset)) : DAN_OFFSET;
+  const rentNetPerMonth = rentGrossPerMonth - danPerMonth;
   const netPerMonth = incomePerMonth - cardSpendPerMonth - rentNetPerMonth;
 
   const toWeek = (perMonth) => Math.round((perMonth * 12) / 52);
@@ -144,7 +152,7 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
         perMonth: rentNetPerMonth,
         perWeek: toWeek(rentNetPerMonth),
         gross: rentGrossPerMonth,
-        offset: DAN_OFFSET,
+        offset: danPerMonth,
       },
       net: { perMonth: netPerMonth, perWeek: toWeek(netPerMonth) },
     },

@@ -2,9 +2,9 @@ import React from "react";
 import { C, ACCENT } from "../../lib/tokens";
 import { PillSelect } from "./Pill.jsx";
 
-// Focus view for a single task: everything else dimmed behind an overlay.
-// Shows the task text, its pill (recategorise), notes / next action, and the
-// priority / decision / done controls. Spec §4.
+// Right-side focus drawer for a single task: the rest of the board dims behind
+// it. Shows the task text, its pill (recategorise), notes / next action, due
+// date, and the priority / decision / done controls. Spec §4.
 export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
   if (!task) return null;
   const col = task.column;
@@ -16,9 +16,9 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
         border: `0.5px solid ${on ? accent : C.border}`,
         background: on ? accent : "transparent",
         color: on ? "#fff" : C.textSecondary,
-        borderRadius: 7,
-        padding: "6px 12px",
-        fontSize: 12,
+        borderRadius: 8,
+        padding: "7px 13px",
+        fontSize: 12.5,
         fontWeight: 500,
         cursor: "pointer",
         fontFamily: "inherit",
@@ -37,29 +37,32 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
         background: C.overlay,
         zIndex: 200,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
+        justifyContent: "flex-end",
+        animation: "overlayIn 0.15s ease",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: C.card,
-          border: `0.5px solid ${C.borderStrong}`,
-          borderRadius: 14,
-          padding: 20,
-          width: "100%",
-          maxWidth: 460,
-          boxShadow: "0 12px 40px rgba(0,0,0,0.28)",
+          borderLeft: `0.5px solid ${C.borderStrong}`,
+          height: "100%",
+          width: "min(440px, 100%)",
+          boxSizing: "border-box",
+          padding: "20px 22px calc(24px + env(safe-area-inset-bottom))",
+          overflowY: "auto",
+          boxShadow: "-12px 0 40px rgba(0,0,0,0.18)",
+          animation: "drawerIn 0.18s ease",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <PillSelect value={task.pill} column={col} onChange={(pill) => onUpdate({ pill })} />
           <button
             onClick={onClose}
             aria-label="Close"
-            style={{ background: "none", border: "none", color: C.textTertiary, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 4 }}
+            style={{ background: "none", border: "none", color: C.textTertiary, fontSize: 22, cursor: "pointer", lineHeight: 1, padding: 4 }}
           >
             ×
           </button>
@@ -74,66 +77,68 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
             border: "none",
             background: "transparent",
             color: C.text,
-            fontSize: 19,
+            fontSize: 20,
             fontWeight: 500,
             fontFamily: "inherit",
             resize: "none",
             outline: "none",
             lineHeight: 1.35,
+            padding: 0,
           }}
         />
 
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 7 }}>
             Notes / next action
           </div>
           <textarea
             value={task.notes || ""}
             onChange={(e) => onUpdate({ notes: e.target.value })}
             placeholder="What's the next concrete step?"
-            rows={4}
+            rows={5}
             style={{
               width: "100%",
               border: `0.5px solid ${C.border}`,
-              borderRadius: 8,
+              borderRadius: 10,
               background: C.bgSecondary,
               color: C.text,
-              fontSize: 13.5,
+              fontSize: 14,
               fontFamily: "inherit",
-              padding: "10px 12px",
-              resize: "vertical",
+              padding: "12px 13px",
+              resize: "none",
               outline: "none",
-              lineHeight: 1.5,
+              lineHeight: 1.55,
+              boxSizing: "border-box",
             }}
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: C.textSecondary }}>Due</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+          <span style={{ fontSize: 12.5, color: C.textSecondary, width: 32 }}>Due</span>
           <input
             type="date"
             value={task.due || ""}
             onChange={(e) => onUpdate({ due: e.target.value || null })}
             style={{
               border: `0.5px solid ${C.border}`,
-              borderRadius: 7,
+              borderRadius: 8,
               background: C.bgSecondary,
-              color: C.text,
+              color: task.due ? C.text : C.textTertiary,
               fontFamily: "inherit",
-              fontSize: 12.5,
-              padding: "5px 8px",
+              fontSize: 13,
+              padding: "7px 10px",
               colorScheme: "light dark",
             }}
           />
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: "auto", paddingTop: 24 }}>
           {flagBtn(task.priority ? "★ Priority" : "☆ Priority", task.priority, () => onUpdate({ priority: !task.priority }), ACCENT.priorities)}
           {flagBtn("Decision", task.isDecision, () => onUpdate({ isDecision: !task.isDecision }), ACCENT.work)}
           {flagBtn(task.status === "done" ? "✓ Done" : "Mark done", task.status === "done", () => onUpdate({ status: task.status === "done" ? "open" : "done" }), ACCENT.personal)}
           <button
             onClick={() => { onDelete(); onClose(); }}
-            style={{ marginLeft: "auto", border: `0.5px solid ${C.border}`, background: "transparent", color: C.danger, borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ marginLeft: "auto", border: `0.5px solid ${C.border}`, background: "transparent", color: C.danger, borderRadius: 8, padding: "7px 13px", fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}
           >
             Delete
           </button>

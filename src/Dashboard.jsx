@@ -14,6 +14,7 @@ import AuthGate from "./components/AuthGate.jsx";
 import LocalLock from "./components/LocalLock.jsx";
 import PhotoQuickAdd from "./components/PhotoQuickAdd.jsx";
 import SpanishButton from "./components/SpanishButton.jsx";
+import SpanishPractice from "./components/SpanishPractice.jsx";
 import TopThree from "./components/TopThree.jsx";
 import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
@@ -326,6 +327,10 @@ export default function Dashboard() {
   // Section reorder mode (per session, not persisted — the ORDER is persisted).
   const [reordering, setReordering] = useState(false);
 
+  // Focused Spanish view: "calma" (the daily session, default) or "more"
+  // (the older Turkish + Reading decks). Session-only.
+  const [spanishMode, setSpanishMode] = useState("calma");
+
   const [railMode, setRailModeRaw] = useState(() => {
     try {
       return localStorage.getItem("lifeDashboard:railMode") || "float";
@@ -454,26 +459,51 @@ export default function Dashboard() {
     return (
       <LocalLock>
         <AuthGate>
-          <div style={styles.page}>
-            <Header today={today} dayOfYear={dayOfYear} quote={quote} />
-            {localOnlyBanner}
-            <div
-              style={{
-                background: C.bg,
-                border: `0.5px solid ${C.border}`,
-                borderRadius: 12,
-                padding: "16px 18px",
-              }}
-            >
-              <LearningProject
-                state={state}
-                setState={setState}
-                meta={LEARNING_META}
-                goalHandlers={makeGoalHandlers(setState, ["projects", "learning", "goals"])}
-              />
+          {spanishMode === "calma" ? (
+            <SpanishPractice
+              state={state}
+              setState={setState}
+              onMore={() => setSpanishMode("more")}
+              localOnlyBanner={localOnlyBanner}
+            />
+          ) : (
+            <div style={styles.page}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button
+                  onClick={() => setSpanishMode("calma")}
+                  style={{
+                    background: "transparent",
+                    border: `0.5px solid ${C.border}`,
+                    borderRadius: 6,
+                    padding: "4px 12px",
+                    fontSize: 12,
+                    color: C.accent,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  ‹ Práctica
+                </button>
+              </div>
+              {localOnlyBanner}
+              <div
+                style={{
+                  background: C.bg,
+                  border: `0.5px solid ${C.border}`,
+                  borderRadius: 12,
+                  padding: "16px 18px",
+                }}
+              >
+                <LearningProject
+                  state={state}
+                  setState={setState}
+                  meta={LEARNING_META}
+                  goalHandlers={makeGoalHandlers(setState, ["projects", "learning", "goals"])}
+                />
+              </div>
+              {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
             </div>
-            {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
-          </div>
+          )}
         </AuthGate>
       </LocalLock>
     );

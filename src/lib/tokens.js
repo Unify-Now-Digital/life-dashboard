@@ -65,6 +65,7 @@ export const PERSONAL_PILLS = ["Money", "Admin", "Health", "Home"];
 // Finance category colours for the monthly stacked bar chart. Deep, distinct,
 // readable in both light and dark.
 export const FINANCE_CAT_COLOR = {
+  rent: "#846A48",
   eating_out: "#D98E3C",
   software_biz: "#3A4E8C",
   p2p_out: "#8A6FB0",

@@ -227,8 +227,8 @@ export default function FinanceLens({ finance, onImport, onClear }) {
         </span>
       </div>
 
-      {/* Monthly spend stacked by category */}
-      <StackedBars months={summary.range?.months} categories={summary.categories} />
+      {/* Monthly spend stacked by category (+ flat rent at the base) */}
+      <StackedBars months={summary.range?.months} categories={summary.categories} rent={1500} />
 
       {/* Category card grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>

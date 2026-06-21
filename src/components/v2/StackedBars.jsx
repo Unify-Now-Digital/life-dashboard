@@ -6,10 +6,14 @@ const monLabel = (m) => MON[parseInt(m.slice(5, 7), 10) - 1];
 const eurK = (n) => (n >= 1000 ? `€${(n / 1000).toFixed(1)}k` : `€${Math.round(n)}`);
 
 // Monthly spend stacked by category, left → right. Built from each category's
-// absolute `monthly` array (aligned to range.months).
-export default function StackedBars({ months, categories, height = 150 }) {
-  const cats = (categories || []).filter((c) => Array.isArray(c.monthly));
-  if (!months?.length || !cats.length) return null;
+// absolute `monthly` array (aligned to range.months). `rent` adds a flat
+// monthly Rent segment at the base (rent is excluded from the spend categories).
+export default function StackedBars({ months, categories, rent = 0, height = 150 }) {
+  const real = (categories || []).filter((c) => Array.isArray(c.monthly));
+  if (!months?.length || !real.length) return null;
+  const cats = rent > 0
+    ? [{ key: "rent", label: "Rent", monthly: months.map(() => rent) }, ...real]
+    : real;
 
   const totals = months.map((_, i) => cats.reduce((s, c) => s + (c.monthly[i] || 0), 0));
   const max = Math.max(...totals, 1);

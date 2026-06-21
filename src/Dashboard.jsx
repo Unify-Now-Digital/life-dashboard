@@ -137,6 +137,10 @@ export default function Dashboard() {
   const updateTask = (id, patch) =>
     setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
   const deleteTask = (id) => setState((s) => ({ ...s, tasks: (s.tasks || []).filter((t) => t.id !== id) }));
+  const toggleDone = (id) =>
+    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
+  const reorderGroups = (column, mode, keys) =>
+    setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupOrder: { ...(s.ui?.groupOrder || {}), [`${mode}:${column}`]: keys } } }));
   const addTask = (column, text) =>
     setState((s) => ({
       ...s,
@@ -221,6 +225,8 @@ export default function Dashboard() {
   const rotateWisdom = () => {
     if (wisdomPool.length) setQIndex((i) => (i + 1) % wisdomPool.length);
   };
+  const unifyHidden = !!state.ui?.unifyTrendHidden;
+  const toggleUnify = () => setState((s) => ({ ...s, ui: { ...(s.ui || {}), unifyTrendHidden: !s.ui?.unifyTrendHidden } }));
 
   const localOnlyBanner = !isSupabaseEnabled() ? (
     <div
@@ -272,7 +278,7 @@ export default function Dashboard() {
     <LocalLock>
       <AuthGate>
         <div style={{ ...styles.page, paddingBottom: isDesktop ? 190 : 270 }}>
-          <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} />
+          <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} unifyHidden={unifyHidden} onToggleUnify={toggleUnify} />
 
           {localOnlyBanner}
 
@@ -327,10 +333,14 @@ export default function Dashboard() {
               isDesktop={isDesktop}
               sortBy={sortBy}
               groupMode={groupMode}
+              groupOrder={state.ui?.groupOrder || {}}
               onOpen={(id) => setFocusId(id)}
               onRecategorise={recategorise}
               onAdd={addTask}
               onDefer={deferTask}
+              onToggleDone={toggleDone}
+              onDelete={deleteTask}
+              onReorderGroups={reorderGroups}
             />
           ) : (
             <FinanceLens finance={state.finance} onImport={importTransactions} onClear={clearTransactions} />

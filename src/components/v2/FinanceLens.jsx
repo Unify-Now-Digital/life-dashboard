@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
-import { C, ACCENT, PILL } from "../../lib/tokens";
+import { C } from "../../lib/tokens";
 import Segmented from "./Segmented.jsx";
-import { Pill } from "./Pill.jsx";
 import MerchantLogo from "./MerchantLogo.jsx";
 import { financeStats } from "../../lib/financeStats.js";
 import { FINANCE_SEED } from "../../lib/financeSeed.js";
@@ -43,12 +42,16 @@ function StatCard({ label, value, note, danger, positive }) {
   );
 }
 
-// Second-line cadence for a merchant (day / week / one-off).
-function merchantSub(m) {
-  const freq = m.freq || (m.count === 1 ? "one-off" : m.count >= 30 ? "day" : "week");
-  if (freq === "one-off") return "one-off";
-  if (freq === "day") return `${eur(m.perDay)}/day`;
-  return `${eur(m.perWeek)}/wk`;
+// Frequency of a merchant from its count over the period. Only "regular"
+// merchants get a per-month/week rate; one-off / occasional ones just show a
+// total, so we don't imply a recurring cost that isn't there.
+function frequencyOf(count, days) {
+  if (!count || count <= 1) return { label: "One-off", regular: false };
+  const interval = days / count;
+  if (interval <= 3) return { label: "Daily", regular: true };
+  if (interval <= 10) return { label: "Weekly", regular: true };
+  if (interval <= 45) return { label: "Monthly", regular: true };
+  return { label: "Occasional", regular: false };
 }
 
 // One category tile in the grid.
@@ -74,7 +77,6 @@ function CategoryCard({ cat, rate, onOpen }) {
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
         <span style={{ fontSize: 16, fontWeight: 500, color: C.text, flex: 1, minWidth: 0 }}>{cat.label}</span>
-        {cat.business && <Pill name="deductible" size="sm" />}
         <Sparkline values={cat.spark} />
       </div>
       <div style={{ fontSize: 25, fontWeight: 600, color: C.text, letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
@@ -87,7 +89,7 @@ function CategoryCard({ cat, rate, onOpen }) {
 }
 
 // Right-side drawer listing a category's merchants.
-function MerchantsDrawer({ cat, rate, onClose }) {
+function MerchantsDrawer({ cat, rate, days, onClose }) {
   if (!cat) return null;
   const figure = rate === "weekly" ? cat.perWeek : cat.perMonth;
   const suffix = rate === "weekly" ? "/wk" : "/mo";
@@ -111,10 +113,7 @@ function MerchantsDrawer({ cat, rate, onClose }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 21, fontWeight: 600, color: C.text }}>{cat.label}</span>
-            {cat.business && <Pill name="deductible" size="sm" />}
-          </div>
+          <span style={{ fontSize: 21, fontWeight: 600, color: C.text }}>{cat.label}</span>
           <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: C.textTertiary, fontSize: 22, cursor: "pointer", lineHeight: 1, padding: 4 }}>×</button>
         </div>
         <div style={{ fontSize: 14, color: C.textTertiary, marginBottom: 16 }}>
@@ -125,20 +124,30 @@ function MerchantsDrawer({ cat, rate, onClose }) {
           <div style={{ fontSize: 13.5, color: C.textTertiary }}>No merchant breakdown for this category.</div>
         )}
         {cat.merchants.map((m) => {
+          const f = frequencyOf(m.count, days);
           const fig = rate === "weekly" ? m.perWeek : m.perMonth;
           const sfx = rate === "weekly" ? "/wk" : "/mo";
           return (
-            <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `0.5px solid ${C.border}` }}>
+            <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: `0.5px solid ${C.border}` }}>
               <MerchantLogo name={m.name} domain={m.domain} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 15, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
-                <div style={{ fontSize: 12.5, color: C.textTertiary }}>{m.count} {m.count === 1 ? "order" : "orders"} · {eur(m.total)} total</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.textSecondary, background: C.bgTertiary, borderRadius: 5, padding: "1px 7px" }}>{f.label}</span>
+                  <span style={{ fontSize: 12.5, color: C.textTertiary }}>{m.count}×</span>
+                </div>
               </div>
               <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                <div style={{ fontSize: 15.5, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>
-                  {eur(fig)}<span style={{ fontSize: 12, color: C.textTertiary, fontWeight: 400 }}>{sfx}</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: C.textTertiary }}>{merchantSub(m)}</div>
+                {f.regular ? (
+                  <>
+                    <div style={{ fontSize: 15.5, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>
+                      {eur(fig)}<span style={{ fontSize: 12, color: C.textTertiary, fontWeight: 400 }}>{sfx}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textTertiary }}>{eur(m.total)} total</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 15.5, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{eur(m.total)}</div>
+                )}
               </div>
             </div>
           );
@@ -210,14 +219,10 @@ export default function FinanceLens({ finance, onImport, onClear }) {
         <StatCard label={`Net ${unit}`} value={eur(get(s.net))} note={s.net.note} danger={s.net.perMonth < 0} positive={s.net.perMonth >= 0} />
       </div>
 
-      {/* Excluded note + deductible */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", margin: "14px 2px 12px" }}>
+      {/* Excluded note */}
+      <div style={{ margin: "14px 2px 12px" }}>
         <span style={{ fontSize: 12.5, color: C.textTertiary }}>
           {eur(rate === "weekly" ? Math.round((summary.excluded.perMonth * 12) / 52) : summary.excluded.perMonth)}{dlbl} of transfers & round-ups excluded from spend
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: PILL.deductible.color }}>
-          <Pill name="deductible" size="sm" />
-          {eur(rate === "weekly" ? summary.deductible.perWeek : summary.deductible.perMonth)}{dlbl}
         </span>
       </div>
 
@@ -228,7 +233,7 @@ export default function FinanceLens({ finance, onImport, onClear }) {
         ))}
       </div>
 
-      <MerchantsDrawer cat={openCat} rate={rate} onClose={() => setOpenKey(null)} />
+      <MerchantsDrawer cat={openCat} rate={rate} days={summary.range?.days || 199} onClose={() => setOpenKey(null)} />
     </div>
   );
 }

@@ -50,7 +50,12 @@ export const INCOME_CATEGORIES = new Set(["income_boddy"]);
 export const OVERRIDES = {
   amevista: "shopping",
   connectcentre: "software_biz", // business
-  assurant: "insurance", // personal
+  assurant: "subscriptions", // insurance folded into subscriptions
+  make: "software_biz",
+  weicheng: "software_biz",
+  meller: "shopping", // gift
+  "tern setup": "shopping",
+  caravelle: "eating_out",
 };
 
 // Internal transfers / round-ups / FX — never spend.
@@ -68,9 +73,9 @@ const RULES = [
     "hostinger", "google workspace", "xai", "notion", "replit", "lovable",
     "cursor", "linear", "roam research", "readwise", "adblock", "twilio",
     "digitalocean", "render.com", "railway", "1global", "zerobounce"]],
-  ["insurance", ["assurant"]],
-  // streaming / subscriptions (before shopping so "amazon prime" beats "amazon")
-  ["subscriptions", ["amazon prime", "spotify", "netflix", "youtube", "icloud", "apple.com", "disney", "hbo", "audible"]],
+  // streaming / subscriptions / insurance / fees (all recurring overheads)
+  ["subscriptions", ["amazon prime", "spotify", "netflix", "youtube", "icloud", "apple.com", "disney", "hbo", "audible",
+    "assurant", " fee", "plan fee", "metal plan", "pastdue"]],
   // groceries / supermarkets (before eating_out)
   ["groceries", ["bonpreu", "mercadona", "carrefour", "lidl", "dia ", "condis", "consum",
     "ametller", "sainsbury", "marks & spencer", "aldi", "picardia", "caprabo", "spar ",
@@ -108,8 +113,6 @@ const RULES = [
     "nike", "druni", "amevista", "vanquish", "prorider", "pretty shiny",
     "sheepskin", "dhl", "h&m", "flying tiger", "ale-hop", "primark", "shein"]],
   ["cash", ["cash withdrawal"]],
-  // refined so "coffee" no longer matches the bare "fee" keyword
-  ["fees", [" fee", "plan fee", "metal plan", "pastdue"]],
 ];
 
 const BUSINESS = new Set(["software_biz"]); // + connectcentre via override

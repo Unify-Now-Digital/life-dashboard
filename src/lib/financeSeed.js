@@ -1,0 +1,115 @@
+// Seed finance summary — the 6-month Revolut export (Oct 2025 – Apr 2026),
+// already parsed. Shown as sane fallbacks until a fresh CSV is imported, at
+// which point financeStats() recomputes everything from real transactions.
+//
+// Shape matches the output of financeStats(). Only `eating_out` carries
+// merchant-level detail (that's all the export surfaced); the rest break down
+// once a statement is imported.
+
+const toWeek = (perMonth) => Math.round((perMonth * 12) / 52);
+const stat = (perMonth, extra = {}) => ({ perMonth, perWeek: toWeek(perMonth), ...extra });
+
+export const FINANCE_SEED = {
+  seeded: true,
+  rangeLabel: "Oct – Apr · 6 mo",
+  range: {
+    start: "2025-10-01",
+    end: "2026-04-30",
+    months: ["2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04"],
+    days: 212,
+  },
+  stats: {
+    income: { ...stat(3820), note: "BODDY + Unify" },
+    cardSpend: { ...stat(2630), note: "transfers excl." },
+    rentNet: { ...stat(1444), gross: 2694, offset: 1250, note: "€2,694 − €1,250 Dan" },
+    net: { ...stat(-254), note: "before P2P paybacks" },
+  },
+  deductible: stat(408),
+  excluded: { perMonth: 2694, total: 16164 },
+  categories: [
+    {
+      key: "eating_out",
+      label: "Eating out",
+      total: 6492,
+      count: 361,
+      perMonth: 968,
+      perWeek: 223,
+      perDay: 31.8,
+      deductible: 0,
+      business: false,
+      spark: [0.62, 0.71, 0.83, 0.69, 0.88, 1.0, 0.74],
+      merchants: [
+        { name: "Glovo", domain: "glovoapp.com", total: 1456, count: 74, perMonth: 217, perWeek: 50, perDay: 7.1, freq: "week" },
+        { name: "Honest Greens", domain: "honestgreens.com", total: 825, count: 86, perMonth: 123, perWeek: 28, perDay: 4, freq: "day" },
+        { name: "Norrsken Foundation", domain: "norrsken.org", total: 283, count: 4, perMonth: 42, perWeek: 10, perDay: 1.3, freq: "week" },
+        { name: "Weicheng", domain: null, total: 232, count: 1, perMonth: 35, perWeek: 8, perDay: 1.1, freq: "one-off" },
+      ],
+      extra: { count: 14, perMonth: 551 },
+    },
+    {
+      key: "p2p_out",
+      label: "Sent to people",
+      total: 3012,
+      count: 38,
+      perMonth: 449,
+      perWeek: toWeek(449),
+      perDay: 14.2,
+      deductible: 0,
+      business: false,
+      spark: [0.4, 0.9, 0.5, 0.7, 0.6, 0.8, 0.55],
+      merchants: [],
+    },
+    {
+      key: "software_biz",
+      label: "Business tools",
+      total: 2737,
+      count: 64,
+      perMonth: 408,
+      perWeek: toWeek(408),
+      perDay: 12.9,
+      deductible: 408,
+      business: true,
+      spark: [0.7, 0.72, 0.75, 0.8, 0.85, 0.92, 1.0],
+      merchants: [],
+    },
+    {
+      key: "travel",
+      label: "Travel",
+      total: 1663,
+      count: 21,
+      perMonth: 248,
+      perWeek: toWeek(248),
+      perDay: 7.8,
+      deductible: 0,
+      business: false,
+      spark: [0.2, 0.1, 0.35, 0.9, 0.5, 0.7, 1.0],
+      merchants: [],
+    },
+    {
+      key: "shopping",
+      label: "Shopping",
+      total: 1650,
+      count: 47,
+      perMonth: 246,
+      perWeek: toWeek(246),
+      perDay: 7.8,
+      deductible: 0,
+      business: false,
+      spark: [0.6, 0.45, 0.7, 0.5, 0.85, 0.6, 1.0],
+      merchants: [],
+    },
+    {
+      key: "groceries",
+      label: "Groceries",
+      total: 590,
+      count: 33,
+      perMonth: 88,
+      perWeek: toWeek(88),
+      perDay: 2.8,
+      deductible: 0,
+      business: false,
+      spark: [0.5, 0.7, 0.6, 0.8, 0.65, 0.9, 0.75],
+      merchants: [],
+    },
+  ],
+};

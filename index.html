@@ -17,14 +17,22 @@
       rel="stylesheet"
     />
     <title>Life Dashboard</title>
-    <style>
-      html, body { margin: 0; padding: 0; background: #FFFFFF; overflow-x: hidden; }
-      body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-      * { box-sizing: border-box; }
-      @media (max-width: 380px) {
-        html { font-size: 15px; }
-      }
-    </style>
+    <!-- Apply the saved theme before first paint to avoid a flash of the
+         wrong colour scheme. Mirrors src/lib/theme.js; index.css owns the
+         colour variables and base resets. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("lifeDashboard:theme");
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute("content", t === "dark" ? "#16171a" : "#ffffff");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

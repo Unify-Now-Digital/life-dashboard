@@ -32,6 +32,7 @@ export function migrate(raw) {
   if (v < 5) s = migrateV4toV5(s);
   if (v < 6) s = migrateV5toV6(s);
   if (v < 7) s = migrateV6toV7(s);
+  if (v < 8) s = migrateV7toV8(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -489,6 +490,21 @@ function migrateV6toV7(s) {
   return out;
 }
 
+// v7 → v8: V2 overhaul. Adds the flat `tasks` list, the top-level `finance`
+// lens container, and `ui.view`. All additive — mergeDefaults seeds the new
+// keys from defaultState; this step just guarantees a `finance.transactions`
+// array and an explicit `ui.view` exist on older blobs.
+function migrateV7toV8(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (!Array.isArray(out.tasks)) out.tasks = defaultState.tasks;
+  if (!out.finance || typeof out.finance !== "object" || Array.isArray(out.finance)) {
+    out.finance = { ...defaultState.finance };
+  }
+  if (!Array.isArray(out.finance.transactions)) out.finance.transactions = [];
+  out.ui = { ...(out.ui || {}), view: out.ui?.view || "tasks", theme: out.ui?.theme ?? null };
+  return out;
+}
+
 // Daily rollover. Runs on every load (not version-gated): when the stored
 // `todayDate` isn't today, reset the day-scoped fields and stamp the new date.
 // Today's Top 3 are ad-hoc daily priorities, so they clear each morning; the
@@ -532,7 +548,12 @@ export async function loadFromCloud() {
     .eq("user_id", user.id)
     .maybeSingle();
   if (error || !data) return null;
-  return migrate(data.state);
+  const storedVersion = data.state?.schemaVersion || 1;
+  const migrated = migrate(data.state);
+  // If migrate() upgraded the blob (e.g. v7 → v8 added tasks/finance/ui),
+  // persist the new shape immediately so the stored row never lags the code.
+  if (storedVersion !== migrated.schemaVersion) saveState(migrated);
+  return migrated;
 }
 
 // ----- save ----------------------------------------------------------------

@@ -44,18 +44,20 @@ export default function Header({ today, dayOfYear, quote }) {
           </div>
         </div>
       </div>
-      <div
-        style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: 15,
-          color: C.textSecondary,
-          fontStyle: "italic",
-          lineHeight: 1.5,
-          marginTop: 14,
-        }}
-      >
-        {quote}
-      </div>
+      {quote && (
+        <div
+          style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: 15,
+            color: C.textSecondary,
+            fontStyle: "italic",
+            lineHeight: 1.5,
+            marginTop: 14,
+          }}
+        >
+          {quote}
+        </div>
+      )}
     </div>
   );
 }

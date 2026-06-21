@@ -1,20 +1,61 @@
-// Design tokens — change these to re-theme the whole dashboard
+// Design tokens — change these to re-theme the whole dashboard.
+//
+// Neutrals (bg/text/border) are driven by CSS variables defined in
+// src/index.css so they flip between light and dark mode automatically.
+// Accent hexes stay literal — they read correctly in both modes (V2 spec §2).
 
 export const C = {
-  accent: "#185FA5",
-  accentLight: "#E6F1FB",
-  accentDark: "#0C447C",
-  text: "#1F1F1F",
-  textSecondary: "#6B6B6B",
-  textTertiary: "#9A9A9A",
-  bg: "#FFFFFF",
-  bgSecondary: "#F7F7F5",
-  bgTertiary: "#EFEFEC",
-  border: "rgba(0,0,0,0.08)",
-  borderStrong: "rgba(0,0,0,0.15)",
+  accent: "#378ADD", // finance/primary blue (new V2 accent)
+  accentLight: "var(--c-accent-light)",
+  accentDark: "#185FA5",
+  text: "var(--c-text)",
+  textSecondary: "var(--c-text-secondary)",
+  textTertiary: "var(--c-text-tertiary)",
+  bg: "var(--c-bg)",
+  bgSecondary: "var(--c-bg-secondary)",
+  bgTertiary: "var(--c-bg-tertiary)",
+  card: "var(--c-card)",
+  statBg: "var(--c-stat-bg)",
+  footerBg: "var(--c-footer-bg)",
+  overlay: "var(--c-overlay)",
+  border: "var(--c-border)",
+  borderStrong: "var(--c-border-strong)",
   success: "#3B6D11",
   danger: "#993C1D",
 };
+
+// V2 section accents — section dots / pills. Hardcoded; read in both modes.
+export const ACCENT = {
+  work: "#534AB7", // work / UD purple
+  personal: "#639922", // personal / health green
+  finance: "#378ADD", // finance blue
+  priorities: "#EF9F27", // priorities amber
+};
+
+// Habit dot states (V2 spec §2 / §6).
+export const HABIT = {
+  hit: "#97C459",
+  miss: "#F7C1C1",
+  today: "#639922", // 1.5px outline ring for "today"
+};
+
+// Run-rate text colour: ≥80% green, <80% amber.
+export const RUNRATE = { good: "#3B6D11", warn: "#854F0B" };
+
+// Category pill backgrounds / text (light fill, dark same-family text).
+// Used by task pills (V2 spec §2) and the finance deductible tag.
+export const PILL = {
+  SM: { bg: "#FAECE7", color: "#993C1D" },
+  CM: { bg: "#FAEEDA", color: "#854F0B" },
+  UD: { bg: "#EEEDFE", color: "#3C3489" },
+  Money: { bg: "#E6F1FB", color: "#185FA5" },
+  Admin: { bg: "#F1EFE8", color: "#444441" },
+  Health: { bg: "#EAF3DE", color: "#3B6D11" },
+  Home: { bg: "#E1F5EE", color: "#0F6E56" },
+  deductible: { bg: "#EEEDFE", color: "#3C3489" },
+};
+export const WORK_PILLS = ["SM", "CM", "UD"];
+export const PERSONAL_PILLS = ["Money", "Admin", "Health", "Home"];
 
 export const CAT_STYLES = {
   CM: { bg: "#E6F1FB", color: "#0C447C" },

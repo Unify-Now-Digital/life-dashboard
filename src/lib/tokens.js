@@ -62,6 +62,22 @@ export const PILL = {
 export const WORK_PILLS = ["SM", "CM", "UD"];
 export const PERSONAL_PILLS = ["Money", "Admin", "Health", "Home"];
 
+// Finance category colours for the monthly stacked bar chart. Deep, distinct,
+// readable in both light and dark.
+export const FINANCE_CAT_COLOR = {
+  eating_out: "#D98E3C",
+  software_biz: "#3A4E8C",
+  p2p_out: "#8A6FB0",
+  travel: "#3E7CB1",
+  shopping: "#C07A8E",
+  groceries: "#5C9A6B",
+  subscriptions: "#6B8FA3",
+  transport: "#C9A14A",
+  health_fitness: "#4FA39A",
+  other: "#9AA0A8",
+};
+export const financeCatColor = (key) => FINANCE_CAT_COLOR[key] || "#9AA0A8";
+
 // Wisdom-phrase category pills (soft fill + dark same-family text). Categories
 // come from the Supabase `wisdom_phrases` table.
 export const WISDOM_PILL = {

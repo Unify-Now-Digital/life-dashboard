@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { C } from "../../lib/tokens";
 import Segmented from "./Segmented.jsx";
 import MerchantLogo from "./MerchantLogo.jsx";
+import StackedBars from "./StackedBars.jsx";
 import { financeStats } from "../../lib/financeStats.js";
 import { FINANCE_SEED } from "../../lib/financeSeed.js";
 import { parseRevolutCsv } from "../../lib/parseRevolutCsv.js";
@@ -225,6 +226,9 @@ export default function FinanceLens({ finance, onImport, onClear }) {
           {eur(rate === "weekly" ? Math.round((summary.excluded.perMonth * 12) / 52) : summary.excluded.perMonth)}{dlbl} of transfers & round-ups excluded from spend
         </span>
       </div>
+
+      {/* Monthly spend stacked by category */}
+      <StackedBars months={summary.range?.months} categories={summary.categories} />
 
       {/* Category card grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>

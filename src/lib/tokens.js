@@ -5,9 +5,9 @@
 // Accent hexes stay literal — they read correctly in both modes (V2 spec §2).
 
 export const C = {
-  accent: "#378ADD", // finance/primary blue (new V2 accent)
+  accent: "var(--c-accent)", // dark royal blue (theme-aware: lighter in dark mode)
   accentLight: "var(--c-accent-light)",
-  accentDark: "#185FA5",
+  accentDark: "var(--c-accent-strong)",
   text: "var(--c-text)",
   textSecondary: "var(--c-text-secondary)",
   textTertiary: "var(--c-text-tertiary)",
@@ -28,8 +28,8 @@ export const C = {
 export const ACCENT = {
   work: "#534AB7", // work / UD purple
   personal: "#639922", // personal / health green
-  finance: "#378ADD", // finance blue
-  priorities: "#EF9F27", // priorities amber
+  finance: "var(--c-accent)", // royal blue (hero)
+  priorities: "#E5912A", // priorities amber
 };
 
 // Habit dot states (V2 spec §2 / §6).

@@ -6,6 +6,7 @@
 
 import { categorise, CATEGORY_LABELS, EXCLUDED_FROM_SPEND, INCOME_CATEGORIES, OVERRIDES } from "./categorise.js";
 import { prettyMerchant, domainFor } from "./merchants.js";
+import { unifyEurPerMonth } from "./unifyIncome.js";
 
 const MS_DAY = 86400000;
 export const DAN_OFFSET = 1250; // Dan's fixed monthly rent contribution.
@@ -133,7 +134,9 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
   const cardSpendTotal = categories.reduce((s, c) => s + c.total, 0);
   const deductiblePerMonth = Math.round(perMonthOf(businessTotal));
 
-  const incomePerMonth = Math.round(perMonthOf(income));
+  // Income = BODDY from the statement + Unify from invoices (GBP→EUR).
+  const unifyPerMonth = unifyEurPerMonth(start, end);
+  const incomePerMonth = Math.round(perMonthOf(income)) + unifyPerMonth;
   const cardSpendPerMonth = Math.round(perMonthOf(cardSpendTotal));
   const rentGrossPerMonth = Math.round(perMonthOf(rentGross));
   // Use Dan's actual contribution when present; fall back to the assumed flat.
@@ -146,15 +149,16 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
   return {
     range: { start, end, months, days },
     stats: {
-      income: { perMonth: incomePerMonth, perWeek: toWeek(incomePerMonth) },
-      cardSpend: { perMonth: cardSpendPerMonth, perWeek: toWeek(cardSpendPerMonth) },
+      income: { perMonth: incomePerMonth, perWeek: toWeek(incomePerMonth), note: "BODDY + Unify (invoiced)" },
+      cardSpend: { perMonth: cardSpendPerMonth, perWeek: toWeek(cardSpendPerMonth), note: "transfers excl." },
       rentNet: {
         perMonth: rentNetPerMonth,
         perWeek: toWeek(rentNetPerMonth),
         gross: rentGrossPerMonth,
         offset: danPerMonth,
+        note: `€${rentGrossPerMonth.toLocaleString()} − €${danPerMonth.toLocaleString()} Dan`,
       },
-      net: { perMonth: netPerMonth, perWeek: toWeek(netPerMonth) },
+      net: { perMonth: netPerMonth, perWeek: toWeek(netPerMonth), note: "before P2P paybacks" },
     },
     deductible: { perMonth: deductiblePerMonth, perWeek: toWeek(deductiblePerMonth) },
     excluded: { perMonth: Math.round(perMonthOf(excludedTotal)), total: Math.round(excludedTotal) },

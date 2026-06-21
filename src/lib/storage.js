@@ -33,6 +33,7 @@ export function migrate(raw) {
   if (v < 6) s = migrateV5toV6(s);
   if (v < 7) s = migrateV6toV7(s);
   if (v < 8) s = migrateV7toV8(s);
+  if (v < 9) s = migrateV8toV9(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -502,6 +503,18 @@ function migrateV7toV8(s) {
   }
   if (!Array.isArray(out.finance.transactions)) out.finance.transactions = [];
   out.ui = { ...(out.ui || {}), view: out.ui?.view || "tasks", theme: out.ui?.theme ?? null };
+  return out;
+}
+
+// v8 → v9: refresh the seeded demo tasks to Arin's real task list — but only
+// when they still look like the untouched original placeholders, so a curated
+// list is never clobbered.
+function migrateV8toV9(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  const tasks = Array.isArray(out.tasks) ? out.tasks : [];
+  const DEMO_SIGNATURES = ["Chase 2 stale permits", "Quote follow-up — Mrs Doyle", "Weekly review — W19", "Order replacement for kitchen"];
+  const looksLikeDemo = tasks.some((t) => DEMO_SIGNATURES.includes(t.text));
+  if (tasks.length === 0 || looksLikeDemo) out.tasks = defaultState.tasks;
   return out;
 }
 

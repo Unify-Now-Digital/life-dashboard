@@ -13,22 +13,23 @@ export const SCHEMA_VERSION = 9;
 const T = (id, text, column, pill, due, meta, extra = {}) => ({
   id, text, column, pill,
   priority: !!extra.priority, isDecision: !!extra.isDecision,
+  importance: extra.importance || 1, // 1 low · 2 medium · 3 high
   due, meta, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: extra.notes || "",
 });
 const seedTasks = () => [
   // Work
-  T("tsk_1", "Mason App: next steps", "work", "UD", "2026-06-19", "overdue", { priority: true, notes: "Revolut api, permit database, inbox functionality, invoice creation, clean dead wood" }),
-  T("tsk_3", "CM — balances & permits", "work", "CM", "2026-06-22", "Mon"),
+  T("tsk_1", "Mason App: next steps", "work", "UD", "2026-06-19", "overdue", { priority: true, importance: 3, notes: "Revolut api, permit database, inbox functionality, invoice creation, clean dead wood" }),
+  T("tsk_3", "CM — balances & permits", "work", "CM", "2026-06-22", "Mon", { importance: 2 }),
   T("tsk_4", "SEO for Sears Melvin", "work", "SM", "2026-06-24", "Wed"),
-  T("tsk_5", "Sears Melvin management agreement", "work", "SM", "2026-06-24", "Wed"),
+  T("tsk_5", "Sears Melvin management agreement", "work", "SM", "2026-06-24", "Wed", { importance: 2 }),
   T("tsk_6", "Add IG posting schedule", "work", "SM", "2026-06-25", "Thu"),
   // Personal
-  T("tsk_7", "Iberia compensation: AI check", "personal", "Admin", "2026-06-21", "today"),
-  T("tsk_8", "Confirm rent account + Dan split", "personal", "Money", null, null, { priority: true, isDecision: true }),
+  T("tsk_7", "Iberia compensation: AI check", "personal", "Admin", "2026-06-21", "today", { importance: 2 }),
+  T("tsk_8", "Confirm rent account + Dan split", "personal", "Money", null, null, { priority: true, isDecision: true, importance: 3 }),
   T("tsk_9", "Training barefoot shoes", "personal", "Health", "2026-06-24", "Wed"),
   T("tsk_10", "Spanish eSIM", "personal", "Admin", "2026-06-26", "Fri"),
   T("tsk_11", "Home improvements", "personal", "Home", "2026-06-26", "Fri", { notes: "Sink splash, blinds, soft lamp auto, fan, bed, table, sink drain shelf" }),
-  T("tsk_12", "Delete my internet footprint", "personal", "Admin", "2026-06-26", "Fri", { priority: true }),
+  T("tsk_12", "Delete my internet footprint", "personal", "Admin", "2026-06-26", "Fri", { priority: true, importance: 3 }),
   T("tsk_13", "Close BBVA", "personal", "Money", "2026-06-26", "Fri"),
   T("tsk_14", "Add TBC card to Celfie account", "personal", "Money", "2026-06-27", "Sat"),
   T("tsk_15", "TV / LG dedicated VPN IP", "personal", "Home", "2026-06-27", "Sat"),

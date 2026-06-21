@@ -6,7 +6,7 @@ import { habitStats } from "../../lib/habitStats.js";
 const CYCLE = { unanswered: "yes", yes: "no", no: "clear" };
 
 function HabitIcon({ habitKey, color }) {
-  const common = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
+  const common = { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 2.4, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
   switch (habitKey) {
     case "spanish":
       return <svg {...common}><path d="M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5z" /></svg>;
@@ -60,8 +60,8 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
   return (
     <div style={{ flex: "1 1 0", minWidth: 0, background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <span style={{ width: 26, height: 26, borderRadius: 8, background: C.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <HabitIcon habitKey={habit.key} color={C.textSecondary} />
+        <span style={{ width: 28, height: 28, borderRadius: 8, background: C.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <HabitIcon habitKey={habit.key} color={C.text} />
         </span>
         <span style={{ fontSize: 14.5, fontWeight: 600, color: C.text, whiteSpace: "nowrap", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{habit.label}</span>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: rateColor, background: tint(rateColor, 0.12), borderRadius: 999, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>

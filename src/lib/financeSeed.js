@@ -46,8 +46,8 @@ export const FINANCE_SEED = {
     }
   },
   "deductible": {
-    "perMonth": 442,
-    "perWeek": 102
+    "perMonth": 486,
+    "perWeek": 112
   },
   "excluded": {
     "perMonth": 6312,
@@ -57,21 +57,21 @@ export const FINANCE_SEED = {
     {
       "key": "eating_out",
       "label": "Eating out",
-      "total": 5209,
+      "total": 5014,
       "count": 287,
-      "perMonth": 797,
-      "perWeek": 183,
-      "perDay": 26.2,
+      "perMonth": 767,
+      "perWeek": 176,
+      "perDay": 25.2,
       "deductible": 0,
       "business": false,
       "spark": [
-        0.903554716361547,
         1,
-        0.914030046794188,
-        0.6037106969871114,
-        0.005845168705360808,
-        0.5586405057056072,
-        0.29079714309170024
+        0.8672317377694928,
+        0.9789505152463684,
+        0.6465902296627158,
+        0.006260331305173563,
+        0.5983188548517565,
+        0.31145148243238474
       ],
       "merchants": [
         {
@@ -100,15 +100,6 @@ export const FINANCE_SEED = {
           "perMonth": 43,
           "perWeek": 10,
           "perDay": 1.4
-        },
-        {
-          "name": "Weicheng1",
-          "domain": null,
-          "total": 232,
-          "count": 1,
-          "perMonth": 35,
-          "perWeek": 8,
-          "perDay": 1.2
         },
         {
           "name": "Taberna Gouda",
@@ -145,31 +136,40 @@ export const FINANCE_SEED = {
           "perMonth": 17,
           "perWeek": 4,
           "perDay": 0.5
+        },
+        {
+          "name": "La Principal",
+          "domain": null,
+          "total": 106,
+          "count": 1,
+          "perMonth": 16,
+          "perWeek": 4,
+          "perDay": 0.5
         }
       ],
       "extra": {
         "count": 59,
-        "perMonth": 269
+        "perMonth": 259
       }
     },
     {
       "key": "software_biz",
       "label": "Business tools",
-      "total": 2888,
-      "count": 62,
-      "perMonth": 442,
-      "perWeek": 102,
-      "perDay": 14.5,
-      "deductible": 442,
+      "total": 3178,
+      "count": 70,
+      "perMonth": 486,
+      "perWeek": 112,
+      "perDay": 16,
+      "deductible": 486,
       "business": true,
       "spark": [
         1,
-        0.5269339735894357,
-        0.7582424969987994,
-        0.1534021608643457,
-        0.06673709483793516,
-        0.26509483793517397,
-        0.0033613445378151254
+        0.7383735063672233,
+        0.7381865100884494,
+        0.1684836471754212,
+        0.06497185706004452,
+        0.2580829141500084,
+        0.003272434878545917
       ],
       "merchants": [
         {
@@ -200,6 +200,15 @@ export const FINANCE_SEED = {
           "perDay": 1.6
         },
         {
+          "name": "Weicheng1",
+          "domain": null,
+          "total": 232,
+          "count": 1,
+          "perMonth": 35,
+          "perWeek": 8,
+          "perDay": 1.2
+        },
+        {
           "name": "Openai",
           "domain": "openai.com",
           "total": 99,
@@ -218,6 +227,15 @@ export const FINANCE_SEED = {
           "perDay": 0.3
         },
         {
+          "name": "Make",
+          "domain": null,
+          "total": 58,
+          "count": 7,
+          "perMonth": 9,
+          "perWeek": 2,
+          "perDay": 0.3
+        },
+        {
           "name": "Zapier",
           "domain": "zapier.com",
           "total": 56,
@@ -225,29 +243,109 @@ export const FINANCE_SEED = {
           "perMonth": 9,
           "perWeek": 2,
           "perDay": 0.3
-        },
-        {
-          "name": "Xai",
-          "domain": null,
-          "total": 52,
-          "count": 2,
-          "perMonth": 8,
-          "perWeek": 2,
-          "perDay": 0.3
-        },
-        {
-          "name": "Notion",
-          "domain": null,
-          "total": 50,
-          "count": 2,
-          "perMonth": 8,
-          "perWeek": 2,
-          "perDay": 0.3
         }
       ],
       "extra": {
-        "count": 12,
-        "perMonth": 45
+        "count": 14,
+        "perMonth": 61
+      }
+    },
+    {
+      "key": "shopping",
+      "label": "Shopping",
+      "total": 2436,
+      "count": 41,
+      "perMonth": 373,
+      "perWeek": 86,
+      "perDay": 12.2,
+      "deductible": 0,
+      "business": false,
+      "spark": [
+        0.09875468313017785,
+        0.567898791620495,
+        0.3884359664397657,
+        1,
+        0.391021581974566,
+        0.6396760065431905,
+        0.12790881747665034
+      ],
+      "merchants": [
+        {
+          "name": "Amazon",
+          "domain": "amazon.com",
+          "total": 669,
+          "count": 17,
+          "perMonth": 102,
+          "perWeek": 24,
+          "perDay": 3.4
+        },
+        {
+          "name": "Sp Tern Setups",
+          "domain": null,
+          "total": 449,
+          "count": 1,
+          "perMonth": 69,
+          "perWeek": 16,
+          "perDay": 2.3
+        },
+        {
+          "name": "Temu",
+          "domain": "temu.com",
+          "total": 241,
+          "count": 2,
+          "perMonth": 37,
+          "perWeek": 8,
+          "perDay": 1.2
+        },
+        {
+          "name": "Amevista",
+          "domain": null,
+          "total": 191,
+          "count": 1,
+          "perMonth": 29,
+          "perWeek": 7,
+          "perDay": 1
+        },
+        {
+          "name": "Cash Withdrawal At Perfumeria Passion",
+          "domain": null,
+          "total": 126,
+          "count": 1,
+          "perMonth": 19,
+          "perWeek": 4,
+          "perDay": 0.6
+        },
+        {
+          "name": "Nespresso",
+          "domain": "nespresso.com",
+          "total": 120,
+          "count": 6,
+          "perMonth": 18,
+          "perWeek": 4,
+          "perDay": 0.6
+        },
+        {
+          "name": "Vanquish Fitness",
+          "domain": null,
+          "total": 104,
+          "count": 1,
+          "perMonth": 16,
+          "perWeek": 4,
+          "perDay": 0.5
+        },
+        {
+          "name": "Nike",
+          "domain": "nike.com",
+          "total": 96,
+          "count": 1,
+          "perMonth": 15,
+          "perWeek": 3,
+          "perDay": 0.5
+        }
+      ],
+      "extra": {
+        "count": 10,
+        "perMonth": 68
       }
     },
     {
@@ -447,132 +545,25 @@ export const FINANCE_SEED = {
       }
     },
     {
-      "key": "shopping",
-      "label": "Shopping",
-      "total": 1928,
-      "count": 39,
-      "perMonth": 295,
-      "perWeek": 68,
-      "perDay": 9.7,
-      "deductible": 0,
-      "business": false,
-      "spark": [
-        0.15438234687564448,
-        0.887791297174675,
-        0.6072386058981233,
-        0.5156527118993607,
-        0.6112806764281294,
-        1,
-        0.19995875438234686
-      ],
-      "merchants": [
-        {
-          "name": "Amazon",
-          "domain": "amazon.com",
-          "total": 669,
-          "count": 17,
-          "perMonth": 102,
-          "perWeek": 24,
-          "perDay": 3.4
-        },
-        {
-          "name": "Temu",
-          "domain": "temu.com",
-          "total": 241,
-          "count": 2,
-          "perMonth": 37,
-          "perWeek": 8,
-          "perDay": 1.2
-        },
-        {
-          "name": "Amevista",
-          "domain": null,
-          "total": 191,
-          "count": 1,
-          "perMonth": 29,
-          "perWeek": 7,
-          "perDay": 1
-        },
-        {
-          "name": "Cash Withdrawal At Perfumeria Passion",
-          "domain": null,
-          "total": 126,
-          "count": 1,
-          "perMonth": 19,
-          "perWeek": 4,
-          "perDay": 0.6
-        },
-        {
-          "name": "Nespresso",
-          "domain": "nespresso.com",
-          "total": 120,
-          "count": 6,
-          "perMonth": 18,
-          "perWeek": 4,
-          "perDay": 0.6
-        },
-        {
-          "name": "Vanquish Fitness",
-          "domain": null,
-          "total": 104,
-          "count": 1,
-          "perMonth": 16,
-          "perWeek": 4,
-          "perDay": 0.5
-        },
-        {
-          "name": "Nike",
-          "domain": "nike.com",
-          "total": 96,
-          "count": 1,
-          "perMonth": 15,
-          "perWeek": 3,
-          "perDay": 0.5
-        },
-        {
-          "name": "Dhl",
-          "domain": null,
-          "total": 89,
-          "count": 1,
-          "perMonth": 14,
-          "perWeek": 3,
-          "perDay": 0.4
-        }
-      ],
-      "extra": {
-        "count": 8,
-        "perMonth": 45
-      }
-    },
-    {
       "key": "other",
       "label": "Other",
-      "total": 1706,
-      "count": 91,
-      "perMonth": 261,
-      "perWeek": 60,
-      "perDay": 8.6,
+      "total": 1103,
+      "count": 81,
+      "perMonth": 169,
+      "perWeek": 39,
+      "perDay": 5.5,
       "deductible": 0,
       "business": false,
       "spark": [
-        0.22944871996230562,
-        0.2929794251609863,
-        0.22891471650698914,
+        0.23297233633047024,
+        0.5092355864525581,
+        0.41868949469995115,
+        0.3109074717761627,
         1,
-        0.5467410083241715,
-        0.3204177791738652,
-        0.0605465682425004
+        0.5860503863721237,
+        0.1107408577748413
       ],
       "merchants": [
-        {
-          "name": "Sp Tern Setups",
-          "domain": null,
-          "total": 449,
-          "count": 1,
-          "perMonth": 69,
-          "perWeek": 16,
-          "perDay": 2.3
-        },
         {
           "name": "Mercado Pago",
           "domain": null,
@@ -581,24 +572,6 @@ export const FINANCE_SEED = {
           "perMonth": 31,
           "perWeek": 7,
           "perDay": 1
-        },
-        {
-          "name": "Meller",
-          "domain": null,
-          "total": 59,
-          "count": 1,
-          "perMonth": 9,
-          "perWeek": 2,
-          "perDay": 0.3
-        },
-        {
-          "name": "Make",
-          "domain": null,
-          "total": 58,
-          "count": 7,
-          "perMonth": 9,
-          "perWeek": 2,
-          "perDay": 0.3
         },
         {
           "name": "Merpago Republica",
@@ -628,18 +601,45 @@ export const FINANCE_SEED = {
           "perDay": 0.2
         },
         {
-          "name": "Caravelle Food",
+          "name": "Bj Aribau 92",
           "domain": null,
-          "total": 37,
+          "total": 34,
           "count": 1,
-          "perMonth": 6,
+          "perMonth": 5,
           "perWeek": 1,
           "perDay": 0.2
+        },
+        {
+          "name": "Merpago Lameccafit",
+          "domain": null,
+          "total": 32,
+          "count": 1,
+          "perMonth": 5,
+          "perWeek": 1,
+          "perDay": 0.2
+        },
+        {
+          "name": "2006",
+          "domain": null,
+          "total": 29,
+          "count": 2,
+          "perMonth": 5,
+          "perWeek": 1,
+          "perDay": 0.1
+        },
+        {
+          "name": "Taulat 44",
+          "domain": null,
+          "total": 27,
+          "count": 2,
+          "perMonth": 4,
+          "perWeek": 1,
+          "perDay": 0.1
         }
       ],
       "extra": {
-        "count": 62,
-        "perMonth": 112
+        "count": 58,
+        "perMonth": 93
       }
     },
     {
@@ -739,6 +739,91 @@ export const FINANCE_SEED = {
         "count": 14,
         "perMonth": 12
       }
+    },
+    {
+      "key": "subscriptions",
+      "label": "Subscriptions",
+      "total": 498,
+      "count": 29,
+      "perMonth": 76,
+      "perWeek": 18,
+      "perDay": 2.5,
+      "deductible": 0,
+      "business": false,
+      "spark": [
+        0.3564492993490014,
+        0.867041818382434,
+        1,
+        0.1617014233697451,
+        0.14327485380116958,
+        0.14327485380116958,
+        0.07718194858214718
+      ],
+      "merchants": [
+        {
+          "name": "Pastdue Credit",
+          "domain": null,
+          "total": 114,
+          "count": 1,
+          "perMonth": 17,
+          "perWeek": 4,
+          "perDay": 0.6
+        },
+        {
+          "name": "Www.assurantsoluti",
+          "domain": null,
+          "total": 104,
+          "count": 1,
+          "perMonth": 16,
+          "perWeek": 4,
+          "perDay": 0.5
+        },
+        {
+          "name": "Youtube",
+          "domain": null,
+          "total": 102,
+          "count": 8,
+          "perMonth": 16,
+          "perWeek": 4,
+          "perDay": 0.5
+        },
+        {
+          "name": "Amazon Prime",
+          "domain": "amazon.com",
+          "total": 56,
+          "count": 8,
+          "perMonth": 9,
+          "perWeek": 2,
+          "perDay": 0.3
+        },
+        {
+          "name": "Metal Plan Fee",
+          "domain": null,
+          "total": 52,
+          "count": 3,
+          "perMonth": 8,
+          "perWeek": 2,
+          "perDay": 0.3
+        },
+        {
+          "name": "Netflix",
+          "domain": "netflix.com",
+          "total": 42,
+          "count": 6,
+          "perMonth": 6,
+          "perWeek": 1,
+          "perDay": 0.2
+        },
+        {
+          "name": "Spotify",
+          "domain": "spotify.com",
+          "total": 29,
+          "count": 2,
+          "perMonth": 4,
+          "perWeek": 1,
+          "perDay": 0.1
+        }
+      ]
     },
     {
       "key": "transport",
@@ -911,135 +996,6 @@ export const FINANCE_SEED = {
           "perMonth": 3,
           "perWeek": 1,
           "perDay": 0.1
-        }
-      ]
-    },
-    {
-      "key": "subscriptions",
-      "label": "Subscriptions",
-      "total": 229,
-      "count": 24,
-      "perMonth": 35,
-      "perWeek": 8,
-      "perDay": 1.2,
-      "deductible": 0,
-      "business": false,
-      "spark": [
-        1,
-        0.40195016251354276,
-        0.936387556105866,
-        0.1854202135892277,
-        0.40195016251354276,
-        0.40195016251354276,
-        0.21652994892431512
-      ],
-      "merchants": [
-        {
-          "name": "Youtube",
-          "domain": null,
-          "total": 102,
-          "count": 8,
-          "perMonth": 16,
-          "perWeek": 4,
-          "perDay": 0.5
-        },
-        {
-          "name": "Amazon Prime",
-          "domain": "amazon.com",
-          "total": 56,
-          "count": 8,
-          "perMonth": 9,
-          "perWeek": 2,
-          "perDay": 0.3
-        },
-        {
-          "name": "Netflix",
-          "domain": "netflix.com",
-          "total": 42,
-          "count": 6,
-          "perMonth": 6,
-          "perWeek": 1,
-          "perDay": 0.2
-        },
-        {
-          "name": "Spotify",
-          "domain": "spotify.com",
-          "total": 29,
-          "count": 2,
-          "perMonth": 4,
-          "perWeek": 1,
-          "perDay": 0.1
-        }
-      ]
-    },
-    {
-      "key": "fees",
-      "label": "Fees",
-      "total": 166,
-      "count": 4,
-      "perMonth": 25,
-      "perWeek": 6,
-      "perDay": 0.8,
-      "deductible": 0,
-      "business": false,
-      "spark": [
-        0,
-        1,
-        0.13126000457351933,
-        0.13209848311609115,
-        0,
-        0,
-        0
-      ],
-      "merchants": [
-        {
-          "name": "Pastdue Credit",
-          "domain": null,
-          "total": 114,
-          "count": 1,
-          "perMonth": 17,
-          "perWeek": 4,
-          "perDay": 0.6
-        },
-        {
-          "name": "Metal Plan Fee",
-          "domain": null,
-          "total": 52,
-          "count": 3,
-          "perMonth": 8,
-          "perWeek": 2,
-          "perDay": 0.3
-        }
-      ]
-    },
-    {
-      "key": "insurance",
-      "label": "Insurance",
-      "total": 104,
-      "count": 1,
-      "perMonth": 16,
-      "perWeek": 4,
-      "perDay": 0.5,
-      "deductible": 0,
-      "business": false,
-      "spark": [
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0
-      ],
-      "merchants": [
-        {
-          "name": "Www.assurantsoluti",
-          "domain": null,
-          "total": 104,
-          "count": 1,
-          "perMonth": 16,
-          "perWeek": 4,
-          "perDay": 0.5
         }
       ]
     }

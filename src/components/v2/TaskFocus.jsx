@@ -114,7 +114,7 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
-          <span style={{ fontSize: 12.5, color: C.textSecondary, width: 32 }}>Due</span>
+          <span style={{ fontSize: 12.5, color: C.textSecondary, width: 76 }}>Due</span>
           <input
             type="date"
             value={task.due || ""}
@@ -130,6 +130,38 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
               colorScheme: "light dark",
             }}
           />
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+          <span style={{ fontSize: 12.5, color: C.textSecondary, width: 76 }}>Importance</span>
+          <div style={{ display: "inline-flex", gap: 6 }}>
+            {[
+              { lvl: 1, label: "Low" },
+              { lvl: 2, label: "Med" },
+              { lvl: 3, label: "High" },
+            ].map(({ lvl, label }) => {
+              const on = (task.importance || 1) === lvl;
+              return (
+                <button
+                  key={lvl}
+                  onClick={() => onUpdate({ importance: lvl })}
+                  style={{
+                    border: `0.5px solid ${on ? C.accent : C.border}`,
+                    background: on ? C.accentLight : "transparent",
+                    color: on ? C.accentDark : C.textSecondary,
+                    borderRadius: 7,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: "auto", paddingTop: 24 }}>

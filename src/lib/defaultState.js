@@ -355,6 +355,19 @@ export const defaultState = {
         phraseIndex: 0,
         chunkIndex: 0,
         phrasesSeen: [],
+        // "Calma" daily-session progress (see lib/calma.js). xp/streak/mastery
+        // are shared across the four drill decks; todayXP rolls over by date.
+        practice: {
+          xp: 0,
+          todayXP: 0,
+          todayDate: "",
+          goal: 60,
+          startDate: "",
+          streakDates: [],
+          mastery: {},
+          credited: {},
+          celebratedDate: null,
+        },
       },
       // Mirrors Spanish shape. Istanbul-Turkish flavour, informal sen form.
       turkish: {

@@ -1,5 +1,5 @@
 import React from "react";
-import { C, HABIT, RUNRATE, tint } from "../../lib/tokens";
+import { C, HABIT, RUNRATE } from "../../lib/tokens";
 import { habitStats } from "../../lib/habitStats.js";
 
 // Tap cycles a day's state: unanswered → yes → no → clear.
@@ -56,7 +56,9 @@ function Sparkline({ values, width = 150, height = 22 }) {
 
 function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
   const stats = habitStats(habit.key, habitLog, habitNoLog, habit);
-  const rateColor = stats.runRate >= 80 ? RUNRATE.good : RUNRATE.warn;
+  const good = stats.runRate >= 80;
+  const rateColor = good ? RUNRATE.good : RUNRATE.warn;
+  const rateBg = good ? RUNRATE.goodBg : RUNRATE.warnBg;
   return (
     <div style={{ flex: "1 1 0", minWidth: 0, background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -64,7 +66,7 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
           <HabitIcon habitKey={habit.key} color={C.text} />
         </span>
         <span style={{ fontSize: 14.5, fontWeight: 600, color: C.text, whiteSpace: "nowrap", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{habit.label}</span>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: rateColor, background: tint(rateColor, 0.12), borderRadius: 999, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: rateColor, background: rateBg, borderRadius: 999, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>
           {stats.runRate}%
         </span>
       </div>

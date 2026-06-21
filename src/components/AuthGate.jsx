@@ -171,7 +171,13 @@ function SignedIn({ children }) {
       setShow(false);
     } catch (e) {
       if (e?.name === "NotAllowedError") setMsg("Cancelled.");
-      else setMsg(e?.message || "Could not add this device.");
+      else if (e?.name === "InvalidStateError") {
+        // This device already has a passkey for the dashboard (commonly an
+        // iCloud-synced one from another Apple device). Already set up — just
+        // dismiss the prompt instead of surfacing the raw WebAuthn error.
+        localStorage.setItem(ENROLL_HINT, "1");
+        setShow(false);
+      } else setMsg(e?.message || "Could not add this device.");
     } finally {
       setBusy(false);
     }

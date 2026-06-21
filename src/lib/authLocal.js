@@ -8,7 +8,9 @@
 //   ls.pin         hex SHA-256 of the user's PIN (4-8 digits)
 //   ls.salt        random hex used as PIN salt (per-device)
 //   ls.webauthnId  base64-url credential id, present iff Face ID is enabled
-//   ss.unlocked    "1" once unlocked for the current tab session
+//   ls.trusted     "1" once this device has been unlocked — a "remember me"
+//                  flag so we never re-prompt on load. Cleared only when the
+//                  user explicitly locks.
 //
 // Treat this as a privacy lock, not a cryptographic vault. The state itself
 // stays in plain localStorage (so it works offline). The PIN guards the UI.
@@ -17,7 +19,11 @@ const LS_PIN = "lifeDashboard:auth:pin";
 const LS_SALT = "lifeDashboard:auth:salt";
 const LS_CRED = "lifeDashboard:auth:cred";
 const LS_DISABLED = "lifeDashboard:auth:disabled";
-const SS_UNLOCKED = "lifeDashboard:auth:unlocked";
+const LS_TRUSTED = "lifeDashboard:auth:trusted";
+
+// Fired when the user explicitly locks, so LocalLock can switch to the unlock
+// screen no matter where the request came from (e.g. the header button).
+export const LOCK_EVENT = "lifeDashboard:lock";
 
 function toHex(buf) {
   return Array.from(new Uint8Array(buf))
@@ -67,16 +73,23 @@ export function isLockSkipped() {
   return localStorage.getItem(LS_DISABLED) === "1";
 }
 
+// Trusted = this device has been unlocked before and hasn't been deliberately
+// locked since. Persisted (localStorage) so reopening the app doesn't re-prompt.
 export function isUnlocked() {
-  return sessionStorage.getItem(SS_UNLOCKED) === "1";
+  return localStorage.getItem(LS_TRUSTED) === "1";
 }
 
 export function markUnlocked() {
-  sessionStorage.setItem(SS_UNLOCKED, "1");
+  localStorage.setItem(LS_TRUSTED, "1");
 }
 
+// Explicitly lock: drop the trust flag and tell LocalLock to show the unlock
+// screen. Used by the "Lock" control — nothing locks automatically anymore.
 export function lockNow() {
-  sessionStorage.removeItem(SS_UNLOCKED);
+  localStorage.removeItem(LS_TRUSTED);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(LOCK_EVENT));
+  }
 }
 
 export async function setPin(pin) {
@@ -98,7 +111,7 @@ export function clearPin() {
   localStorage.removeItem(LS_PIN);
   localStorage.removeItem(LS_CRED);
   localStorage.removeItem(LS_DISABLED);
-  sessionStorage.removeItem(SS_UNLOCKED);
+  localStorage.removeItem(LS_TRUSTED);
 }
 
 export function skipLock() {

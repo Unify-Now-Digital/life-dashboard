@@ -185,7 +185,7 @@ export default function FinanceLens({ finance, onImport, onClear }) {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 780, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <span style={{ fontSize: 22, fontWeight: 600, color: C.text }}>Finance</span>

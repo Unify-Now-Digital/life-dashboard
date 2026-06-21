@@ -36,7 +36,7 @@ function Dot({ status, today, onClick }) {
         border: today
           ? `1.5px solid ${HABIT.today}`
           : status === "unanswered"
-          ? `1px solid ${C.borderStrong}`
+          ? `1px solid ${C.textTertiary}`
           : "none",
         padding: 0,
         cursor: "pointer",

@@ -13,6 +13,7 @@ import UndoToast from "./components/UndoToast.jsx";
 import AuthGate from "./components/AuthGate.jsx";
 import LocalLock from "./components/LocalLock.jsx";
 import PhotoQuickAdd from "./components/PhotoQuickAdd.jsx";
+import SpanishButton from "./components/SpanishButton.jsx";
 import TopThree from "./components/TopThree.jsx";
 import GoalsRollup from "./components/GoalsRollup.jsx";
 import Calendar from "./components/Calendar.jsx";
@@ -638,6 +639,7 @@ export default function Dashboard() {
           setState={setState}
           onCreated={() => setOpenProject("journal")}
         />
+        <SpanishButton />
         {isDesktop && <JumpNav />}
         {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </div>

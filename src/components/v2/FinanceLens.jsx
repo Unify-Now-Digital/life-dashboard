@@ -70,14 +70,16 @@ function merchantSub(m) {
   return `${eur(m.perWeek)}/wk`;
 }
 
-const MERCHANT_LIMIT = 6;
+const MERCHANT_LIMIT = 4;
 
 function CategoryRow({ cat, rate, expanded, onToggle }) {
   const [showAll, setShowAll] = useState(false);
   const figure = rate === "weekly" ? cat.perWeek : cat.perMonth;
   const suffix = rate === "weekly" ? "/wk" : "/mo";
   const shownMerchants = showAll ? cat.merchants : cat.merchants.slice(0, MERCHANT_LIMIT);
-  const moreFromData = cat.merchants.length - MERCHANT_LIMIT;
+  const hiddenInArray = Math.max(0, cat.merchants.length - MERCHANT_LIMIT); // itemised but collapsed
+  const tailCount = cat.extra?.count || 0; // long tail, not itemised
+  const collapsedMore = hiddenInArray + tailCount;
   return (
     <div style={{ borderBottom: `0.5px solid ${C.border}` }}>
       <div
@@ -105,7 +107,7 @@ function CategoryRow({ cat, rate, expanded, onToggle }) {
         <div style={{ paddingBottom: 10 }}>
           {cat.merchants.length === 0 && (
             <div style={{ fontSize: 13, color: C.textTertiary, padding: "4px 2px 12px 24px" }}>
-              Import a statement to break this down by merchant.
+              No merchant breakdown for this category.
             </div>
           )}
           {shownMerchants.map((m) => {
@@ -130,20 +132,28 @@ function CategoryRow({ cat, rate, expanded, onToggle }) {
               </div>
             );
           })}
-          {/* Imported data: a real "show more / less" toggle. */}
-          {moreFromData > 0 && (
+          {/* Collapsed: reveal the rest of the itemised merchants. */}
+          {!showAll && collapsedMore > 0 && (
             <button
-              onClick={() => setShowAll((v) => !v)}
+              onClick={() => setShowAll(true)}
               style={{ padding: "6px 2px 4px 24px", fontSize: 13.5, color: C.accent, fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "block" }}
             >
-              {showAll ? "show fewer" : `+ ${moreFromData} more merchants`}
+              + {collapsedMore} more {collapsedMore === 1 ? "merchant" : "merchants"}
             </button>
           )}
-          {/* Seed fallback: count only, no underlying merchants — plain text. */}
-          {moreFromData <= 0 && cat.extra?.count > 0 && (
+          {/* Expanded: long tail isn't itemised; show it as a muted count. */}
+          {showAll && tailCount > 0 && (
             <div style={{ padding: "6px 2px 4px 24px", fontSize: 13, color: C.textTertiary }}>
-              + {cat.extra.count} more merchants · import a statement to see them
+              + {tailCount} more {tailCount === 1 ? "merchant" : "merchants"} in the long tail
             </div>
+          )}
+          {showAll && hiddenInArray > 0 && (
+            <button
+              onClick={() => setShowAll(false)}
+              style={{ padding: "2px 2px 4px 24px", fontSize: 13.5, color: C.textSecondary, fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "block" }}
+            >
+              show fewer
+            </button>
           )}
         </div>
       )}

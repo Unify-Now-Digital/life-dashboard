@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { C, ACCENT, styles } from "./lib/tokens";
+import { C, ACCENT, styles, QUOTES } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
 import { isSupabaseEnabled } from "./lib/supabase";
 import { isSpanishHost } from "./lib/host.js";
 import { getTheme, setTheme as persistTheme } from "./lib/theme.js";
+import { addDays, metaFromDue } from "./lib/taskDates.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -140,6 +141,17 @@ export default function Dashboard() {
       ],
     }));
   const recategorise = (id, pill) => updateTask(id, { pill });
+  // Quick-defer: push the due date by n days (from current due or today) and
+  // refresh the urgency label.
+  const deferTask = (id, n) =>
+    setState((s) => ({
+      ...s,
+      tasks: (s.tasks || []).map((t) => {
+        if (t.id !== id) return t;
+        const due = addDays(t.due, n);
+        return { ...t, due, meta: metaFromDue(due) };
+      }),
+    }));
 
   const addPriority = () => {
     const id = "tsk_" + Date.now();
@@ -233,7 +245,7 @@ export default function Dashboard() {
     <LocalLock>
       <AuthGate>
         <div style={{ ...styles.page, paddingBottom: isDesktop ? 190 : 270 }}>
-          <Header today={today} dayOfYear={dayOfYear} quote={null} />
+          <Header today={today} dayOfYear={dayOfYear} quote={QUOTES[dayOfYear % QUOTES.length]} />
 
           {localOnlyBanner}
 
@@ -265,6 +277,7 @@ export default function Dashboard() {
               onOpen={(id) => setFocusId(id)}
               onRecategorise={recategorise}
               onAdd={addTask}
+              onDefer={deferTask}
             />
           ) : (
             <FinanceLens finance={state.finance} onImport={importTransactions} onClear={clearTransactions} />
@@ -278,6 +291,7 @@ export default function Dashboard() {
           onClose={() => setFocusId(null)}
           onUpdate={(patch) => updateTask(focusId, patch)}
           onDelete={() => deleteTask(focusId)}
+          onDefer={(n) => deferTask(focusId, n)}
         />
 
         <SpanishButton />

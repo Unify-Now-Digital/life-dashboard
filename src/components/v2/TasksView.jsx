@@ -1,24 +1,21 @@
 import React, { useState } from "react";
-import { C, ACCENT } from "../../lib/tokens";
+import { C, ACCENT, PILL, WORK_PILLS, PERSONAL_PILLS } from "../../lib/tokens";
 import Segmented from "./Segmented.jsx";
-import { PillSelect } from "./Pill.jsx";
+import { PillSelect, Pill } from "./Pill.jsx";
+import { todayISO } from "../../lib/taskDates.js";
 
 const META_OVERDUE = new Set(["overdue"]);
 const COLUMN_LIMIT = 10;
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
 const dueKey = (t) => t.due || "9999-99-99";
 
-// Sort comparators.
 const CMP = {
   importance: (a, b) => (b.importance || 1) - (a.importance || 1) || dueKey(a).localeCompare(dueKey(b)) || (a.createdAt || "").localeCompare(b.createdAt || ""),
   due: (a, b) => dueKey(a).localeCompare(dueKey(b)) || (b.importance || 1) - (a.importance || 1),
   added: (a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""),
 };
 
-// Due-bucket grouping.
-const GROUP_ORDER = ["Overdue", "Today", "This week", "Later"];
-function bucketOf(t, today) {
+const DUE_ORDER = ["Overdue", "Today", "This week", "Later"];
+function dueBucket(t, today) {
   if (!t.due) return "Later";
   if (t.due < today) return "Overdue";
   if (t.due === today) return "Today";
@@ -26,7 +23,12 @@ function bucketOf(t, today) {
   return diff <= 7 ? "This week" : "Later";
 }
 
-// Importance indicator — three rising bars, filled to the level. Hidden at 1.
+const DEFERS = [
+  { n: 1, label: "+1 day" },
+  { n: 3, label: "+3 days" },
+  { n: 7, label: "+1 week" },
+];
+
 function ImportanceMark({ level }) {
   if (!level || level <= 1) return null;
   return (
@@ -38,7 +40,8 @@ function ImportanceMark({ level }) {
   );
 }
 
-function TaskRow({ task, onOpen, onRecategorise }) {
+function TaskRow({ task, onOpen, onRecategorise, onDefer }) {
+  const [deferOpen, setDeferOpen] = useState(false);
   const meta = task.meta;
   const overdue = meta && META_OVERDUE.has(String(meta).toLowerCase());
   const done = task.status === "done";
@@ -57,39 +60,81 @@ function TaskRow({ task, onOpen, onRecategorise }) {
         {task.text}
       </span>
       <ImportanceMark level={task.importance} />
-      {meta && (
-        <span style={{ fontSize: 12.5, fontWeight: 500, color: overdue ? C.danger : C.textTertiary, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", flexShrink: 0 }}>
-          {meta}
-        </span>
-      )}
+
+      {/* Click the urgency flag to defer; rows with no date get a subtle trigger. */}
+      <span style={{ position: "relative", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setDeferOpen((o) => !o)}
+          title="Defer"
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: "2px 2px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: overdue ? C.danger : meta ? C.textTertiary : C.borderStrong,
+            fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {meta || (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block" }}>
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M3 9h18M8 3v4M16 3v4" />
+            </svg>
+          )}
+        </button>
+        {deferOpen && (
+          <>
+            <div onClick={() => setDeferOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+            <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 61, background: C.card, border: `0.5px solid ${C.borderStrong}`, borderRadius: 9, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", minWidth: 110 }}>
+              {DEFERS.map(({ n, label }) => (
+                <button
+                  key={n}
+                  onClick={() => { onDefer(task.id, n); setDeferOpen(false); }}
+                  style={{ background: "transparent", border: "none", textAlign: "left", padding: "7px 10px", borderRadius: 6, fontSize: 13, color: C.text, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </span>
     </div>
   );
 }
 
-function Column({ title, accent, tasks, sortBy, grouped, today, onOpen, onRecategorise, onAdd }) {
+function Column({ title, accent, column, tasks, sortBy, groupMode, today, onOpen, onRecategorise, onDefer, onAdd }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   const sorted = [...tasks].sort(CMP[sortBy]);
+  const renderRow = (t) => <TaskRow key={t.id} task={t} onOpen={onOpen} onRecategorise={(pill) => onRecategorise(t.id, pill)} onDefer={onDefer} />;
 
-  const commit = () => {
-    const text = draft.trim();
-    if (text) onAdd(text);
-    setDraft("");
-    setAdding(false);
-  };
-
-  const renderRow = (t) => <TaskRow key={t.id} task={t} onOpen={onOpen} onRecategorise={(pill) => onRecategorise(t.id, pill)} />;
+  const groupHeader = (label, danger) => (
+    <div style={{ fontSize: 11, fontWeight: 600, color: danger ? C.danger : C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{label}</div>
+  );
 
   let body;
-  if (grouped) {
-    const groups = {};
-    for (const t of sorted) (groups[bucketOf(t, today)] ||= []).push(t);
-    body = GROUP_ORDER.filter((g) => groups[g]?.length).map((g) => (
-      <div key={g} style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: g === "Overdue" ? C.danger : C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{g}</div>
-        {groups[g].map(renderRow)}
+  if (groupMode === "due") {
+    const g = {};
+    for (const t of sorted) (g[dueBucket(t, today)] ||= []).push(t);
+    body = DUE_ORDER.filter((k) => g[k]?.length).map((k) => (
+      <div key={k} style={{ marginTop: 10 }}>{groupHeader(k, k === "Overdue")}{g[k].map(renderRow)}</div>
+    ));
+  } else if (groupMode === "label") {
+    const order = column === "personal" ? PERSONAL_PILLS : WORK_PILLS;
+    const g = {};
+    for (const t of sorted) (g[t.pill] ||= []).push(t);
+    const keys = [...order.filter((p) => g[p]), ...Object.keys(g).filter((p) => !order.includes(p))];
+    body = keys.map((p) => (
+      <div key={p} style={{ marginTop: 10 }}>
+        <div style={{ marginBottom: 4 }}><Pill name={p} size="sm" /></div>
+        {g[p].map(renderRow)}
       </div>
     ));
   } else {
@@ -105,6 +150,13 @@ function Column({ title, accent, tasks, sortBy, grouped, today, onOpen, onRecate
       </>
     );
   }
+
+  const commit = () => {
+    const text = draft.trim();
+    if (text) onAdd(text);
+    setDraft("");
+    setAdding(false);
+  };
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -137,11 +189,11 @@ function Column({ title, accent, tasks, sortBy, grouped, today, onOpen, onRecate
   );
 }
 
-// Tasks view — Work | Personal columns with sort / group-by-due / list limits
-// and an importance (1–3) indicator. Spec §4.
-export default function TasksView({ tasks, decisionsActive, isDesktop, onOpen, onRecategorise, onAdd }) {
+// Tasks view — Work | Personal columns with sort, group-by (due / label), list
+// limits, importance (1–3), and click-to-defer on each row. Spec §4.
+export default function TasksView({ tasks, decisionsActive, isDesktop, onOpen, onRecategorise, onAdd, onDefer }) {
   const [sortBy, setSortBy] = useState("importance");
-  const [grouped, setGrouped] = useState(false);
+  const [groupMode, setGroupMode] = useState("none");
   const today = todayISO();
 
   const open = tasks.filter((t) => t.status !== "done");
@@ -149,40 +201,27 @@ export default function TasksView({ tasks, decisionsActive, isDesktop, onOpen, o
   const work = visible.filter((t) => t.column === "work");
   const personal = visible.filter((t) => t.column === "personal");
 
+  const col = (title, accent, column, list) => (
+    <Column title={title} accent={accent} column={column} tasks={list} sortBy={sortBy} groupMode={groupMode} today={today} onOpen={onOpen} onRecategorise={onRecategorise} onDefer={onDefer} onAdd={(text) => onAdd(column, text)} />
+  );
+
   return (
     <div>
-      {/* Controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-        <span style={{ fontSize: 12.5, color: C.textTertiary }}>Sort</span>
-        <Segmented
-          options={[{ value: "importance", label: "Importance" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]}
-          value={sortBy}
-          onChange={setSortBy}
-          accent={C.accent}
-          size="sm"
-        />
-        <button
-          onClick={() => setGrouped((g) => !g)}
-          style={{
-            border: `0.5px solid ${grouped ? C.accent : C.border}`,
-            background: grouped ? C.accentLight : "transparent",
-            color: grouped ? C.accentDark : C.textSecondary,
-            borderRadius: 999,
-            padding: "5px 13px",
-            fontSize: 12.5,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          Group by due
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.textTertiary }}>Sort</span>
+          <Segmented options={[{ value: "importance", label: "Importance" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]} value={sortBy} onChange={setSortBy} accent={C.accent} size="sm" />
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.textTertiary }}>Group</span>
+          <Segmented options={[{ value: "none", label: "Off" }, { value: "due", label: "Due" }, { value: "label", label: "Label" }]} value={groupMode} onChange={setGroupMode} accent={C.accent} size="sm" />
+        </span>
       </div>
 
       <div style={{ display: "flex", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 36 : 24, alignItems: "flex-start" }}>
-        <Column title="Work" accent={ACCENT.work} tasks={work} sortBy={sortBy} grouped={grouped} today={today} onOpen={onOpen} onRecategorise={onRecategorise} onAdd={(text) => onAdd("work", text)} />
+        {col("Work", ACCENT.work, "work", work)}
         {isDesktop && <div style={{ width: 0.5, alignSelf: "stretch", background: C.border }} />}
-        <Column title="Personal" accent={ACCENT.personal} tasks={personal} sortBy={sortBy} grouped={grouped} today={today} onOpen={onOpen} onRecategorise={onRecategorise} onAdd={(text) => onAdd("personal", text)} />
+        {col("Personal", ACCENT.personal, "personal", personal)}
       </div>
     </div>
   );

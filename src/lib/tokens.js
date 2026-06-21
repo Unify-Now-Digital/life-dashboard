@@ -32,15 +32,20 @@ export const ACCENT = {
   priorities: "#E5912A", // priorities amber
 };
 
-// Habit dot states — blue scheme (V2 spec §2 / §6).
+// Habit dot states — deep, muted indigo (theme-aware via CSS vars).
 export const HABIT = {
-  hit: "#4C6EF5", // blue
-  miss: "#E7A9A9", // soft red
-  today: "#4C6EF5", // 1.5px outline ring for "today"
+  hit: "var(--c-habit-hit)",
+  miss: "var(--c-habit-miss)",
+  today: "var(--c-habit-hit)", // 1.5px outline ring for "today"
 };
 
-// Run-rate badge colour: ≥80% strong blue, <80% muted slate.
-export const RUNRATE = { good: "#2A50C8", warn: "#7E8AA3" };
+// Run-rate badge: deep indigo when ≥80%, muted slate below — with soft fills.
+export const RUNRATE = {
+  good: "var(--c-habit-rate-good)",
+  warn: "var(--c-habit-rate-warn)",
+  goodBg: "var(--c-habit-rate-good-bg)",
+  warnBg: "var(--c-habit-rate-warn-bg)",
+};
 
 // Category pill backgrounds / text (light fill, dark same-family text).
 // Used by task pills (V2 spec §2) and the finance deductible tag.

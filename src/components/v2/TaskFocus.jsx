@@ -1,11 +1,12 @@
 import React from "react";
 import { C, ACCENT } from "../../lib/tokens";
 import { PillSelect } from "./Pill.jsx";
+import { metaFromDue } from "../../lib/taskDates.js";
 
 // Right-side focus drawer for a single task: the rest of the board dims behind
 // it. Shows the task text, its pill (recategorise), notes / next action, due
 // date, and the priority / decision / done controls. Spec §4.
-export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
+export default function TaskFocus({ task, onClose, onUpdate, onDelete, onDefer }) {
   if (!task) return null;
   const col = task.column;
 
@@ -113,12 +114,12 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12.5, color: C.textSecondary, width: 76 }}>Due</span>
           <input
             type="date"
             value={task.due || ""}
-            onChange={(e) => onUpdate({ due: e.target.value || null })}
+            onChange={(e) => onUpdate({ due: e.target.value || null, meta: metaFromDue(e.target.value || null) })}
             style={{
               border: `0.5px solid ${C.border}`,
               borderRadius: 8,
@@ -130,6 +131,22 @@ export default function TaskFocus({ task, onClose, onUpdate, onDelete }) {
               colorScheme: "light dark",
             }}
           />
+          <div style={{ display: "inline-flex", gap: 6 }}>
+            {[
+              { n: 1, label: "+1d" },
+              { n: 3, label: "+3d" },
+              { n: 7, label: "+1w" },
+            ].map(({ n, label }) => (
+              <button
+                key={n}
+                onClick={() => onDefer(n)}
+                title={`Defer ${n} day${n > 1 ? "s" : ""}`}
+                style={{ border: `0.5px solid ${C.border}`, background: "transparent", color: C.textSecondary, borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>

@@ -8,9 +8,9 @@
 //   ls.pin         hex SHA-256 of the user's PIN (4-8 digits)
 //   ls.salt        random hex used as PIN salt (per-device)
 //   ls.webauthnId  base64-url credential id, present iff Face ID is enabled
-//   ls.trusted     "1" once this device has been unlocked — a "remember me"
-//                  flag so we never re-prompt on load. Cleared only when the
-//                  user explicitly locks.
+//   ls.locked      "1" only after the user EXPLICITLY locks. Absent means open,
+//                  so we never prompt on load — the device stays trusted until
+//                  the user taps Lock.
 //
 // Treat this as a privacy lock, not a cryptographic vault. The state itself
 // stays in plain localStorage (so it works offline). The PIN guards the UI.
@@ -19,7 +19,7 @@ const LS_PIN = "lifeDashboard:auth:pin";
 const LS_SALT = "lifeDashboard:auth:salt";
 const LS_CRED = "lifeDashboard:auth:cred";
 const LS_DISABLED = "lifeDashboard:auth:disabled";
-const LS_TRUSTED = "lifeDashboard:auth:trusted";
+const LS_LOCKED = "lifeDashboard:auth:locked";
 
 // Fired when the user explicitly locks, so LocalLock can switch to the unlock
 // screen no matter where the request came from (e.g. the header button).
@@ -73,20 +73,21 @@ export function isLockSkipped() {
   return localStorage.getItem(LS_DISABLED) === "1";
 }
 
-// Trusted = this device has been unlocked before and hasn't been deliberately
-// locked since. Persisted (localStorage) so reopening the app doesn't re-prompt.
+// Open unless the user has explicitly locked. A device with a PIN set stays
+// trusted across reloads and is NEVER prompted on load — only after a manual
+// lock does the unlock screen reappear.
 export function isUnlocked() {
-  return localStorage.getItem(LS_TRUSTED) === "1";
+  return localStorage.getItem(LS_LOCKED) !== "1";
 }
 
 export function markUnlocked() {
-  localStorage.setItem(LS_TRUSTED, "1");
+  localStorage.removeItem(LS_LOCKED);
 }
 
-// Explicitly lock: drop the trust flag and tell LocalLock to show the unlock
+// Explicitly lock: set the locked flag and tell LocalLock to show the unlock
 // screen. Used by the "Lock" control — nothing locks automatically anymore.
 export function lockNow() {
-  localStorage.removeItem(LS_TRUSTED);
+  localStorage.setItem(LS_LOCKED, "1");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(LOCK_EVENT));
   }
@@ -111,7 +112,7 @@ export function clearPin() {
   localStorage.removeItem(LS_PIN);
   localStorage.removeItem(LS_CRED);
   localStorage.removeItem(LS_DISABLED);
-  localStorage.removeItem(LS_TRUSTED);
+  localStorage.removeItem(LS_LOCKED);
 }
 
 export function skipLock() {

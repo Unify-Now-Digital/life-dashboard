@@ -3,7 +3,7 @@ import { C } from "../../lib/tokens";
 import Segmented from "./Segmented.jsx";
 import MerchantLogo from "./MerchantLogo.jsx";
 import StackedBars from "./StackedBars.jsx";
-import { financeStats } from "../../lib/financeStats.js";
+import { financeStats, RENT_MONTHLY } from "../../lib/financeStats.js";
 import { FINANCE_SEED } from "../../lib/financeSeed.js";
 import { parseRevolutCsv } from "../../lib/parseRevolutCsv.js";
 import { prettyMerchant } from "../../lib/merchants.js";
@@ -228,7 +228,7 @@ export default function FinanceLens({ finance, onImport, onClear }) {
       </div>
 
       {/* Monthly spend stacked by category (+ flat rent at the base) */}
-      <StackedBars months={summary.range?.months} categories={summary.categories} rent={1500} />
+      <StackedBars months={summary.range?.months} categories={summary.categories} rent={RENT_MONTHLY} />
 
       {/* Category card grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>

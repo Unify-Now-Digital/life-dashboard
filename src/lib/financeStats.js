@@ -9,7 +9,8 @@ import { prettyMerchant, domainFor } from "./merchants.js";
 import { unifyEurPerMonth } from "./unifyIncome.js";
 
 const MS_DAY = 86400000;
-export const DAN_OFFSET = 1250; // Dan's fixed monthly rent contribution.
+export const DAN_OFFSET = 1250; // Dan's assumed monthly contribution (fallback).
+export const RENT_MONTHLY = 1500; // fixed monthly rent.
 
 const daysBetween = (start, end) => Math.max(1, (new Date(end) - new Date(start)) / MS_DAY);
 const monthKey = (iso) => (iso || "").slice(0, 7);
@@ -139,8 +140,9 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
   const unifyPerMonth = unifyEurPerMonth(start, end);
   const incomePerMonth = Math.round(perMonthOf(income)) + unifyPerMonth;
   const cardSpendPerMonth = Math.round(perMonthOf(cardSpendTotal));
-  const rentGrossPerMonth = Math.round(perMonthOf(rentGross));
-  // Use Dan's actual contribution when present; fall back to the assumed flat.
+  // Rent is a fixed €1,500/mo (the self-transfers that fund it are variable
+  // savings sweeps, not rent). Net = rent − Dan's actual monthly contribution.
+  const rentGrossPerMonth = RENT_MONTHLY;
   const danPerMonth = danOffset > 0 ? Math.round(perMonthOf(danOffset)) : DAN_OFFSET;
   const rentNetPerMonth = rentGrossPerMonth - danPerMonth;
   const netPerMonth = incomePerMonth - cardSpendPerMonth - rentNetPerMonth;

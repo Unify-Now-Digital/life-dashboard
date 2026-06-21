@@ -55,8 +55,6 @@ export default function Dashboard() {
 
   const [decisionsActive, setDecisionsActive] = useState(false);
   const [focusId, setFocusId] = useState(null);
-  const [sortBy, setSortBy] = useState("importance");
-  const [groupMode, setGroupMode] = useState("none");
   const [phrases, setPhrases] = useState([]);
   const [qIndex, setQIndex] = useState(0);
 
@@ -133,6 +131,11 @@ export default function Dashboard() {
   const tasks = state.tasks || [];
   const view = state.ui?.view || "tasks";
   const setView = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), view: v } }));
+  // Task layout (sort + grouping) — persisted so it sticks across loads/devices.
+  const sortBy = state.ui?.sortBy || "due";
+  const setSortBy = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), sortBy: v } }));
+  const groupMode = state.ui?.groupMode || "label";
+  const setGroupMode = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupMode: v } }));
 
   const updateTask = (id, patch) =>
     setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...patch } : t)) }));

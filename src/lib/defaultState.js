@@ -95,7 +95,7 @@ export const defaultState = {
   // synced light/dark preference (null = follow device). `unifyTrendHidden`
   // hides the header Unify sparkline; `groupOrder` stores custom task-group
   // ordering keyed by `${groupMode}:${column}`.
-  ui: { view: "tasks", theme: null, sectionOrder: [], unifyTrendHidden: false, groupOrder: {} },
+  ui: { view: "tasks", theme: null, sectionOrder: [], unifyTrendHidden: false, groupOrder: {}, sortBy: "due", groupMode: "label" },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
   // TopThree component. Auto-filled when a Work todo is starred (which also

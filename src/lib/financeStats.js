@@ -126,6 +126,7 @@ export function financeStats(transactions, range, overrides = OVERRIDES) {
         deductible: Math.round(perMonthOf(c.deductible)),
         business: c.deductible > c.total / 2,
         spark: normalise(months.map((m) => c.byMonth[m] || 0)),
+        monthly: months.map((m) => Math.round(c.byMonth[m] || 0)), // absolute €/month, for the stacked bars
         merchants,
       };
     })

@@ -46,8 +46,12 @@ export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden
             {greet}, Arin.
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 18 }}>
-          {onToggleUnify && <UnifyTrend hidden={unifyHidden} onToggle={onToggleUnify} />}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flex: "1 1 320px", maxWidth: 500, minWidth: 230, justifyContent: "flex-end" }}>
+          {onToggleUnify && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <UnifyTrend hidden={unifyHidden} onToggle={onToggleUnify} />
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
           <button
             type="button"

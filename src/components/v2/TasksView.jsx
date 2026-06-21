@@ -186,7 +186,8 @@ function Column({ title, accent, column, tasks, sortBy, groupMode, groupOrder, t
       natural = DUE_ORDER.filter((k) => groups[k]?.length);
       headerFor = (k) => <span style={{ fontSize: 11, fontWeight: 600, color: k === "Overdue" ? C.danger : C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k}</span>;
     } else {
-      const order = column === "personal" ? PERSONAL_PILLS : WORK_PILLS;
+      // Default group order: Admin leads the personal column.
+      const order = column === "personal" ? ["Admin", "Money", "Health", "Home"] : WORK_PILLS;
       for (const t of sorted) (groups[t.pill] ||= []).push(t);
       natural = [...order.filter((p) => groups[p]), ...Object.keys(groups).filter((p) => !order.includes(p))];
       headerFor = (k) => <Pill name={k} size="sm" />;

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { C, styles } from "../lib/tokens";
 import {
   isLockEnabled,
-  isLockSkipped,
   isUnlocked,
   markUnlocked,
   setPin as savePin,
@@ -13,43 +12,38 @@ import {
   isFaceIdEnabled,
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
+  LOCK_EVENT,
 } from "../lib/authLocal";
 
 // Privacy lock that sits in front of the dashboard. Three modes:
-//   "setup"  — first run, asks user to set a PIN (or skip)
+//   "setup"  — set a PIN (reached only by tapping "Set a lock", never on load)
 //   "unlock" — PIN entry, with a Face ID button if a passkey is registered
 //   "open"   — render children
 //
-// Cloud login (Supabase magic link) is unaffected; it runs underneath this
-// component via AuthGate.
+// It NEVER prompts on load. A device that's been unlocked once is trusted and
+// stays open across reloads ("remember my device"); the unlock screen appears
+// only after an explicit lock. Cloud login (Supabase) runs underneath via
+// AuthGate.
 
 const PIN_LEN_MIN = 4;
 const PIN_LEN_MAX = 8;
 
 export default function LocalLock({ children }) {
   const [mode, setMode] = useState(() => {
-    if (isLockSkipped()) return "open";
-    if (!isLockEnabled()) return "setup";
+    // Open by default. Only show the unlock screen if a lock is set AND the
+    // user deliberately locked last time (trust flag cleared). No PIN, or a
+    // trusted device → straight in, no prompt.
+    if (!isLockEnabled()) return "open";
     return isUnlocked() ? "open" : "unlock";
   });
 
-  // Re-lock when the tab is hidden for >5 minutes. The lock is a privacy
-  // boundary — short backgrounding (switching apps to grab a number) shouldn't
-  // re-prompt, but a longer absence should.
+  // React to an explicit lock request from anywhere (e.g. the header button).
+  // If no lock is configured yet, route to setup; otherwise show unlock.
   useEffect(() => {
-    if (mode !== "open" || !isLockEnabled()) return;
-    let hiddenAt = null;
-    const onVis = () => {
-      if (document.hidden) {
-        hiddenAt = Date.now();
-      } else if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000) {
-        sessionStorage.removeItem("lifeDashboard:auth:unlocked");
-        setMode("unlock");
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [mode]);
+    const onLock = () => setMode(isLockEnabled() ? "unlock" : "setup");
+    window.addEventListener(LOCK_EVENT, onLock);
+    return () => window.removeEventListener(LOCK_EVENT, onLock);
+  }, []);
 
   if (mode === "open") return children;
 

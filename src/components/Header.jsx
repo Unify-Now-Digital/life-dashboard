@@ -1,5 +1,6 @@
 import React from "react";
 import { C } from "../lib/tokens";
+import { lockNow, isLockEnabled } from "../lib/authLocal";
 
 export default function Header({ today, dayOfYear, quote }) {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -18,11 +19,29 @@ export default function Header({ today, dayOfYear, quote }) {
             {greet}, Arin.
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 10, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Day
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+          <button
+            type="button"
+            onClick={lockNow}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 11,
+              color: C.textTertiary,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+            aria-label={isLockEnabled() ? "Lock dashboard" : "Set a lock"}
+          >
+            {isLockEnabled() ? "Lock" : "Set a lock"}
+          </button>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Day
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{dayOfYear}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{dayOfYear}</div>
         </div>
       </div>
       <div

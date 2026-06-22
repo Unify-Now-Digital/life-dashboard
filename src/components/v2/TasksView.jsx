@@ -97,7 +97,7 @@ function TaskRow({ task, hidePill, isDesktop, onOpen, onRecategorise, onDefer, o
   );
 
   return (
-    <div style={{ position: "relative", overflow: "hidden", borderBottom: `0.5px solid ${C.border}` }}>
+    <div style={{ position: "relative", overflow: dx !== 0 ? "hidden" : "visible", borderBottom: `0.5px solid ${C.border}` }}>
       {/* swipe action backdrops */}
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", fontSize: 13, fontWeight: 600, pointerEvents: "none" }}>
         <span style={{ color: C.success, opacity: dx > 8 ? 1 : 0 }}>{done ? "Reopen" : "✓ Done"}</span>

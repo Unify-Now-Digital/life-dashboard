@@ -121,7 +121,7 @@ function TaskRow({ task, hidePill, isDesktop, onOpen, onRecategorise, onDefer, o
           padding: "9px 2px",
           cursor: "pointer",
           background: C.bg,
-          transform: `translateX(${dx}px)`,
+          transform: dx !== 0 ? `translateX(${dx}px)` : "none",
           transition: swiping.current ? "none" : "transform 0.16s ease",
         }}
       >

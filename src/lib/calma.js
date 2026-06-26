@@ -15,6 +15,10 @@ import { normalizeSentence } from "./sentences";
 // Spaced-repetition intervals, indexed by the item's NEW mastery level (0–5).
 export const INTERVALS = [1, 1, 2, 4, 8, 16];
 
+// Max brand-new cards introduced per deck per day (the rest of a session is
+// due reviews), so progress is paced rather than dumping every card at once.
+export const NEW_PER_DAY = 6;
+
 export const DECK_ORDER = ["verb", "phrase", "sentence", "convo"];
 export const DECK_META = {
   verb: { label: "Verbos" },
@@ -60,6 +64,7 @@ export function freshPractice(goal = 60) {
     mastery: {},
     credited: {},
     celebratedDate: null,
+    introduced: { date: todayISO(), byDeck: {} },
   };
 }
 
@@ -78,6 +83,11 @@ export function normalizePractice(p, goal = 60) {
   }
   if (!next.startDate) {
     next.startDate = t;
+    changed = true;
+  }
+  // Reset the daily new-card intake counter on rollover.
+  if (!next.introduced || next.introduced.date !== t) {
+    next.introduced = { date: t, byDeck: {} };
     changed = true;
   }
   return changed ? next : p;
@@ -156,6 +166,75 @@ export function markSeen(p, id) {
   m.seen = 1;
   m.due = addDays(todayISO(), 1);
   p.mastery[id] = m;
+}
+// Struggled (wrong, then corrected / revealed / skipped) → drop back to the
+// learning level so it returns tomorrow and ranks as weak. Absolute writes →
+// idempotent. `lapses` is informational.
+export function resetToLearning(p, id) {
+  const m = p.mastery[id] || { lvl: 0 };
+  m.lvl = 0;
+  m.seen = 1;
+  m.due = addDays(todayISO(), 1);
+  m.lapses = (m.lapses || 0) + 1;
+  p.mastery[id] = m;
+}
+
+// ----- daily rotation + queue ordering ---------------------------------------
+// Stable-per-day hash of an id → [0,1). Different each day, same within a day,
+// so card order rotates daily without a stored shuffle.
+function hash01(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  h = Math.imul(h ^ (h >>> 16), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+export const dayKey = (id) => hash01(id + ":" + todayISO());
+
+// New cards already started today for a deck (caps the daily intake).
+export function introducedToday(p, deckType) {
+  const intro = p && p.introduced;
+  if (!intro || intro.date !== todayISO()) return 0;
+  return (intro.byDeck && intro.byDeck[deckType]) || 0;
+}
+export function noteIntroduced(p, deckType) {
+  const t = todayISO();
+  if (!p.introduced || p.introduced.date !== t) p.introduced = { date: t, byDeck: {} };
+  p.introduced.byDeck[deckType] = (p.introduced.byDeck[deckType] || 0) + 1;
+}
+
+// Order a deck's cards for the session: due reviews first (most-overdue +
+// lowest mastery, ties rotated daily), then up to the day's remaining quota of
+// brand-new cards. `all` (Repasar igual) includes everything, uncapped.
+export function orderDueQueue(deckCards, p, deckType, { all = false } = {}) {
+  const today = todayISO();
+  const mastery = (p && p.mastery) || {};
+  const reviews = [];
+  const news = [];
+  for (const it of deckCards || []) {
+    const m = mastery[it.id];
+    if (m && m.seen) {
+      if (all || isDue(p, it.id)) reviews.push(it);
+    } else {
+      news.push(it);
+    }
+  }
+  reviews.sort((a, b) => {
+    const ma = mastery[a.id] || {};
+    const mb = mastery[b.id] || {};
+    const oa = ma.due && ma.due < today ? 0 : 1;
+    const ob = mb.due && mb.due < today ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    if ((ma.lvl || 0) !== (mb.lvl || 0)) return (ma.lvl || 0) - (mb.lvl || 0);
+    return dayKey(a.id) - dayKey(b.id);
+  });
+  news.sort((a, b) => dayKey(a.id) - dayKey(b.id));
+  const cap = all ? news.length : Math.max(0, NEW_PER_DAY - introducedToday(p, deckType));
+  return [...reviews.map((it) => it.id), ...news.slice(0, cap).map((it) => it.id)];
 }
 // Set the once-per-day "celebrated" flag when today's goal is first crossed.
 // Returns true the one time it flips.

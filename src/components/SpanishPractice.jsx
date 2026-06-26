@@ -6,12 +6,13 @@ import {
   streakLen,
   chain14,
   dayNumber,
-  isDue,
   norm,
   answerMatches,
   credit,
   masterUp,
-  markSeen,
+  resetToLearning,
+  noteIntroduced,
+  orderDueQueue,
   maybeCelebrate,
   DECK_ORDER,
   DECK_META,
@@ -153,20 +154,23 @@ const btn = {
   },
 };
 
-function ProgressRing({ pct }) {
-  const circ = 2 * Math.PI * 36;
+function ProgressRing({ pct, size = 84 }) {
+  const sw = Math.round(size * 0.107);
+  const r = size / 2 - sw / 2 - 1;
+  const c = size / 2;
+  const circ = 2 * Math.PI * r;
   const dash = `${(circ * Math.min(1, pct / 100)).toFixed(1)} ${circ.toFixed(1)}`;
   return (
-    <div style={{ position: "relative", width: 84, height: 84, flex: "none" }}>
-      <svg width="84" height="84" viewBox="0 0 84 84" style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="42" cy="42" r="36" fill="none" stroke={T.track} strokeWidth="9" />
+    <div style={{ position: "relative", width: size, height: size, flex: "none" }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={c} cy={c} r={r} fill="none" stroke={T.track} strokeWidth={sw} />
         <circle
-          cx="42"
-          cy="42"
-          r="36"
+          cx={c}
+          cy={c}
+          r={r}
           fill="none"
           stroke={T.amber}
-          strokeWidth="9"
+          strokeWidth={sw}
           strokeLinecap="round"
           strokeDasharray={dash}
         />
@@ -180,7 +184,7 @@ function ProgressRing({ pct }) {
           justifyContent: "center",
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 800, color: T.ink, fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ fontSize: Math.round(size * 0.214), fontWeight: 800, color: T.ink, fontVariantNumeric: "tabular-nums" }}>
           {pct}%
         </div>
       </div>
@@ -251,6 +255,20 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
   const firstRef = useRef(null);
   const confettiTimer = useRef(null);
   const gainTimer = useRef(null);
+  // Ids answered wrong / revealed / skipped this session — they reschedule as
+  // "weak" (resetToLearning) instead of levelling up. Cleared per deck build.
+  const missedRef = useRef(new Set());
+
+  // Desktop runs the same mobile-first column, just scaled down so it doesn't
+  // read zoomed on a laptop.
+  const [isWide, setIsWide] = useState(
+    typeof window !== "undefined" && window.innerWidth >= 860
+  );
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 860);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Latest practice for handlers that build a queue right after a commit.
   const practiceRef = useRef(practice);
@@ -280,7 +298,8 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
   };
 
   const rebuildQueue = (deckKey, p, all = false) => {
-    const ids = decks[deckKey].filter((it) => all || isDue(p, it.id)).map((it) => it.id);
+    const ids = orderDueQueue(decks[deckKey], p, deckKey, { all });
+    missedRef.current = new Set();
     setQueueIds(ids);
     setAnswers({});
     setResults({});
@@ -396,6 +415,10 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     });
     if (all && !p0.credited[item.bonusFid]) earned += 6;
     const cele = willCelebrate(earned);
+    // Anything short of a clean all-correct comprobar marks the card weak.
+    if (!all) missedRef.current.add(item.id);
+    const wasNew = !p0.mastery[item.id];
+    const struggled = missedRef.current.has(item.id);
 
     commitPractice((p) => {
       item.fields.forEach((f) => {
@@ -403,7 +426,9 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
       });
       if (all) {
         credit(p, item.bonusFid, 6);
-        masterUp(p, item.id);
+        if (struggled) resetToLearning(p, item.id);
+        else masterUp(p, item.id);
+        if (wasNew) noteIntroduced(p, deck);
       }
       maybeCelebrate(p);
     });
@@ -420,11 +445,16 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     const empty = norm(answers[item.field.fid]) === "";
     const earned = ok && !p0.credited[item.field.fid] ? item.xp : 0;
     const cele = willCelebrate(earned);
+    if (!ok && !empty) missedRef.current.add(item.id);
+    const wasNew = !p0.mastery[item.id];
+    const struggled = missedRef.current.has(item.id);
 
     commitPractice((p) => {
       if (ok) {
         credit(p, item.field.fid, item.xp);
-        masterUp(p, item.id);
+        if (struggled) resetToLearning(p, item.id);
+        else masterUp(p, item.id);
+        if (wasNew) noteIntroduced(p, deck);
       }
       maybeCelebrate(p);
     });
@@ -466,7 +496,12 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
       setAnswers((a) => ({ ...a, [item.field.fid]: item.field.answer }));
       setResults((r) => ({ ...r, [item.field.fid]: "revealed" }));
     }
-    commitPractice((p) => markSeen(p, item.id));
+    // Revealing = struggled: drop back to learning, return tomorrow as weak.
+    const wasNew = !practiceRef.current.mastery[item.id];
+    commitPractice((p) => {
+      resetToLearning(p, item.id);
+      if (wasNew) noteIntroduced(p, deck);
+    });
     setRevealed((r) => ({ ...r, [item.id]: true }));
   };
 
@@ -478,8 +513,13 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
 
   const skipCur = () => {
     if (!cur) return;
-    commitPractice((p) => markSeen(p, cur.id));
-    markDone(cur.id);
+    const item = cur;
+    const wasNew = !practiceRef.current.mastery[item.id];
+    commitPractice((p) => {
+      resetToLearning(p, item.id);
+      if (wasNew) noteIntroduced(p, deck);
+    });
+    markDone(item.id);
   };
 
   const onKey = (e) => {
@@ -520,7 +560,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     color: active ? "#fff" : n > 0 ? T.amberText2 : T.faint2,
   });
 
-  const dueCountFor = (key) => decks[key].filter((it) => isDue(practice, it.id)).length;
+  const dueCountFor = (key) => orderDueQueue(decks[key], practice, key).length;
 
   return (
     <div style={{ minHeight: "100vh", background: T.page, padding: "0 16px 72px", fontFamily: T.ui, color: T.ink }}>
@@ -600,7 +640,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
           background: T.cardOuter,
           border: `1px solid ${T.cardBorder}`,
           borderRadius: 20,
-          padding: "34px 28px 40px",
+          padding: isWide ? "26px 30px 30px" : "34px 28px 40px",
           boxShadow: "0 20px 50px -28px rgba(60,45,20,.35)",
           overflow: "hidden",
         }}
@@ -640,7 +680,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
             >
               {dateLabel}
             </div>
-            <div style={{ fontFamily: T.serif, fontSize: 34, lineHeight: 1.05, color: T.ink }}>{greeting}</div>
+            <div style={{ fontFamily: T.serif, fontSize: isWide ? 27 : 34, lineHeight: 1.05, color: T.ink }}>{greeting}</div>
           </div>
           <div
             style={{
@@ -681,7 +721,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
             marginBottom: 14,
           }}
         >
-          <ProgressRing pct={goalPct} />
+          <ProgressRing pct={goalPct} size={isWide ? 66 : 84} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.ink, marginBottom: 3 }}>Meta de hoy</div>
             <div style={{ fontSize: 13, color: T.muted, fontVariantNumeric: "tabular-nums" }}>
@@ -711,6 +751,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
           <DrillCard
             key={cur.id}
             item={cur}
+            isWide={isWide}
             answers={answers}
             results={results}
             revealed={!!revealed[cur.id]}
@@ -765,6 +806,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
 
 function DrillCard({
   item,
+  isWide,
   answers,
   results,
   revealed,
@@ -784,7 +826,7 @@ function DrillCard({
         background: "#fff",
         border: `1px solid ${T.innerBorder}`,
         borderRadius: 16,
-        padding: "26px 26px 22px",
+        padding: isWide ? "22px 24px 20px" : "26px 26px 22px",
         animation: "calmaSoftIn .25s ease both",
       }}
     >
@@ -796,7 +838,7 @@ function DrillCard({
           {sessionDoneN} / {sessionTotal}
         </span>
       </div>
-      <div style={{ fontFamily: T.serif, fontSize: 30, color: T.ink, lineHeight: 1.12, marginBottom: 6 }}>
+      <div style={{ fontFamily: T.serif, fontSize: isWide ? 25 : 30, color: T.ink, lineHeight: 1.12, marginBottom: 6 }}>
         {item.title}
       </div>
       <div style={{ fontSize: 14, color: T.muted2, marginBottom: 22 }}>{item.sub}</div>

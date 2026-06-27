@@ -23,6 +23,14 @@ import {
   DECK_META,
 } from "../lib/calma.js";
 import { mainHref } from "../lib/host.js";
+import {
+  isPushSupported,
+  needsInstall,
+  permissionState,
+  getExistingSubscription,
+  enablePush,
+  disablePush,
+} from "../lib/push.js";
 
 // "Calma" — the daily Spanish session (design V2). A single warm screen that
 // drills one of four decks (Verbos / Frases / Oraciones / Charla) one card at a
@@ -230,6 +238,142 @@ function Confetti() {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+// "Recordatorios" — opt into the evening Web Push nudge (19:00 Madrid, only if
+// you haven't practiced). Push is bound to the Spanish origin; on iOS it only
+// works once Calma is installed to the Home Screen, so this detects that case
+// and shows install guidance instead of a prompt that would throw. Persists
+// practice.remind = { enabled, hour } via the parent's commitPractice.
+function RemindToggle({ remind, commitPractice, isWide }) {
+  const [supported] = useState(() => isPushSupported());
+  const [install, setInstall] = useState(() => needsInstall());
+  const [subscribed, setSubscribed] = useState(false);
+  const [perm, setPerm] = useState(() => permissionState());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Reflect the real browser subscription state on mount (a saved pref can drift
+  // from the actual SW subscription, e.g. after clearing site data).
+  useEffect(() => {
+    let alive = true;
+    setInstall(needsInstall());
+    if (supported) {
+      getExistingSubscription()
+        .then((s) => alive && setSubscribed(!!s))
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [supported]);
+
+  // Nothing we can do on this browser (and not the iOS-install case) → hide.
+  if (!supported && !install) return null;
+
+  const enabled = !!remind?.enabled && subscribed;
+
+  const toggle = async () => {
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setSubscribed(false);
+        commitPractice((p) => {
+          p.remind = { ...(p.remind || {}), enabled: false, hour: p.remind?.hour ?? 19 };
+        });
+      } else {
+        await enablePush();
+        setSubscribed(true);
+        setPerm(permissionState());
+        commitPractice((p) => {
+          p.remind = { ...(p.remind || {}), enabled: true, hour: p.remind?.hour ?? 19 };
+        });
+      }
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const box = {
+    background: T.goalStrip,
+    border: `1px solid ${T.innerBorder}`,
+    borderRadius: 16,
+    padding: "14px 16px",
+    marginBottom: 14,
+    fontFamily: T.ui,
+  };
+
+  // iOS, not installed → can't subscribe; guide to Add to Home Screen.
+  if (install) {
+    return (
+      <div style={box}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.ink, marginBottom: 4 }}>Recordatorios</div>
+        <div style={{ fontSize: 12.5, color: T.muted, lineHeight: 1.45 }}>
+          Añadí Calma a tu pantalla de inicio para recibir recordatorios: tocá{" "}
+          <span style={{ fontWeight: 700, color: T.amberText }}>Compartir</span> y luego{" "}
+          <span style={{ fontWeight: 700, color: T.amberText }}>Añadir a pantalla de inicio</span>.
+        </div>
+      </div>
+    );
+  }
+
+  const denied = perm === "denied";
+
+  return (
+    <div style={box}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.ink }}>Recordatorios</div>
+          <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
+            {denied
+              ? "Permiso bloqueado — activalo en los ajustes del navegador."
+              : "Una vez por la tarde (19:00), solo si no practicaste."}
+          </div>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={busy || denied}
+          aria-pressed={enabled}
+          aria-label="Activar recordatorios"
+          style={{
+            position: "relative",
+            width: 46,
+            height: 28,
+            flexShrink: 0,
+            borderRadius: 999,
+            border: "none",
+            cursor: busy || denied ? "default" : "pointer",
+            background: enabled ? T.amber : T.track,
+            opacity: busy || denied ? 0.5 : 1,
+            transition: "background .2s ease",
+            padding: 0,
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 3,
+              left: enabled ? 21 : 3,
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              background: "#fff",
+              boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+              transition: "left .2s ease",
+            }}
+          />
+        </button>
+      </div>
+      {error && (
+        <div style={{ fontSize: 12, color: "#b4421f", marginTop: 8 }}>{error}</div>
+      )}
     </div>
   );
 }
@@ -882,6 +1026,9 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
             </div>
           </div>
         </div>
+
+        {/* evening practice reminder (Web Push) */}
+        <RemindToggle remind={practice.remind} commitPractice={commitPractice} isWide={isWide} />
 
         {/* lifetime progress: level tier + XP toward the next tier */}
         <div style={{ marginBottom: 14, padding: "0 4px" }}>

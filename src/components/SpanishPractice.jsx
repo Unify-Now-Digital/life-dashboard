@@ -13,6 +13,8 @@ import {
   resetToLearning,
   noteIntroduced,
   orderDueQueue,
+  logDaily,
+  dailyStats,
   maybeCelebrate,
   DECK_ORDER,
   DECK_META,
@@ -363,6 +365,11 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
   const goalPct = Math.round(100 * Math.min(1, todayXP / goal));
   const streak = streakLen(practice.streakDates);
   const chain = chain14(practice.streakDates);
+  // Performance scorecard (last 7 days; the last entry is today).
+  const week = dailyStats(practice, 7);
+  const todayStat = week[week.length - 1];
+  const weekCorrect = week.reduce((s, d) => s + d.correct, 0);
+  const weekMissed = week.reduce((s, d) => s + d.missed, 0);
 
   const now = new Date();
   const hr = now.getHours();
@@ -430,6 +437,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         if (struggled) resetToLearning(p, item.id);
         else masterUp(p, item.id);
         if (wasNew) noteIntroduced(p, deck);
+        logDaily(p, { wasNew, correct: !struggled });
       }
       maybeCelebrate(p);
     });
@@ -456,6 +464,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         if (struggled) resetToLearning(p, item.id);
         else masterUp(p, item.id);
         if (wasNew) noteIntroduced(p, deck);
+        logDaily(p, { wasNew, correct: !struggled });
       }
       maybeCelebrate(p);
     });
@@ -473,9 +482,12 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
       const p0 = practiceRef.current;
       const earned = !p0.credited[item.fid] ? item.xp : 0;
       const cele = willCelebrate(earned);
+      const wasNew = !p0.mastery[item.id];
       commitPractice((p) => {
         credit(p, item.fid, item.xp);
         masterUp(p, item.id);
+        if (wasNew) noteIntroduced(p, deck); // convo now respects the daily new-card cap
+        logDaily(p, { wasNew, correct: true });
         maybeCelebrate(p);
       });
       setRevealed((r) => ({ ...r, [item.id]: true }));
@@ -502,6 +514,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     commitPractice((p) => {
       resetToLearning(p, item.id);
       if (wasNew) noteIntroduced(p, deck);
+      logDaily(p, { wasNew, correct: false });
     });
     setRevealed((r) => ({ ...r, [item.id]: true }));
   };
@@ -519,6 +532,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     commitPractice((p) => {
       resetToLearning(p, item.id);
       if (wasNew) noteIntroduced(p, deck);
+      logDaily(p, { wasNew, correct: false });
     });
     markDone(item.id);
   };
@@ -797,9 +811,59 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
           >
             <div style={{ fontSize: 46, marginBottom: 8 }}>🎉</div>
             <div style={{ fontFamily: T.serif, fontSize: 30, color: T.ink, marginBottom: 6 }}>¡Listo por hoy!</div>
-            <div style={{ fontSize: 14, color: T.muted2, maxWidth: 340, margin: "0 auto 22px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: T.muted2, maxWidth: 340, margin: "0 auto 18px", lineHeight: 1.5 }}>
               Sumaste {todayXP} XP y mantuviste tu racha de {streak} días. Volvé mañana para no cortarla. 🔥
             </div>
+
+            {/* scorecard — today's tally + a 7-day correct/missed strip */}
+            <div
+              style={{
+                maxWidth: 360,
+                margin: "0 auto 22px",
+                background: T.goalStrip,
+                border: `1px solid ${T.innerBorder}`,
+                borderRadius: 14,
+                padding: "14px 16px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "center", gap: 22, marginBottom: 12, fontVariantNumeric: "tabular-nums" }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0e6b4f" }}>{todayStat.correct}</div>
+                  <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: T.faint }}>aciertos hoy</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: T.amberText }}>{todayStat.missed}</div>
+                  <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: T.faint }}>a repasar</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: T.ink }}>{todayStat.new}</div>
+                  <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: T.faint }}>nuevas</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 6, height: 30 }}>
+                {week.map((d) => {
+                  const tot = d.correct + d.missed;
+                  const h = tot === 0 ? 3 : 6 + Math.round(24 * (d.correct / tot));
+                  return (
+                    <div
+                      key={d.iso}
+                      title={`${d.iso}: ${d.correct} aciertos · ${d.missed} a repasar`}
+                      style={{
+                        width: 14,
+                        height: h,
+                        borderRadius: 3,
+                        background: tot === 0 ? T.dotEmpty : d.today ? T.amber : "#cda96a",
+                        opacity: tot === 0 ? 0.6 : 1,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: T.faint, marginTop: 8 }}>
+                7 días · {weekCorrect} aciertos · {weekMissed} a repasar
+              </div>
+            </div>
+
             <button
               onClick={practiceMore}
               style={{

@@ -65,6 +65,7 @@ export function freshPractice(goal = 60) {
     credited: {},
     celebratedDate: null,
     introduced: { date: todayISO(), byDeck: {} },
+    daily: {}, // per-day rollup { "YYYY-MM-DD": {new,reviews,correct,missed,xp} }
   };
 }
 
@@ -90,6 +91,9 @@ export function normalizePractice(p, goal = 60) {
     next.introduced = { date: t, byDeck: {} };
     changed = true;
   }
+  // Note: `daily` is filled from `freshPractice()` via the spread above whenever
+  // a normalized object is returned; logDaily()/dailyStats() also tolerate its
+  // absence, so no explicit backfill (and no needless write) is required here.
   return changed ? next : p;
 }
 
@@ -153,11 +157,15 @@ export function credit(p, fid, n) {
   return 0;
 }
 // Correct answer → level up (cap 5) and reschedule by the new level's interval.
+// Also records the success on the card (right/last/lastDate) for reporting.
 export function masterUp(p, id) {
   const m = p.mastery[id] || { lvl: 0 };
   m.lvl = Math.min(5, (m.lvl || 0) + 1);
   m.seen = 1;
   m.due = addDays(todayISO(), INTERVALS[m.lvl]);
+  m.right = (m.right || 0) + 1;
+  m.last = "ok";
+  m.lastDate = todayISO();
   p.mastery[id] = m;
 }
 // Reveal / skip → seen, comes back tomorrow, no level change.
@@ -176,7 +184,46 @@ export function resetToLearning(p, id) {
   m.seen = 1;
   m.due = addDays(todayISO(), 1);
   m.lapses = (m.lapses || 0) + 1;
+  m.last = "miss";
+  m.lastDate = todayISO();
   p.mastery[id] = m;
+}
+
+// ----- per-day performance log (for exact reports / trends) ------------------
+// How many days of the rollup to retain, so the blob can't grow unbounded.
+export const DAILY_KEEP = 90;
+// Record one answered card into today's tally. `wasNew` splits new-vs-review,
+// `correct` splits success-vs-mistake; xp snapshots the live daily total (so
+// past days stay frozen once the date rolls). Call once per completed card.
+export function logDaily(p, { wasNew = false, correct = false } = {}) {
+  const t = todayISO();
+  if (!p.daily || typeof p.daily !== "object") p.daily = {};
+  const d = p.daily[t] || { new: 0, reviews: 0, correct: 0, missed: 0, xp: 0 };
+  if (wasNew) d.new += 1;
+  else d.reviews += 1;
+  if (correct) d.correct += 1;
+  else d.missed += 1;
+  d.xp = p.todayXP || 0;
+  p.daily[t] = d;
+  // Prune to the most recent DAILY_KEEP days (ISO keys sort chronologically).
+  const keys = Object.keys(p.daily).sort();
+  if (keys.length > DAILY_KEEP) {
+    for (const k of keys.slice(0, keys.length - DAILY_KEEP)) delete p.daily[k];
+  }
+}
+
+// Last `days` days as an array of { iso, today, new, reviews, correct, missed,
+// xp }, zero-filled for days with no practice — for the scorecard / trends.
+export function dailyStats(p, days = 7) {
+  const t = todayISO();
+  const map = (p && p.daily) || {};
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const iso = addDays(t, -i);
+    const d = map[iso] || { new: 0, reviews: 0, correct: 0, missed: 0, xp: 0 };
+    out.push({ iso, today: iso === t, ...d });
+  }
+  return out;
 }
 
 // ----- daily rotation + queue ordering ---------------------------------------

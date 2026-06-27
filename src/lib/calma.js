@@ -66,6 +66,9 @@ export function freshPractice(goal = 60) {
     celebratedDate: null,
     introduced: { date: todayISO(), byDeck: {} },
     daily: {}, // per-day rollup { "YYYY-MM-DD": {new,reviews,correct,missed,xp} }
+    freezes: 2, // streak-freeze budget: bridges a single missed day
+    frozenDates: [], // days auto-covered by a freeze (count toward the streak)
+    celebratedMilestones: [], // milestone keys already celebrated ("xp:1000"…)
   };
 }
 
@@ -94,6 +97,19 @@ export function normalizePractice(p, goal = 60) {
   // Note: `daily` is filled from `freshPractice()` via the spread above whenever
   // a normalized object is returned; logDaily()/dailyStats() also tolerate its
   // absence, so no explicit backfill (and no needless write) is required here.
+
+  // Seed the milestone baseline for existing learners: mark every milestone
+  // already passed as "celebrated" so we don't replay fanfare retroactively —
+  // only future crossings celebrate. New learners get an empty list. Checked
+  // against the ORIGINAL `p` because the spread above already fills an empty [].
+  if (!Array.isArray(p && p.celebratedMilestones)) {
+    const st = streakLen(effectiveStreakDates(next));
+    next.celebratedMilestones = [
+      ...XP_MILESTONES.filter((m) => (next.xp || 0) >= m).map((m) => "xp:" + m),
+      ...STREAK_MILESTONES.filter((m) => st >= m).map((m) => "streak:" + m),
+    ];
+    changed = true;
+  }
   return changed ? next : p;
 }
 
@@ -146,6 +162,7 @@ export function gainXP(p, n) {
   }
   p.todayXP += n;
   if (!p.streakDates.includes(t)) p.streakDates.push(t);
+  applyStreakFreeze(p); // bridge a single missed day so the streak survives
 }
 // Award XP for a field/item exactly once, ever.
 export function credit(p, fid, n) {
@@ -224,6 +241,85 @@ export function dailyStats(p, days = 7) {
     out.push({ iso, today: iso === t, ...d });
   }
   return out;
+}
+
+// ----- levels (cumulative XP → named tier + progress) ------------------------
+// Lifetime XP maps to a named tier; the bar shows progress toward the next one
+// (goal-gradient / visible-progression: a number that means something).
+export const LEVELS = [
+  { name: "Inicio", at: 0 },
+  { name: "Aprendiz", at: 250 },
+  { name: "Intermedio", at: 750 },
+  { name: "Avanzado", at: 1500 },
+  { name: "Experto", at: 3000 },
+  { name: "Maestro", at: 6000 },
+];
+export function levelFor(xp = 0) {
+  let i = 0;
+  for (let k = 0; k < LEVELS.length; k++) if (xp >= LEVELS[k].at) i = k;
+  const cur = LEVELS[i];
+  const next = LEVELS[i + 1] || null;
+  const into = xp - cur.at;
+  const span = next ? next.at - cur.at : 1;
+  return {
+    index: i,
+    name: cur.name,
+    next: next ? next.name : null,
+    pct: next ? Math.min(100, Math.round((100 * into) / span)) : 100,
+    toNext: next ? Math.max(0, next.at - xp) : 0,
+    max: !next,
+  };
+}
+
+// ----- milestones (one-time celebrations) ------------------------------------
+export const XP_MILESTONES = [100, 250, 500, 1000, 2500, 5000, 10000];
+export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
+// Mark newly-reached milestones as celebrated and return them (so the UI can
+// fire confetti once). Reaching a streak milestone also grants a freeze.
+export function checkMilestones(p, streak) {
+  if (!Array.isArray(p.celebratedMilestones)) p.celebratedMilestones = [];
+  const hit = [];
+  for (const m of XP_MILESTONES) {
+    const key = "xp:" + m;
+    if ((p.xp || 0) >= m && !p.celebratedMilestones.includes(key)) {
+      p.celebratedMilestones.push(key);
+      hit.push({ key, type: "xp", value: m });
+    }
+  }
+  for (const m of STREAK_MILESTONES) {
+    const key = "streak:" + m;
+    if ((streak || 0) >= m && !p.celebratedMilestones.includes(key)) {
+      p.celebratedMilestones.push(key);
+      hit.push({ key, type: "streak", value: m });
+      grantFreeze(p); // reward for reaching a streak milestone
+    }
+  }
+  return hit;
+}
+
+// ----- streak freeze (flexibility beats rigid enforcement) -------------------
+export const FREEZE_CAP = 5;
+export function grantFreeze(p) {
+  p.freezes = Math.min(FREEZE_CAP, (p.freezes || 0) + 1);
+}
+// Days that count toward the streak: genuinely practised + freeze-covered.
+export function effectiveStreakDates(p) {
+  return [...((p && p.streakDates) || []), ...((p && p.frozenDates) || [])];
+}
+// When today is practised, spend one freeze to bridge a SINGLE missed day
+// immediately before the current run, so a one-day lapse doesn't break the
+// streak. Absolute / set-based → idempotent across repeated XP gains.
+export function applyStreakFreeze(p) {
+  const today = todayISO();
+  const have = new Set(effectiveStreakDates(p));
+  if (!have.has(today)) return; // only after today is credited
+  const y = addDays(today, -1);
+  const yy = addDays(today, -2);
+  if (!have.has(y) && have.has(yy) && (p.freezes || 0) > 0) {
+    if (!Array.isArray(p.frozenDates)) p.frozenDates = [];
+    p.frozenDates.push(y);
+    p.freezes -= 1;
+  }
 }
 
 // ----- daily rotation + queue ordering ---------------------------------------

@@ -16,6 +16,9 @@ import {
   logDaily,
   dailyStats,
   maybeCelebrate,
+  levelFor,
+  checkMilestones,
+  effectiveStreakDates,
   DECK_ORDER,
   DECK_META,
 } from "../lib/calma.js";
@@ -254,10 +257,13 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
   const [revealed, setRevealed] = useState({});
   const [celebrate, setCelebrate] = useState(false);
   const [gain, setGain] = useState(null);
+  const [milestone, setMilestone] = useState(null);
+  const [editGoal, setEditGoal] = useState(false);
 
   const firstRef = useRef(null);
   const confettiTimer = useRef(null);
   const gainTimer = useRef(null);
+  const milestoneTimer = useRef(null);
   // Ids answered wrong / revealed / skipped this session — they reschedule as
   // "weak" (resetToLearning) instead of levelling up. Cleared per deck build.
   const missedRef = useRef(new Set());
@@ -324,6 +330,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     return () => {
       clearTimeout(confettiTimer.current);
       clearTimeout(gainTimer.current);
+      clearTimeout(milestoneTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -362,9 +369,16 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
 
   const goal = practice.goal || 60;
   const todayXP = practice.todayXP || 0;
-  const goalPct = Math.round(100 * Math.min(1, todayXP / goal));
-  const streak = streakLen(practice.streakDates);
-  const chain = chain14(practice.streakDates);
+  // Endowed-progress: the ring carries a small head start toward the goal, so
+  // even at 0 XP today it reads as "you've started" (the % label matches).
+  const ENDOW = 0.12;
+  const goalPct = Math.round(100 * (ENDOW + (1 - ENDOW) * Math.min(1, todayXP / goal)));
+  const effDates = effectiveStreakDates(practice);
+  const streak = streakLen(effDates);
+  const chain = chain14(effDates);
+  const level = levelFor(practice.xp || 0);
+  const lifetimeXP = practice.xp || 0;
+  const freezes = practice.freezes || 0;
   // Performance scorecard (last 7 days; the last entry is today).
   const week = dailyStats(practice, 7);
   const todayStat = week[week.length - 1];
@@ -388,6 +402,24 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     clearTimeout(confettiTimer.current);
     setCelebrate(true);
     confettiTimer.current = setTimeout(() => setCelebrate(false), 2700);
+  };
+  // Show a one-time banner + confetti for a newly-reached milestone.
+  const fireMilestone = (hits) => {
+    if (!hits || !hits.length) return;
+    const h = hits[hits.length - 1];
+    const label =
+      h.type === "streak" ? `¡Racha de ${h.value} días!` : `¡${h.value.toLocaleString()} XP!`;
+    setMilestone({ label, id: Date.now() });
+    fireConfetti();
+    clearTimeout(milestoneTimer.current);
+    milestoneTimer.current = setTimeout(() => setMilestone(null), 3200);
+  };
+  // Self-set daily goal (autonomy support).
+  const setGoalTo = (g) => {
+    commitPractice((p) => {
+      p.goal = g;
+    });
+    setEditGoal(false);
   };
   // Would this much XP push today across the goal for the first time?
   const willCelebrate = (earned) =>
@@ -428,6 +460,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     const wasNew = !p0.mastery[item.id];
     const struggled = missedRef.current.has(item.id);
 
+    let mHits = [];
     commitPractice((p) => {
       item.fields.forEach((f) => {
         if (answerMatches(answers[f.fid], f.answer)) credit(p, f.fid, 4);
@@ -440,11 +473,13 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         logDaily(p, { wasNew, correct: !struggled });
       }
       maybeCelebrate(p);
+      mHits = checkMilestones(p, streakLen(effectiveStreakDates(p)));
     });
 
     setResults(nr);
     if (earned > 0) flashGain(`+${earned}`);
     if (cele) fireConfetti();
+    if (mHits.length) fireMilestone(mHits);
     if (all) setTimeout(() => markDone(item.id), 480);
   };
 
@@ -458,6 +493,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
     const wasNew = !p0.mastery[item.id];
     const struggled = missedRef.current.has(item.id);
 
+    let mHits = [];
     commitPractice((p) => {
       if (ok) {
         credit(p, item.field.fid, item.xp);
@@ -467,11 +503,13 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         logDaily(p, { wasNew, correct: !struggled });
       }
       maybeCelebrate(p);
+      mHits = checkMilestones(p, streakLen(effectiveStreakDates(p)));
     });
 
     setResults((r) => ({ ...r, [item.field.fid]: ok ? "correct" : empty ? undefined : "wrong" }));
     if (earned > 0) flashGain(`+${earned}`);
     if (cele) fireConfetti();
+    if (mHits.length) fireMilestone(mHits);
     if (ok) setTimeout(() => markDone(item.id), 480);
   };
 
@@ -483,16 +521,19 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
       const earned = !p0.credited[item.fid] ? item.xp : 0;
       const cele = willCelebrate(earned);
       const wasNew = !p0.mastery[item.id];
+      let mHits = [];
       commitPractice((p) => {
         credit(p, item.fid, item.xp);
         masterUp(p, item.id);
         if (wasNew) noteIntroduced(p, deck); // convo now respects the daily new-card cap
         logDaily(p, { wasNew, correct: true });
         maybeCelebrate(p);
+        mHits = checkMilestones(p, streakLen(effectiveStreakDates(p)));
       });
       setRevealed((r) => ({ ...r, [item.id]: true }));
       if (earned > 0) flashGain(`+${earned}`);
       if (cele) fireConfetti();
+      if (mHits.length) fireMilestone(mHits);
       return;
     }
     // Verb / single: fill in the answer(s), no XP, comes back tomorrow.
@@ -698,6 +739,30 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
             {gain.text}
           </div>
         )}
+        {milestone && (
+          <div
+            key={milestone.id}
+            style={{
+              position: "absolute",
+              top: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 55,
+              background: T.ink,
+              color: "#fff",
+              padding: "8px 18px",
+              borderRadius: 999,
+              fontSize: 14,
+              fontWeight: 800,
+              fontFamily: T.ui,
+              whiteSpace: "nowrap",
+              boxShadow: "0 10px 28px -8px rgba(40,30,15,.45)",
+              animation: "calmaPop .4s ease both",
+            }}
+          >
+            {milestone.label}
+          </div>
+        )}
 
         {/* header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26, gap: 12 }}>
@@ -738,6 +803,14 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
                 racha
               </div>
             </div>
+            {freezes > 0 && (
+              <div
+                title={`${freezes} congelaciones — protegen un día perdido`}
+                style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13, color: T.faint2, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}
+              >
+                ❄️ {freezes}
+              </div>
+            )}
           </div>
         </div>
 
@@ -756,10 +829,41 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         >
           <ProgressRing pct={goalPct} size={isWide ? 66 : 84} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: T.ink, marginBottom: 3 }}>Meta de hoy</div>
-            <div style={{ fontSize: 13, color: T.muted, fontVariantNumeric: "tabular-nums" }}>
-              {Math.min(todayXP, goal)} / {goal} XP · quedan {remainCount} tarjetas
-            </div>
+            <button
+              onClick={() => setEditGoal((v) => !v)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: T.ui }}
+            >
+              <span style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>Meta de hoy</span>
+              <span style={{ fontSize: 11, color: T.faint }}>ajustar ▾</span>
+            </button>
+            {editGoal ? (
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {[30, 60, 90, 120].map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGoalTo(g)}
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: 999,
+                      fontFamily: T.ui,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontVariantNumeric: "tabular-nums",
+                      border: g === goal ? "none" : `1px solid ${T.inputBorder}`,
+                      background: g === goal ? T.amber : "#fff",
+                      color: g === goal ? "#fff" : T.muted,
+                    }}
+                  >
+                    {g} XP
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: T.muted, fontVariantNumeric: "tabular-nums", marginTop: 3 }}>
+                {Math.min(todayXP, goal)} / {goal} XP · quedan {remainCount} tarjetas
+              </div>
+            )}
             <div style={{ display: "flex", gap: 5, marginTop: 11, flexWrap: "wrap" }}>
               {chain.map((d) => (
                 <div
@@ -776,6 +880,19 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
                 />
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* lifetime progress: level tier + XP toward the next tier */}
+        <div style={{ marginBottom: 14, padding: "0 4px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+            <span style={{ fontWeight: 700, color: T.ink }}>Nivel · {level.name}</span>
+            <span style={{ color: T.faint, fontVariantNumeric: "tabular-nums" }}>
+              {lifetimeXP.toLocaleString()} XP{level.max ? "" : ` · faltan ${level.toNext.toLocaleString()} para ${level.next}`}
+            </span>
+          </div>
+          <div style={{ height: 6, borderRadius: 999, background: T.track, overflow: "hidden" }}>
+            <div style={{ width: `${level.pct}%`, height: "100%", background: T.amber, borderRadius: 999, transition: "width .4s ease" }} />
           </div>
         </div>
 

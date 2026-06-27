@@ -367,7 +367,7 @@ export default function Dashboard() {
           onDefer={(n) => deferTask(focusId, n)}
         />
 
-        <SpanishButton />
+        <SpanishButton practice={state.projects?.learning?.spanish?.practice} />
       </AuthGate>
     </LocalLock>
   );

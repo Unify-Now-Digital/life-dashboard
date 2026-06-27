@@ -17,6 +17,7 @@ import {
   DECK_ORDER,
   DECK_META,
 } from "../lib/calma.js";
+import { mainHref } from "../lib/host.js";
 
 // "Calma" — the daily Spanish session (design V2). A single warm screen that
 // drills one of four decks (Verbos / Frases / Oraciones / Charla) one card at a
@@ -579,6 +580,24 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
         }}
       >
         <div style={{ position: "relative", width: "100%", maxWidth: 680, display: "flex", justifyContent: "center" }}>
+          <a
+            href={mainHref()}
+            title="Volver al panel"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: T.faint,
+              fontSize: 12,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: T.ui,
+              padding: "6px 2px",
+            }}
+          >
+            ‹ Panel
+          </a>
           <div
             style={{
               display: "inline-flex",

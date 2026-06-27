@@ -3,7 +3,7 @@ import { C, ACCENT, styles, QUOTES } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
 import { isSupabaseEnabled } from "./lib/supabase";
-import { isSpanishHost } from "./lib/host.js";
+import { isSpanishHost, mainHref } from "./lib/host.js";
 import { getTheme, setTheme as persistTheme } from "./lib/theme.js";
 import { addDays, metaFromDue } from "./lib/taskDates.js";
 import { loadWisdom } from "./lib/wisdom.js";
@@ -256,7 +256,14 @@ export default function Dashboard() {
             <SpanishPractice state={state} setState={setState} onMore={() => setSpanishMode("more")} localOnlyBanner={localOnlyBanner} />
           ) : (
             <div style={styles.page}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <a
+                  href={mainHref()}
+                  title="Volver al panel"
+                  style={{ fontSize: 12, color: C.textTertiary, textDecoration: "none", fontFamily: "inherit", padding: "4px 2px" }}
+                >
+                  ‹ Panel
+                </a>
                 <button
                   onClick={() => setSpanishMode("calma")}
                   style={{ background: "transparent", border: `0.5px solid ${C.border}`, borderRadius: 6, padding: "4px 12px", fontSize: 12, color: C.accent, cursor: "pointer", fontFamily: "inherit" }}

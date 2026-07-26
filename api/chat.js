@@ -18,7 +18,55 @@
 
 const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PREFIX =
-  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You cannot edit anything yet — you can only discuss and advise.";
+  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You can take three actions when asked: mark a task done or reopen it (set_task_done), add a new task (add_task), and log a habit as done or skipped for a day (log_habit). Use the [task_id] and (key) values from the context snapshot. After using a tool, confirm briefly in plain language what you did.";
+
+const TOOLS = [
+  {
+    name: "set_task_done",
+    description: "Mark an existing task done, or reopen a done task.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The [task_id] from the context snapshot." },
+        done: { type: "boolean", description: "true to mark done, false to reopen." },
+      },
+      required: ["task_id", "done"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "add_task",
+    description: "Add a new task to the Work or Personal column.",
+    input_schema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "The task text." },
+        column: { type: "string", enum: ["work", "personal"] },
+        priority: { type: "boolean", description: "Whether to also add it to the priorities bar." },
+        due: { type: ["string", "null"], description: "ISO date (YYYY-MM-DD), or null for no due date." },
+      },
+      required: ["text", "column"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "log_habit",
+    description: "Log a habit as done or skipped for a given day.",
+    input_schema: {
+      type: "object",
+      properties: {
+        habit_key: { type: "string", description: "The (key) of the habit from the context snapshot." },
+        answer: { type: "string", enum: ["yes", "no"] },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD). Defaults to today if omitted." },
+      },
+      required: ["habit_key", "answer"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+];
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -47,10 +95,11 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1024,
+        max_tokens: 1536,
         stream: true,
         system,
         messages,
+        tools: TOOLS,
       }),
     });
 

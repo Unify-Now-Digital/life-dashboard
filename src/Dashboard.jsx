@@ -9,6 +9,7 @@ import { addDays, metaFromDue } from "./lib/taskDates.js";
 import { loadWisdom } from "./lib/wisdom.js";
 import { streamChat } from "./lib/chatStream.js";
 import { buildAssistantContext } from "./lib/assistantContext.js";
+import { isoDate } from "./lib/habits.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -154,20 +155,20 @@ export default function Dashboard() {
     setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
   const reorderGroups = (column, mode, keys) =>
     setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupOrder: { ...(s.ui?.groupOrder || {}), [`${mode}:${column}`]: keys } } }));
-  const addTask = (column, text) =>
+  const addTask = (column, text, extra = {}) =>
     setState((s) => ({
       ...s,
       tasks: [
         ...(s.tasks || []),
         {
-          id: "tsk_" + Date.now(),
+          id: extra.id || "tsk_" + Date.now(),
           text,
           column,
           pill: column === "personal" ? "Admin" : "CM",
-          priority: false,
+          priority: !!extra.priority,
           isDecision: false,
           importance: 1,
-          due: null,
+          due: extra.due ?? null,
           meta: null,
           status: "open",
           createdAt: new Date().toISOString(),
@@ -228,6 +229,8 @@ export default function Dashboard() {
 
   // ---- Assistant ------------------------------------------------------------
   const MAX_ASSISTANT_MESSAGES = 40;
+  const MAX_TOOL_ROUNDS = 4;
+  const undoTimerRef = useRef(null);
 
   const appendAssistantMessage = (msg) =>
     setState((s) => {
@@ -235,17 +238,204 @@ export default function Dashboard() {
       return { ...s, assistant: { ...(s.assistant || {}), messages } };
     });
 
+  // Merges only the slices the tool executors touch into the *latest* state —
+  // never overwrites wholesale, so it can't clobber a concurrently-appended
+  // chat message or any other in-flight edit.
+  const commitToolState = (working) =>
+    setState((s) => ({ ...s, tasks: working.tasks, habitLog: working.habitLog, habitNoLog: working.habitNoLog }));
+
+  const showUndo = (label, onUndo) => {
+    clearTimeout(undoTimerRef.current);
+    setUndo({ label, onUndo: () => { setUndo(null); onUndo(); } });
+    undoTimerRef.current = setTimeout(() => setUndo(null), 6000);
+  };
+
+  // Pure: (workingState, call) -> { state, toolResult, undo? }. Never touches
+  // React state directly, so several calls in one turn can chain against a
+  // local working copy before a single commit.
+  const applyToolCall = (working, call) => {
+    const { name, input } = call;
+
+    if (name === "set_task_done") {
+      const { task_id, done } = input || {};
+      const task = (working.tasks || []).find((t) => t.id === task_id);
+      if (!task) return { state: working, toolResult: { ok: false, message: `No task with id "${task_id}" found.` } };
+      const prevStatus = task.status;
+      const nextState = {
+        ...working,
+        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status: done ? "done" : "open" } : t)),
+      };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `${done ? "Marked" : "Reopened"} "${task.text}" ${done ? "done" : "open"}.` },
+        undo: {
+          label: `${done ? "Marked" : "Reopened"} "${task.text}"`,
+          onUndo: () => updateTask(task_id, { status: prevStatus }),
+        },
+      };
+    }
+
+    if (name === "add_task") {
+      const { text, column, priority, due } = input || {};
+      if (!text || (column !== "work" && column !== "personal")) {
+        return { state: working, toolResult: { ok: false, message: 'add_task needs "text" and "column" (work or personal).' } };
+      }
+      const id = "tsk_" + Date.now() + "_" + call.id.slice(-8);
+      const task = {
+        id,
+        text,
+        column,
+        pill: column === "personal" ? "Admin" : "CM",
+        priority: !!priority,
+        isDecision: false,
+        importance: 1,
+        due: due ?? null,
+        meta: null,
+        status: "open",
+        createdAt: new Date().toISOString(),
+        notes: "",
+      };
+      const nextState = { ...working, tasks: [...(working.tasks || []), task] };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `Added "${text}" to ${column}.` },
+        undo: { label: `Added "${text}"`, onUndo: () => deleteTask(id) },
+      };
+    }
+
+    if (name === "log_habit") {
+      const { habit_key, answer, date } = input || {};
+      const habit = (working.habits || []).find((h) => h.key === habit_key);
+      if (!habit) return { state: working, toolResult: { ok: false, message: `No habit with key "${habit_key}" found.` } };
+      if (answer !== "yes" && answer !== "no") {
+        return { state: working, toolResult: { ok: false, message: 'log_habit answer must be "yes" or "no".' } };
+      }
+      const dateISO = date || isoDate(new Date());
+      const habitLog = working.habitLog || {};
+      const habitNoLog = working.habitNoLog || {};
+      const prevAnswer = (habitLog[habit_key] || []).includes(dateISO)
+        ? "yes"
+        : (habitNoLog[habit_key] || []).includes(dateISO)
+          ? "no"
+          : null;
+      const yes = (habitLog[habit_key] || []).filter((d) => d !== dateISO);
+      const no = (habitNoLog[habit_key] || []).filter((d) => d !== dateISO);
+      if (answer === "yes") yes.push(dateISO);
+      if (answer === "no") no.push(dateISO);
+      const nextState = {
+        ...working,
+        habitLog: { ...habitLog, [habit_key]: yes },
+        habitNoLog: { ...habitNoLog, [habit_key]: no },
+      };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `Logged ${habit.label} as ${answer} for ${dateISO}.` },
+        undo: {
+          label: `Logged ${habit.label} as ${answer}`,
+          // confirmHabit clears both logs for any answer outside yes/no —
+          // exactly "reset to unlogged".
+          onUndo: () => confirmHabit(habit_key, dateISO, prevAnswer || "clear"),
+        },
+      };
+    }
+
+    return { state: working, toolResult: { ok: false, message: `Unknown tool "${name}".` } };
+  };
+
   // Reply text streams into a ref (not persisted state) so tokens don't
   // trigger the debounced cloud save; only the finished reply is committed.
-  const finalizeAssistantReply = () => {
+  const finalizeAssistantLoop = (appliedActions) => {
     setAssistantStreaming(false);
-    setAssistantStreamText("");
     assistantAbortRef.current = null;
-    const text = assistantBufferRef.current;
+    pendingResolveRef.current = null;
+    const streamed = assistantBufferRef.current.trim();
     assistantBufferRef.current = "";
-    if (text.trim()) {
-      appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text, createdAt: new Date().toISOString() });
+    setAssistantStreamText("");
+    // A real mutation must never end the turn with zero visible trace — if
+    // the model never narrated (round cap, or a tool-only final round), fall
+    // back to a plain summary of what was applied.
+    const finalText = streamed || appliedActions.join(" ");
+    if (finalText) {
+      appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text: finalText, createdAt: new Date().toISOString() });
     }
+  };
+
+  const pendingResolveRef = useRef(null);
+  const stopRequestedRef = useRef(false);
+
+  const runAssistantLoop = async (initialMessages, contextSnapshot, startState) => {
+    let working = startState;
+    let messages = initialMessages;
+    const appliedActions = [];
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (stopRequestedRef.current) break;
+
+      const controller = new AbortController();
+      assistantAbortRef.current = controller;
+
+      const outcome = await new Promise((resolve) => {
+        pendingResolveRef.current = resolve;
+        const toolCalls = [];
+        streamChat({
+          messages,
+          context: contextSnapshot,
+          signal: controller.signal,
+          onDelta: (chunk) => {
+            assistantBufferRef.current += chunk;
+            setAssistantStreamText(assistantBufferRef.current);
+          },
+          onToolCall: (call) => toolCalls.push(call),
+          onDone: ({ stopReason }) => resolve({ stopReason, toolCalls }),
+          onError: (err) => resolve({ error: err }),
+        });
+      });
+      pendingResolveRef.current = null;
+
+      if (outcome.error) {
+        setAssistantError(outcome.error.message || "Something went wrong.");
+        break;
+      }
+      if (stopRequestedRef.current) break;
+
+      const { stopReason, toolCalls } = outcome;
+      if (stopReason !== "tool_use" || !toolCalls.length) break;
+
+      // Anthropic requires the full assistant turn (text + every tool_use
+      // block) echoed back, followed by one user turn with every matching
+      // tool_result — never split across messages.
+      const assistantBlocks = [];
+      const streamedText = assistantBufferRef.current.trim();
+      if (streamedText) assistantBlocks.push({ type: "text", text: streamedText });
+      assistantBufferRef.current = "";
+      setAssistantStreamText("");
+
+      const toolResultBlocks = [];
+      for (const call of toolCalls) {
+        assistantBlocks.push({ type: "tool_use", id: call.id, name: call.name, input: call.input || {} });
+        if (call.error) {
+          toolResultBlocks.push({ type: "tool_result", tool_use_id: call.id, content: call.error, is_error: true });
+          continue;
+        }
+        const { state: nextWorking, toolResult, undo } = applyToolCall(working, call);
+        working = nextWorking;
+        if (toolResult.ok) {
+          appliedActions.push(toolResult.message);
+          if (undo) showUndo(undo.label, undo.onUndo);
+        }
+        toolResultBlocks.push({
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: toolResult.message,
+          ...(toolResult.ok ? {} : { is_error: true }),
+        });
+      }
+
+      commitToolState(working);
+      messages = [...messages, { role: "assistant", content: assistantBlocks }, { role: "user", content: toolResultBlocks }];
+    }
+
+    finalizeAssistantLoop(appliedActions);
   };
 
   const sendAssistantMessage = (text) => {
@@ -260,29 +450,17 @@ export default function Dashboard() {
     setAssistantStreaming(true);
     setAssistantStreamText("");
     assistantBufferRef.current = "";
+    stopRequestedRef.current = false;
 
-    const controller = new AbortController();
-    assistantAbortRef.current = controller;
-
-    streamChat({
-      messages: history,
-      context: contextSnapshot,
-      signal: controller.signal,
-      onDelta: (chunk) => {
-        assistantBufferRef.current += chunk;
-        setAssistantStreamText(assistantBufferRef.current);
-      },
-      onDone: finalizeAssistantReply,
-      onError: (err) => {
-        setAssistantError(err.message || "Something went wrong.");
-        finalizeAssistantReply();
-      },
-    });
+    runAssistantLoop(history, contextSnapshot, state);
   };
 
   const stopAssistant = () => {
+    stopRequestedRef.current = true;
     assistantAbortRef.current?.abort();
-    finalizeAssistantReply();
+    const resolve = pendingResolveRef.current;
+    pendingResolveRef.current = null;
+    if (resolve) resolve({ stopReason: "aborted" });
   };
 
   const today = new Date();
@@ -450,6 +628,8 @@ export default function Dashboard() {
           onStop={stopAssistant}
           isCompact={isCompact}
         />
+
+        {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </AuthGate>
     </LocalLock>
   );

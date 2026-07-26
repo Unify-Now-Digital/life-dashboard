@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 // Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
 // carries a category `pill`, an optional `meta` urgency flag, and the
@@ -96,6 +96,11 @@ export const defaultState = {
   // hides the header Unify sparkline; `groupOrder` stores custom task-group
   // ordering keyed by `${groupMode}:${column}`.
   ui: { view: "tasks", theme: null, sectionOrder: [], unifyTrendHidden: false, groupOrder: {}, sortBy: "due", groupMode: "label" },
+
+  // Floating assistant widget — synced chat history with the personal AI
+  // assistant. `messages`: [{ id, role: 'user'|'assistant', text, createdAt }].
+  // Capped to the most recent ~40 entries on append (see Dashboard.jsx).
+  assistant: { messages: [] },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
   // TopThree component. Auto-filled when a Work todo is starred (which also

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { C, ACCENT, styles, QUOTES } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
@@ -7,11 +7,15 @@ import { isSpanishHost, mainHref } from "./lib/host.js";
 import { getTheme, setTheme as persistTheme } from "./lib/theme.js";
 import { addDays, metaFromDue } from "./lib/taskDates.js";
 import { loadWisdom } from "./lib/wisdom.js";
+import { streamChat } from "./lib/chatStream.js";
+import { buildAssistantContext } from "./lib/assistantContext.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
 import LocalLock from "./components/LocalLock.jsx";
 import SpanishButton from "./components/SpanishButton.jsx";
+import AssistantButton from "./components/v2/AssistantButton.jsx";
+import AssistantPanel from "./components/v2/AssistantPanel.jsx";
 import SpanishPractice from "./components/SpanishPractice.jsx";
 import LearningProject from "./components/projects/LearningProject.jsx";
 import UndoToast from "./components/UndoToast.jsx";
@@ -55,6 +59,12 @@ export default function Dashboard() {
 
   const [decisionsActive, setDecisionsActive] = useState(false);
   const [focusId, setFocusId] = useState(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantStreaming, setAssistantStreaming] = useState(false);
+  const [assistantStreamText, setAssistantStreamText] = useState("");
+  const [assistantError, setAssistantError] = useState(null);
+  const assistantAbortRef = useRef(null);
+  const assistantBufferRef = useRef("");
   const [phrases, setPhrases] = useState([]);
   const [qIndex, setQIndex] = useState(0);
 
@@ -216,6 +226,65 @@ export default function Dashboard() {
   const clearTransactions = () =>
     setState((s) => ({ ...s, finance: { ...(s.finance || {}), transactions: [], importedAt: null } }));
 
+  // ---- Assistant ------------------------------------------------------------
+  const MAX_ASSISTANT_MESSAGES = 40;
+
+  const appendAssistantMessage = (msg) =>
+    setState((s) => {
+      const messages = [...(s.assistant?.messages || []), msg].slice(-MAX_ASSISTANT_MESSAGES);
+      return { ...s, assistant: { ...(s.assistant || {}), messages } };
+    });
+
+  // Reply text streams into a ref (not persisted state) so tokens don't
+  // trigger the debounced cloud save; only the finished reply is committed.
+  const finalizeAssistantReply = () => {
+    setAssistantStreaming(false);
+    setAssistantStreamText("");
+    assistantAbortRef.current = null;
+    const text = assistantBufferRef.current;
+    assistantBufferRef.current = "";
+    if (text.trim()) {
+      appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text, createdAt: new Date().toISOString() });
+    }
+  };
+
+  const sendAssistantMessage = (text) => {
+    const userMsg = { id: "msg_" + Date.now(), role: "user", text, createdAt: new Date().toISOString() };
+    const history = [...(state.assistant?.messages || []), userMsg]
+      .slice(-MAX_ASSISTANT_MESSAGES)
+      .map((m) => ({ role: m.role, content: m.text }));
+    const contextSnapshot = buildAssistantContext(state);
+
+    appendAssistantMessage(userMsg);
+    setAssistantError(null);
+    setAssistantStreaming(true);
+    setAssistantStreamText("");
+    assistantBufferRef.current = "";
+
+    const controller = new AbortController();
+    assistantAbortRef.current = controller;
+
+    streamChat({
+      messages: history,
+      context: contextSnapshot,
+      signal: controller.signal,
+      onDelta: (chunk) => {
+        assistantBufferRef.current += chunk;
+        setAssistantStreamText(assistantBufferRef.current);
+      },
+      onDone: finalizeAssistantReply,
+      onError: (err) => {
+        setAssistantError(err.message || "Something went wrong.");
+        finalizeAssistantReply();
+      },
+    });
+  };
+
+  const stopAssistant = () => {
+    assistantAbortRef.current?.abort();
+    finalizeAssistantReply();
+  };
+
   const today = new Date();
   const start = new Date(today.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((today - start) / 86400000);
@@ -368,6 +437,19 @@ export default function Dashboard() {
         />
 
         <SpanishButton practice={state.projects?.learning?.spanish?.practice} />
+
+        <AssistantButton onClick={() => setAssistantOpen(true)} isCompact={isCompact} />
+        <AssistantPanel
+          open={assistantOpen}
+          onClose={() => setAssistantOpen(false)}
+          messages={state.assistant?.messages || []}
+          streamingText={assistantStreamText}
+          isStreaming={assistantStreaming}
+          error={assistantError}
+          onSend={sendAssistantMessage}
+          onStop={stopAssistant}
+          isCompact={isCompact}
+        />
       </AuthGate>
     </LocalLock>
   );

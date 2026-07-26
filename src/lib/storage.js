@@ -34,6 +34,7 @@ export function migrate(raw) {
   if (v < 7) s = migrateV6toV7(s);
   if (v < 8) s = migrateV7toV8(s);
   if (v < 9) s = migrateV8toV9(s);
+  if (v < 10) s = migrateV9toV10(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -515,6 +516,18 @@ function migrateV8toV9(s) {
   const DEMO_SIGNATURES = ["Chase 2 stale permits", "Quote follow-up — Mrs Doyle", "Weekly review — W19", "Order replacement for kitchen"];
   const looksLikeDemo = tasks.some((t) => DEMO_SIGNATURES.includes(t.text));
   if (tasks.length === 0 || looksLikeDemo) out.tasks = defaultState.tasks;
+  return out;
+}
+
+// v9 → v10: floating assistant widget. Adds the top-level `assistant`
+// container for synced chat history. mergeDefaults would backfill this
+// anyway, but this explicit step keeps the changelog consistent with prior
+// schema bumps.
+function migrateV9toV10(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (!out.assistant || typeof out.assistant !== "object" || !Array.isArray(out.assistant.messages)) {
+    out.assistant = { ...defaultState.assistant };
+  }
   return out;
 }
 

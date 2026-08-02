@@ -242,11 +242,35 @@ export default function Dashboard() {
       return { ...s, assistant: { ...(s.assistant || {}), messages } };
     });
 
-  // Merges only the slices the tool executors touch into the *latest* state —
-  // never overwrites wholesale, so it can't clobber a concurrently-appended
-  // chat message or any other in-flight edit.
-  const commitToolState = (working) =>
-    setState((s) => ({ ...s, tasks: working.tasks, habitLog: working.habitLog, habitNoLog: working.habitNoLog }));
+  // Applies one round's worth of tool-call patches against the *latest*
+  // state by id/key — same pattern as updateTask/addTask/confirmHabit —
+  // never by replacing the tasks/habitLog/habitNoLog slices wholesale.
+  // That distinction matters here specifically: a wholesale replace would
+  // silently discard any edit Arin made by hand in the UI while a
+  // multi-round tool loop was still in flight.
+  const commitPatches = (patches) =>
+    setState((s) => {
+      let tasks = s.tasks || [];
+      let habitLog = s.habitLog || {};
+      let habitNoLog = s.habitNoLog || {};
+      const statusById = new Map();
+      const added = [];
+      for (const p of patches) {
+        if (p.type === "task_status") statusById.set(p.taskId, p.status);
+        else if (p.type === "task_add") added.push(p.task);
+        else if (p.type === "habit_log") {
+          const yes = (habitLog[p.key] || []).filter((d) => d !== p.dateISO);
+          const no = (habitNoLog[p.key] || []).filter((d) => d !== p.dateISO);
+          if (p.answer === "yes") yes.push(p.dateISO);
+          if (p.answer === "no") no.push(p.dateISO);
+          habitLog = { ...habitLog, [p.key]: yes };
+          habitNoLog = { ...habitNoLog, [p.key]: no };
+        }
+      }
+      if (statusById.size) tasks = tasks.map((t) => (statusById.has(t.id) ? { ...t, status: statusById.get(t.id) } : t));
+      if (added.length) tasks = [...tasks, ...added];
+      return { ...s, tasks, habitLog, habitNoLog };
+    });
 
   const showUndo = (label, onUndo) => {
     clearTimeout(undoTimerRef.current);
@@ -254,9 +278,15 @@ export default function Dashboard() {
     undoTimerRef.current = setTimeout(() => setUndo(null), 6000);
   };
 
-  // Pure: (workingState, call) -> { state, toolResult, undo? }. Never touches
-  // React state directly, so several calls in one turn can chain against a
-  // local working copy before a single commit.
+  // Pure: (workingState, call) -> { state, toolResult, undo?, patch? }.
+  // Never touches React state directly. `state` (the working copy) exists
+  // only so several calls *within one turn* can see each other's writes —
+  // e.g. add_task then reference the task it just created. The actual
+  // commit to React state happens separately via `patch`, applied against
+  // the *latest* state by id/key (see commitPatches) — never by replacing
+  // working.tasks/habitLog/habitNoLog wholesale, which would silently
+  // clobber an unrelated edit Arin made in the UI while the loop was
+  // in flight.
   const applyToolCall = (working, call) => {
     const { name, input } = call;
 
@@ -265,9 +295,10 @@ export default function Dashboard() {
       const task = (working.tasks || []).find((t) => t.id === task_id);
       if (!task) return { state: working, toolResult: { ok: false, message: `No task with id "${task_id}" found.` } };
       const prevStatus = task.status;
+      const status = done ? "done" : "open";
       const nextState = {
         ...working,
-        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status: done ? "done" : "open" } : t)),
+        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status } : t)),
       };
       return {
         state: nextState,
@@ -276,6 +307,7 @@ export default function Dashboard() {
           label: `${done ? "Marked" : "Reopened"} "${task.text}"`,
           onUndo: () => updateTask(task_id, { status: prevStatus }),
         },
+        patch: { type: "task_status", taskId: task_id, status },
       };
     }
 
@@ -284,7 +316,9 @@ export default function Dashboard() {
       if (!text || (column !== "work" && column !== "personal")) {
         return { state: working, toolResult: { ok: false, message: 'add_task needs "text" and "column" (work or personal).' } };
       }
-      const id = "tsk_" + Date.now() + "_" + call.id.slice(-8);
+      // call.id (the Anthropic tool_use id) is already globally unique —
+      // no need to also mix in Date.now().
+      const id = "tsk_" + call.id;
       const task = {
         id,
         text,
@@ -302,8 +336,11 @@ export default function Dashboard() {
       const nextState = { ...working, tasks: [...(working.tasks || []), task] };
       return {
         state: nextState,
-        toolResult: { ok: true, message: `Added "${text}" to ${column}.` },
+        // Echo the id back so a later tool call *this same turn* (e.g.
+        // "add X, then mark X done") can reference it.
+        toolResult: { ok: true, message: `Added "${text}" to ${column} (id: ${id}).` },
         undo: { label: `Added "${text}"`, onUndo: () => deleteTask(id) },
+        patch: { type: "task_add", task },
       };
     }
 
@@ -340,6 +377,7 @@ export default function Dashboard() {
           // exactly "reset to unlogged".
           onUndo: () => confirmHabit(habit_key, dateISO, prevAnswer || "clear"),
         },
+        patch: { type: "habit_log", key: habit_key, dateISO, answer },
       };
     }
 
@@ -400,12 +438,10 @@ export default function Dashboard() {
         .filter((t) => (!start || t.date >= start) && (!end || t.date <= end))
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .slice(0, cap)
-        .map((t) => ({
-          date: t.date,
-          merchant: prettyMerchant(t.desc),
-          amount: Math.abs(t.amount),
-          category: CATEGORY_LABELS[categorise(t, overrides).category] || categorise(t, overrides).category,
-        }));
+        .map((t) => {
+          const cat = categorise(t, overrides).category;
+          return { date: t.date, merchant: prettyMerchant(t.desc), amount: Math.abs(t.amount), category: CATEGORY_LABELS[cat] || cat };
+        });
       return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: results.length, results }) } };
     }
 
@@ -448,17 +484,19 @@ export default function Dashboard() {
 
   // Reply text streams into a ref (not persisted state) so tokens don't
   // trigger the debounced cloud save; only the finished reply is committed.
-  const finalizeAssistantLoop = (appliedActions) => {
+  const finalizeAssistantLoop = (appliedActions, madeAnyToolCall) => {
     setAssistantStreaming(false);
     assistantAbortRef.current = null;
     pendingResolveRef.current = null;
     const streamed = assistantBufferRef.current.trim();
     assistantBufferRef.current = "";
     setAssistantStreamText("");
-    // A real mutation must never end the turn with zero visible trace — if
-    // the model never narrated (round cap, or a tool-only final round), fall
-    // back to a plain summary of what was applied.
-    const finalText = streamed || appliedActions.join(" ");
+    // A turn that actually did something must never end with zero visible
+    // trace — if the model never narrated (round cap hit, or the final
+    // round was tool-only), fall back to a plain summary of what was
+    // applied, or — if it was reads only — a generic acknowledgement so
+    // Arin isn't left staring at a chat that silently ate his message.
+    const finalText = streamed || appliedActions.join(" ") || (madeAnyToolCall ? "Got that — let me know if you'd like more detail." : "");
     if (finalText) {
       appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text: finalText, createdAt: new Date().toISOString() });
     }
@@ -471,6 +509,7 @@ export default function Dashboard() {
     let working = startState;
     let messages = initialMessages;
     const appliedActions = [];
+    let madeAnyToolCall = false;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (stopRequestedRef.current) break;
@@ -504,6 +543,7 @@ export default function Dashboard() {
 
       const { stopReason, toolCalls } = outcome;
       if (stopReason !== "tool_use" || !toolCalls.length) break;
+      madeAnyToolCall = true;
 
       // Anthropic requires the full assistant turn (text + every tool_use
       // block) echoed back, followed by one user turn with every matching
@@ -515,20 +555,22 @@ export default function Dashboard() {
       setAssistantStreamText("");
 
       const toolResultBlocks = [];
-      const workingBeforeRound = working;
+      const roundPatches = [];
+      const roundUndos = [];
       for (const call of toolCalls) {
         assistantBlocks.push({ type: "tool_use", id: call.id, name: call.name, input: call.input || {} });
         if (call.error) {
           toolResultBlocks.push({ type: "tool_result", tool_use_id: call.id, content: call.error, is_error: true });
           continue;
         }
-        const { state: nextWorking, toolResult, undo } = applyToolCall(working, call);
+        const { state: nextWorking, toolResult, undo, patch } = applyToolCall(working, call);
         working = nextWorking;
         if (toolResult.ok && undo) {
           // Only mutations (write tools always carry an undo) go into the
           // fallback narration — a read tool's raw JSON isn't fit to show.
           appliedActions.push(toolResult.message);
-          showUndo(undo.label, undo.onUndo);
+          roundUndos.push(undo);
+          if (patch) roundPatches.push(patch);
         }
         toolResultBlocks.push({
           type: "tool_result",
@@ -538,11 +580,23 @@ export default function Dashboard() {
         });
       }
 
-      if (working !== workingBeforeRound) commitToolState(working);
+      if (roundPatches.length) commitPatches(roundPatches);
+
+      // One toast per round, not one per action — showing a second toast
+      // immediately after the first (both synchronous, same round) would
+      // silently replace it before Arin ever saw it or could undo it.
+      if (roundUndos.length === 1) {
+        showUndo(roundUndos[0].label, roundUndos[0].onUndo);
+      } else if (roundUndos.length > 1) {
+        showUndo(`Applied ${roundUndos.length} changes`, () => {
+          for (let i = roundUndos.length - 1; i >= 0; i--) roundUndos[i].onUndo();
+        });
+      }
+
       messages = [...messages, { role: "assistant", content: assistantBlocks }, { role: "user", content: toolResultBlocks }];
     }
 
-    finalizeAssistantLoop(appliedActions);
+    finalizeAssistantLoop(appliedActions, madeAnyToolCall);
   };
 
   const sendAssistantMessage = (text) => {

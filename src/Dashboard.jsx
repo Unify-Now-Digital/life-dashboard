@@ -895,6 +895,17 @@ export default function Dashboard() {
           error={assistantError}
           onSend={sendAssistantMessage}
           onStop={stopAssistant}
+          onOpenTask={(taskId) => {
+            // A chip from an older persisted chat message can outlive the
+            // task it points to (deleted since). Fail quietly rather than
+            // closing the panel for nothing.
+            if (!(state.tasks || []).some((t) => t.id === taskId)) return;
+            // TaskFocus's overlay (z-index 200) sits *below* the assistant
+            // panel's (210) — opening it underneath would be invisible, so
+            // close the panel first.
+            setAssistantOpen(false);
+            setFocusId(taskId);
+          }}
           isCompact={isCompact}
         />
 

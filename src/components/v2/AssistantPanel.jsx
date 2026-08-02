@@ -1,6 +1,78 @@
 import React, { useEffect, useRef, useState } from "react";
 import { C } from "../../lib/tokens";
 
+// The model wraps a task reference as {{task:TASK_ID|short label}} (see
+// SYSTEM_PREFIX in api/chat.js / functions/api/chat.js) so it renders as a
+// tappable chip instead of plain text. Only ever applied to assistant
+// messages — a user typing this syntax literally should never turn into a
+// live chip.
+// Label is `*` (allow empty), not `+` — an empty label ({{task:id|}}) still
+// falls through to a sensible fallback below rather than failing to match
+// entirely and leaking the raw {{...}} markup into the chat.
+const TASK_CHIP_RE = /\{\{task:([^|}]+)\|([^}]*)\}\}/g;
+
+function renderContent(text, onOpenTask) {
+  if (!text.includes("{{task:")) return text;
+  const nodes = [];
+  let lastIndex = 0;
+  let i = 0;
+  TASK_CHIP_RE.lastIndex = 0;
+  let match;
+  while ((match = TASK_CHIP_RE.exec(text))) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+    const [, taskId, rawLabel] = match;
+    const label = rawLabel.trim() || "Open task";
+    nodes.push(
+      <button
+        key={`chip-${i++}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenTask?.(taskId.trim());
+        }}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 2,
+          background: C.card,
+          border: `0.5px solid ${C.accent}`,
+          color: C.accent,
+          borderRadius: 999,
+          padding: "1px 8px",
+          margin: "0 1px",
+          fontSize: 12.5,
+          fontWeight: 500,
+          fontFamily: "inherit",
+          cursor: "pointer",
+          verticalAlign: "middle",
+        }}
+      >
+        {label}
+        <span aria-hidden="true" style={{ fontSize: 11 }}>›</span>
+      </button>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+// Cheap, static follow-up suggestions keyed on what the last reply touched —
+// no extra API call, no model round-trip to decide. A reply that doesn't
+// match any rule just shows no suggestions, which is the right default
+// (not every answer needs a nudge to keep going).
+const SUGGESTION_RULES = [
+  { test: /spend|category|categories|transaction|budget|merchant/i, replies: ["Compare to last month", "Biggest category this month?"] },
+  { test: /habit|streak|gym|logged|hit.rate/i, replies: ["How's my week overall?", "Any habit at risk?"] },
+  { test: /weekly review|correlation|pattern/i, replies: ["Any task overdue?", "How's my spend this week?"] },
+  { test: /task|priority|priorities|decision/i, replies: ["What's overdue?", "Any pending decisions?"] },
+];
+
+function suggestedRepliesFor(text) {
+  if (!text) return [];
+  const rule = SUGGESTION_RULES.find((r) => r.test.test(text));
+  return rule ? rule.replies : [];
+}
+
 // Floating assistant chat panel. Reuses TaskFocus's overlay+panel pattern
 // (backdrop click-to-close, C.overlay, matching animation timings) but opens
 // from the bottom-right corner rather than the right edge, and goes
@@ -15,6 +87,7 @@ export default function AssistantPanel({
   error,
   onSend,
   onStop,
+  onOpenTask,
   isCompact,
 }) {
   const [draft, setDraft] = useState("");
@@ -53,7 +126,7 @@ export default function AssistantPanel({
           wordBreak: "break-word",
         }}
       >
-        {text}
+        {role === "assistant" ? renderContent(text, onOpenTask) : text}
       </div>
     </div>
   );
@@ -99,6 +172,35 @@ export default function AssistantPanel({
           )}
 
           {messages.map((m) => bubble(m.role, m.text, m.id))}
+
+          {!isStreaming && !error && messages.length > 0 && messages[messages.length - 1].role === "assistant" && (
+            (() => {
+              const suggestions = suggestedRepliesFor(messages[messages.length - 1].text);
+              return suggestions.length ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 2 }}>
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => onSend(s)}
+                      style={{
+                        border: `0.5px solid ${C.border}`,
+                        background: C.bgSecondary,
+                        color: C.textSecondary,
+                        borderRadius: 999,
+                        padding: "5px 11px",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              ) : null;
+            })()
+          )}
 
           {isStreaming && !streamingText && (
             <div style={{ display: "flex", justifyContent: "flex-start" }}>

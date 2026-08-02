@@ -1,59 +1,102 @@
 import React, { useEffect, useRef, useState } from "react";
 import { C } from "../../lib/tokens";
 
-// The model wraps a task reference as {{task:TASK_ID|short label}} (see
-// SYSTEM_PREFIX in api/chat.js / functions/api/chat.js) so it renders as a
-// tappable chip instead of plain text. Only ever applied to assistant
-// messages — a user typing this syntax literally should never turn into a
-// live chip.
-// Label is `*` (allow empty), not `+` — an empty label ({{task:id|}}) still
-// falls through to a sensible fallback below rather than failing to match
-// entirely and leaking the raw {{...}} markup into the chat.
-const TASK_CHIP_RE = /\{\{task:([^|}]+)\|([^}]*)\}\}/g;
-
-function renderContent(text, onOpenTask) {
-  if (!text.includes("{{task:")) return text;
-  const nodes = [];
+// Splits `text` on every match of a global regex `re`, replacing each match
+// with `toNode(match, indexWithinThisCall)`; plain substrings pass through
+// as-is. Shared by the chip and bold parsers below — same mechanics, just a
+// different pattern and a different node to render.
+function splitByRegex(text, re, toNode) {
+  re.lastIndex = 0;
+  if (!re.test(text)) return [text];
+  re.lastIndex = 0;
+  const parts = [];
   let lastIndex = 0;
   let i = 0;
-  TASK_CHIP_RE.lastIndex = 0;
   let match;
-  while ((match = TASK_CHIP_RE.exec(text))) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-    const [, taskId, rawLabel] = match;
-    const label = rawLabel.trim() || "Open task";
-    nodes.push(
-      <button
-        key={`chip-${i++}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenTask?.(taskId.trim());
-        }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 2,
-          background: C.card,
-          border: `0.5px solid ${C.accent}`,
-          color: C.accent,
-          borderRadius: 999,
-          padding: "1px 8px",
-          margin: "0 1px",
-          fontSize: 12.5,
-          fontWeight: 500,
-          fontFamily: "inherit",
-          cursor: "pointer",
-          verticalAlign: "middle",
-        }}
-      >
-        {label}
-        <span aria-hidden="true" style={{ fontSize: 11 }}>›</span>
-      </button>
-    );
+  while ((match = re.exec(text))) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    parts.push(toNode(match, i++));
     lastIndex = match.index + match[0].length;
   }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+// The model wraps a task reference as {{task:TASK_ID|short label}} (see
+// SYSTEM_PREFIX in api/chat.js / functions/api/chat.js) so it renders as a
+// tappable chip instead of plain text, and may bold the one number/phrase
+// that matters most as **text**. Both only ever applied to assistant
+// messages — a user typing this syntax literally should never turn into a
+// live chip or bold run.
+// Chip label is `*` (allow empty), not `+` — an empty label ({{task:id|}})
+// still falls through to a sensible fallback rather than failing to match
+// entirely and leaking the raw {{...}} markup into the chat.
+const TASK_CHIP_RE = /\{\{task:([^|}]+)\|([^}]*)\}\}/g;
+const BOLD_RE = /\*\*([^*]+)\*\*/g;
+
+function chipNode(match, i, onOpenTask) {
+  const [, taskId, rawLabel] = match;
+  const label = rawLabel.trim() || "Open task";
+  return (
+    <button
+      key={`chip-${i}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpenTask?.(taskId.trim());
+      }}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
+        background: C.card,
+        border: `0.5px solid ${C.accent}`,
+        color: C.accent,
+        borderRadius: 999,
+        padding: "1px 8px",
+        margin: "0 1px",
+        fontSize: 12.5,
+        fontWeight: 500,
+        fontFamily: "inherit",
+        cursor: "pointer",
+        verticalAlign: "middle",
+      }}
+    >
+      {label}
+      <span aria-hidden="true" style={{ fontSize: 11 }}>›</span>
+    </button>
+  );
+}
+
+function renderContent(text, onOpenTask) {
+  const chipParts = splitByRegex(text, TASK_CHIP_RE, (match, i) => chipNode(match, i, onOpenTask));
+  // Bold only applies within the plain-text parts — chip buttons are
+  // already elements, pass them through untouched.
+  return chipParts.flatMap((part, pi) =>
+    typeof part === "string"
+      ? splitByRegex(part, BOLD_RE, (match, i) => (
+          <strong key={`b-${pi}-${i}`} style={{ fontWeight: 700 }}>
+            {match[1]}
+          </strong>
+        ))
+      : [part]
+  );
+}
+
+// Local calendar day key for grouping — deliberately not a slice of the raw
+// UTC ISO string (createdAt is `new Date().toISOString()`), which reads off
+// the wrong day near local midnight in any timezone ahead of UTC.
+function dayKey(date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function dayLabel(createdAtIso) {
+  const d = new Date(createdAtIso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (dayKey(d) === dayKey(today)) return "Today";
+  if (dayKey(d) === dayKey(yesterday)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // Cheap, static follow-up suggestions keyed on what the last reply touched —
@@ -124,6 +167,10 @@ export default function AssistantPanel({
           lineHeight: 1.5,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
+          // Numbers in replies (€ amounts, %, counts) align cleanly instead
+          // of jittering — the same convention every other numeric display
+          // in the app already follows.
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {role === "assistant" ? renderContent(text, onOpenTask) : text}
@@ -171,7 +218,30 @@ export default function AssistantPanel({
             </div>
           )}
 
-          {messages.map((m) => bubble(m.role, m.text, m.id))}
+          {messages.map((m, i) => {
+            const prev = messages[i - 1];
+            const showDivider = m.createdAt && (!prev?.createdAt || dayKey(new Date(m.createdAt)) !== dayKey(new Date(prev.createdAt)));
+            return (
+              <React.Fragment key={m.id}>
+                {showDivider && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      color: C.textTertiary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.4,
+                      margin: "6px 0 2px",
+                    }}
+                  >
+                    {dayLabel(m.createdAt)}
+                  </div>
+                )}
+                {bubble(m.role, m.text, `${m.id}-bubble`)}
+              </React.Fragment>
+            );
+          })}
 
           {!isStreaming && !error && messages.length > 0 && messages[messages.length - 1].role === "assistant" && (
             (() => {

@@ -36,13 +36,22 @@ export async function streamChat({ messages, context, tier, onDelta, onToolCall,
   }
 
   if (!res.ok || !res.body) {
-    let message = "Something went wrong.";
-    try {
-      const data = await res.json();
-      if (res.status === 503) message = "Assistant isn't configured yet.";
-      else if (data?.error) message = data.error;
-    } catch {
-      // ignore — use default message
+    // 503 (missing ANTHROPIC_API_KEY, see api/chat.js) always gets the
+    // specific, actionable message regardless of whether its JSON body
+    // parses — previously this branch only fired when res.json() *also*
+    // succeeded, so any 503 with an unreadable body (or any other failure
+    // — a 404, a 500, a proxy error) silently fell through to a contentless
+    // "Something went wrong.", giving no signal to act on.
+    let message;
+    if (res.status === 503) {
+      message = "Assistant isn't configured yet.";
+    } else {
+      try {
+        const data = await res.json();
+        message = data?.error || `Assistant unavailable right now (${res.status}).`;
+      } catch {
+        message = `Assistant unavailable right now (${res.status}).`;
+      }
     }
     onError(new Error(message));
     return;

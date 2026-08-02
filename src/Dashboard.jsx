@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { C, ACCENT, styles, QUOTES } from "./lib/tokens";
+import { C, ACCENT, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
 import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
 import { isSupabaseEnabled } from "./lib/supabase";
@@ -168,6 +168,18 @@ export default function Dashboard() {
   const updateTask = (id, patch) =>
     setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...withCompletedAt(t, patch) } : t)) }));
   const deleteTask = (id) => setState((s) => ({ ...s, tasks: (s.tasks || []).filter((t) => t.id !== id) }));
+  // UI-triggered deletes (TasksView row swipe/quick-action, TaskFocus trash
+  // icon) get an undo toast, same as every AI-assistant mutation — deleting
+  // a task shouldn't be the one action in the app with zero recovery path.
+  // `deleteTask` itself stays undo-free since it's also used as the *target*
+  // of another undo (add_task's own undo handler) — wrapping it there would
+  // stack a second toast on top of the first.
+  const deleteTaskWithUndo = (id) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    deleteTask(id);
+    showUndo(`Deleted "${task.text}"`, () => setState((s) => ({ ...s, tasks: [...(s.tasks || []), task] })));
+  };
   const toggleDone = (id) =>
     setState((s) => ({
       ...s,
@@ -762,16 +774,19 @@ export default function Dashboard() {
   const localOnlyBanner = !isSupabaseEnabled() ? (
     <div
       style={{
-        background: "#FDF6E3",
-        border: "0.5px solid #E6D9A8",
-        color: "#7A5C00",
+        // ACCENT.priorities is a literal hex (reads correctly in both
+        // modes, unlike a hardcoded neutral bg/text pair) — tinted for the
+        // background, full-strength for the border/emphasis.
+        background: tint(ACCENT.priorities, 0.12),
+        border: `0.5px solid ${ACCENT.priorities}`,
+        color: C.text,
         borderRadius: 8,
         padding: "8px 12px",
         fontSize: 12,
         marginBottom: 12,
       }}
     >
-      Local only — changes are saved on this device but <strong>not backed up</strong>. Set the Supabase env vars to sync across devices.
+      Local only — changes are saved on this device but <strong style={{ color: ACCENT.priorities }}>not backed up</strong>. Set the Supabase env vars to sync across devices.
     </div>
   ) : null;
 
@@ -897,7 +912,7 @@ export default function Dashboard() {
                 onAdd={addTask}
                 onDefer={deferTask}
                 onToggleDone={toggleDone}
-                onDelete={deleteTask}
+                onDelete={deleteTaskWithUndo}
                 onReorderGroups={reorderGroups}
               />
             </>
@@ -916,15 +931,15 @@ export default function Dashboard() {
           task={focusTask}
           onClose={() => setFocusId(null)}
           onUpdate={(patch) => updateTask(focusId, patch)}
-          onDelete={() => deleteTask(focusId)}
+          onDelete={() => deleteTaskWithUndo(focusId)}
           onDefer={(n) => deferTask(focusId, n)}
         />
 
-        <SpanishButton practice={state.projects?.learning?.spanish?.practice} />
+        <SpanishButton practice={state.projects?.learning?.spanish?.practice} compact={isCompact} />
 
         <AssistantButton
           onClick={() => setAssistantOpen(true)}
-          reviewReady={isReviewReady(state.assistant?.lastReviewWeek)}
+          reviewReady={isReviewReady(state.assistant?.lastReviewWeek, state)}
           onReviewClick={() => {
             setAssistantOpen(true);
             sendWeeklyReview();

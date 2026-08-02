@@ -166,10 +166,11 @@ function TaskRow({ task, hidePill, isDesktop, onOpen, onRecategorise, onDefer, o
   );
 }
 
-function Column({ title, accent, column, tasks, sortBy, groupMode, groupOrder, today, isDesktop, onOpen, onRecategorise, onDefer, onToggleDone, onDelete, onReorderGroups, onAdd }) {
+function Column({ title, accent, column, tasks, doneTasks = [], sortBy, groupMode, groupOrder, today, isDesktop, onOpen, onRecategorise, onDefer, onToggleDone, onDelete, onReorderGroups, onAdd }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   const sorted = [...tasks].sort(CMP[sortBy]);
   const renderRow = (t) => (
@@ -260,6 +261,22 @@ function Column({ title, accent, column, tasks, sortBy, groupMode, groupOrder, t
           + add task
         </button>
       )}
+      {doneTasks.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <button
+            onClick={() => setShowDone((v) => !v)}
+            style={{ background: "none", border: "none", color: C.textTertiary, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: "4px 2px", display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <span style={{ fontSize: 10 }}>{showDone ? "▾" : "▸"}</span>
+            Done ({doneTasks.length})
+          </button>
+          {showDone && (
+            <div style={{ marginTop: 4 }}>
+              {[...doneTasks].sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")).map(renderRow)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -270,17 +287,22 @@ function Column({ title, accent, column, tasks, sortBy, groupMode, groupOrder, t
 export default function TasksView({ tasks, decisionsActive, isDesktop, sortBy = "importance", groupMode = "none", groupOrder = {}, onOpen, onRecategorise, onAdd, onDefer, onToggleDone, onDelete, onReorderGroups }) {
   const today = todayISO();
   const open = tasks.filter((t) => t.status !== "done");
+  const done = tasks.filter((t) => t.status === "done");
   const visible = decisionsActive ? open.filter((t) => t.isDecision) : open;
+  // Done tasks are collapsed under a "Done (N)" toggle per column instead of
+  // disappearing entirely — marking something done shouldn't be a one-way
+  // trip out of the UI with no way back.
+  const visibleDone = decisionsActive ? done.filter((t) => t.isDecision) : done;
 
-  const col = (title, accent, column, list) => (
-    <Column title={title} accent={accent} column={column} tasks={list} sortBy={sortBy} groupMode={groupMode} groupOrder={groupOrder} today={today} isDesktop={isDesktop} onOpen={onOpen} onRecategorise={onRecategorise} onDefer={onDefer} onToggleDone={onToggleDone} onDelete={onDelete} onReorderGroups={onReorderGroups} onAdd={(text) => onAdd(column, text)} />
+  const col = (title, accent, column, list, doneList) => (
+    <Column title={title} accent={accent} column={column} tasks={list} doneTasks={doneList} sortBy={sortBy} groupMode={groupMode} groupOrder={groupOrder} today={today} isDesktop={isDesktop} onOpen={onOpen} onRecategorise={onRecategorise} onDefer={onDefer} onToggleDone={onToggleDone} onDelete={onDelete} onReorderGroups={onReorderGroups} onAdd={(text) => onAdd(column, text)} />
   );
 
   return (
     <div style={{ display: "flex", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 36 : 24, alignItems: "flex-start" }}>
-      {col("Work", ACCENT.work, "work", visible.filter((t) => t.column === "work"))}
+      {col("Work", ACCENT.work, "work", visible.filter((t) => t.column === "work"), visibleDone.filter((t) => t.column === "work"))}
       {isDesktop && <div style={{ width: 0.5, alignSelf: "stretch", background: C.border }} />}
-      {col("Personal", ACCENT.personal, "personal", visible.filter((t) => t.column === "personal"))}
+      {col("Personal", ACCENT.personal, "personal", visible.filter((t) => t.column === "personal"), visibleDone.filter((t) => t.column === "personal"))}
     </div>
   );
 }

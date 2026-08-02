@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { C } from "../../lib/tokens";
+import { C, tint } from "../../lib/tokens";
 import Segmented from "./Segmented.jsx";
 import MerchantLogo from "./MerchantLogo.jsx";
 import StackedBars from "./StackedBars.jsx";
@@ -166,7 +166,9 @@ function MerchantsDrawer({ cat, rate, days, onClose }) {
 export default function FinanceLens({ finance, onImport, onClear }) {
   const [rate, setRate] = useState("monthly");
   const [openKey, setOpenKey] = useState(null);
+  const [importStatus, setImportStatus] = useState(null); // { ok, text } — a bad/empty CSV used to fail silently
   const fileRef = useRef(null);
+  const importStatusTimerRef = useRef(null);
 
   const summary = useMemo(() => {
     const txns = finance?.transactions || [];
@@ -180,6 +182,12 @@ export default function FinanceLens({ finance, onImport, onClear }) {
   const dlbl = rate === "weekly" ? "/wk" : "/mo";
   const openCat = summary.categories.find((c) => c.key === openKey) || null;
 
+  const showImportStatus = (status) => {
+    clearTimeout(importStatusTimerRef.current);
+    setImportStatus(status);
+    importStatusTimerRef.current = setTimeout(() => setImportStatus(null), 6000);
+  };
+
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -189,8 +197,14 @@ export default function FinanceLens({ finance, onImport, onClear }) {
       if (txns.length) {
         const dates = txns.map((t) => t.date).sort();
         onImport(txns, { start: dates[0], end: dates[dates.length - 1] });
+        showImportStatus({ ok: true, text: `Imported ${txns.length.toLocaleString()} transactions, ${dates[0]} – ${dates[dates.length - 1]}.` });
+      } else {
+        // Previously silent — a wrong-format file left the screen looking
+        // untouched with no indication anything had (or hadn't) happened.
+        showImportStatus({ ok: false, text: `No valid transactions found in "${file.name}" — check this is a Revolut CSV export.` });
       }
     };
+    reader.onerror = () => showImportStatus({ ok: false, text: `Couldn't read "${file.name}".` });
     reader.readAsText(file);
     e.target.value = "";
   };
@@ -211,6 +225,23 @@ export default function FinanceLens({ finance, onImport, onClear }) {
         )}
         <Segmented options={[{ value: "monthly", label: "Monthly" }, { value: "weekly", label: "Weekly" }]} value={rate} onChange={setRate} accent={C.accent} size="sm" />
       </div>
+
+      {importStatus && (
+        <div
+          style={{
+            marginTop: -8,
+            marginBottom: 16,
+            padding: "8px 12px",
+            borderRadius: 8,
+            fontSize: 12.5,
+            background: tint(importStatus.ok ? C.success : C.danger, 0.1),
+            border: `0.5px solid ${importStatus.ok ? C.success : C.danger}`,
+            color: C.text,
+          }}
+        >
+          {importStatus.text}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>

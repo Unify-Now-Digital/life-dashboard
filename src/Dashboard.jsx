@@ -9,6 +9,12 @@ import { addDays, metaFromDue } from "./lib/taskDates.js";
 import { loadWisdom } from "./lib/wisdom.js";
 import { streamChat } from "./lib/chatStream.js";
 import { buildAssistantContext } from "./lib/assistantContext.js";
+import { isoDate } from "./lib/habits.js";
+import { financeStats } from "./lib/financeStats.js";
+import { FINANCE_SEED } from "./lib/financeSeed.js";
+import { categorise, CATEGORY_LABELS } from "./lib/categorise.js";
+import { prettyMerchant } from "./lib/merchants.js";
+import { buildWeeklyReviewData, isReviewReady } from "./lib/weeklyReview.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -147,30 +153,43 @@ export default function Dashboard() {
   const groupMode = state.ui?.groupMode || "label";
   const setGroupMode = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupMode: v } }));
 
+  // Whenever a patch flips `status`, stamp/clear `completedAt` alongside it —
+  // the weekly review's task summary depends on knowing *when* a task was
+  // actually completed, not just its current state.
+  const withCompletedAt = (task, patch) =>
+    "status" in patch ? { ...patch, completedAt: patch.status === "done" ? new Date().toISOString() : null } : patch;
   const updateTask = (id, patch) =>
-    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
+    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...withCompletedAt(t, patch) } : t)) }));
   const deleteTask = (id) => setState((s) => ({ ...s, tasks: (s.tasks || []).filter((t) => t.id !== id) }));
   const toggleDone = (id) =>
-    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
+    setState((s) => ({
+      ...s,
+      tasks: (s.tasks || []).map((t) => {
+        if (t.id !== id) return t;
+        const status = t.status === "done" ? "open" : "done";
+        return { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null };
+      }),
+    }));
   const reorderGroups = (column, mode, keys) =>
     setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupOrder: { ...(s.ui?.groupOrder || {}), [`${mode}:${column}`]: keys } } }));
-  const addTask = (column, text) =>
+  const addTask = (column, text, extra = {}) =>
     setState((s) => ({
       ...s,
       tasks: [
         ...(s.tasks || []),
         {
-          id: "tsk_" + Date.now(),
+          id: extra.id || "tsk_" + Date.now(),
           text,
           column,
           pill: column === "personal" ? "Admin" : "CM",
-          priority: false,
+          priority: !!extra.priority,
           isDecision: false,
           importance: 1,
-          due: null,
+          due: extra.due ?? null,
           meta: null,
           status: "open",
           createdAt: new Date().toISOString(),
+          completedAt: null,
           notes: "",
         },
       ],
@@ -206,6 +225,7 @@ export default function Dashboard() {
           meta: null,
           status: "open",
           createdAt: new Date().toISOString(),
+          completedAt: null,
           notes: "",
         },
       ],
@@ -228,27 +248,453 @@ export default function Dashboard() {
 
   // ---- Assistant ------------------------------------------------------------
   const MAX_ASSISTANT_MESSAGES = 40;
+  const MAX_TOOL_ROUNDS = 4;
+  const undoTimerRef = useRef(null);
 
   const appendAssistantMessage = (msg) =>
     setState((s) => {
       const messages = [...(s.assistant?.messages || []), msg].slice(-MAX_ASSISTANT_MESSAGES);
       return { ...s, assistant: { ...(s.assistant || {}), messages } };
     });
+  const forgetMemory = (id) =>
+    setState((s) => ({ ...s, assistant: { ...(s.assistant || {}), memory: (s.assistant?.memory || []).filter((m) => m.id !== id) } }));
+
+  // Applies one round's worth of tool-call patches against the *latest*
+  // state by id/key — same pattern as updateTask/addTask/confirmHabit —
+  // never by replacing the tasks/habitLog/habitNoLog slices wholesale.
+  // That distinction matters here specifically: a wholesale replace would
+  // silently discard any edit Arin made by hand in the UI while a
+  // multi-round tool loop was still in flight.
+  const MEMORY_CAP = 30;
+
+  const commitPatches = (patches) =>
+    setState((s) => {
+      let tasks = s.tasks || [];
+      let habitLog = s.habitLog || {};
+      let habitNoLog = s.habitNoLog || {};
+      let assistant = s.assistant || {};
+      const statusById = new Map();
+      const added = [];
+      const memoryAdds = [];
+      let reviewWeekConsumed = null;
+      for (const p of patches) {
+        if (p.type === "task_status") statusById.set(p.taskId, p.status);
+        else if (p.type === "task_add") added.push(p.task);
+        else if (p.type === "habit_log") {
+          const yes = (habitLog[p.key] || []).filter((d) => d !== p.dateISO);
+          const no = (habitNoLog[p.key] || []).filter((d) => d !== p.dateISO);
+          if (p.answer === "yes") yes.push(p.dateISO);
+          if (p.answer === "no") no.push(p.dateISO);
+          habitLog = { ...habitLog, [p.key]: yes };
+          habitNoLog = { ...habitNoLog, [p.key]: no };
+        } else if (p.type === "memory_add") memoryAdds.push(p.entry);
+        else if (p.type === "review_consumed") reviewWeekConsumed = p.week;
+      }
+      // Append added tasks *before* applying status patches — a same-turn
+      // "add X, then mark X done" produces a task_add patch and a
+      // task_status patch for the same (not-yet-existing) id in one batch;
+      // applying status first would map over a task list that doesn't
+      // contain X yet and silently drop the status flip.
+      if (added.length) tasks = [...tasks, ...added];
+      if (statusById.size) {
+        tasks = tasks.map((t) => {
+          if (!statusById.has(t.id)) return t;
+          const status = statusById.get(t.id);
+          return { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null };
+        });
+      }
+      if (memoryAdds.length) {
+        const memory = [...(assistant.memory || []), ...memoryAdds].slice(-MEMORY_CAP);
+        assistant = { ...assistant, memory };
+      }
+      if (reviewWeekConsumed) assistant = { ...assistant, lastReviewWeek: reviewWeekConsumed };
+      return { ...s, tasks, habitLog, habitNoLog, assistant };
+    });
+
+  const showUndo = (label, onUndo) => {
+    clearTimeout(undoTimerRef.current);
+    setUndo({ label, onUndo: () => { setUndo(null); onUndo(); } });
+    undoTimerRef.current = setTimeout(() => setUndo(null), 6000);
+  };
+
+  // Pure: (workingState, call) -> { state, toolResult, undo?, patch? }.
+  // Never touches React state directly. `state` (the working copy) exists
+  // only so several calls *within one turn* can see each other's writes —
+  // e.g. add_task then reference the task it just created. The actual
+  // commit to React state happens separately via `patch`, applied against
+  // the *latest* state by id/key (see commitPatches) — never by replacing
+  // working.tasks/habitLog/habitNoLog wholesale, which would silently
+  // clobber an unrelated edit Arin made in the UI while the loop was
+  // in flight.
+  const applyToolCall = (working, call) => {
+    const { name, input } = call;
+
+    if (name === "set_task_done") {
+      const { task_id, done } = input || {};
+      const task = (working.tasks || []).find((t) => t.id === task_id);
+      if (!task) return { state: working, toolResult: { ok: false, message: `No task with id "${task_id}" found.` } };
+      const prevStatus = task.status;
+      const status = done ? "done" : "open";
+      const completedAt = status === "done" ? new Date().toISOString() : null;
+      const nextState = {
+        ...working,
+        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status, completedAt } : t)),
+      };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `${done ? "Marked" : "Reopened"} "${task.text}" ${done ? "done" : "open"}.` },
+        undo: {
+          label: `${done ? "Marked" : "Reopened"} "${task.text}"`,
+          onUndo: () => updateTask(task_id, { status: prevStatus }),
+        },
+        patch: { type: "task_status", taskId: task_id, status },
+      };
+    }
+
+    if (name === "add_task") {
+      const { text, column, priority, due } = input || {};
+      if (!text || (column !== "work" && column !== "personal")) {
+        return { state: working, toolResult: { ok: false, message: 'add_task needs "text" and "column" (work or personal).' } };
+      }
+      // call.id (the Anthropic tool_use id) is already globally unique —
+      // no need to also mix in Date.now().
+      const id = "tsk_" + call.id;
+      const task = {
+        id,
+        text,
+        column,
+        pill: column === "personal" ? "Admin" : "CM",
+        priority: !!priority,
+        isDecision: false,
+        importance: 1,
+        due: due ?? null,
+        meta: null,
+        status: "open",
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        notes: "",
+      };
+      const nextState = { ...working, tasks: [...(working.tasks || []), task] };
+      return {
+        state: nextState,
+        // Echo the id back so a later tool call *this same turn* (e.g.
+        // "add X, then mark X done") can reference it.
+        toolResult: { ok: true, message: `Added "${text}" to ${column} (id: ${id}).` },
+        undo: { label: `Added "${text}"`, onUndo: () => deleteTask(id) },
+        patch: { type: "task_add", task },
+      };
+    }
+
+    if (name === "log_habit") {
+      const { habit_key, answer, date } = input || {};
+      const habit = (working.habits || []).find((h) => h.key === habit_key);
+      if (!habit) return { state: working, toolResult: { ok: false, message: `No habit with key "${habit_key}" found.` } };
+      if (answer !== "yes" && answer !== "no") {
+        return { state: working, toolResult: { ok: false, message: 'log_habit answer must be "yes" or "no".' } };
+      }
+      const dateISO = date || isoDate(new Date());
+      const habitLog = working.habitLog || {};
+      const habitNoLog = working.habitNoLog || {};
+      const prevAnswer = (habitLog[habit_key] || []).includes(dateISO)
+        ? "yes"
+        : (habitNoLog[habit_key] || []).includes(dateISO)
+          ? "no"
+          : null;
+      const yes = (habitLog[habit_key] || []).filter((d) => d !== dateISO);
+      const no = (habitNoLog[habit_key] || []).filter((d) => d !== dateISO);
+      if (answer === "yes") yes.push(dateISO);
+      if (answer === "no") no.push(dateISO);
+      const nextState = {
+        ...working,
+        habitLog: { ...habitLog, [habit_key]: yes },
+        habitNoLog: { ...habitNoLog, [habit_key]: no },
+      };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `Logged ${habit.label} as ${answer} for ${dateISO}.` },
+        undo: {
+          label: `Logged ${habit.label} as ${answer}`,
+          // confirmHabit clears both logs for any answer outside yes/no —
+          // exactly "reset to unlogged".
+          onUndo: () => confirmHabit(habit_key, dateISO, prevAnswer || "clear"),
+        },
+        patch: { type: "habit_log", key: habit_key, dateISO, answer },
+      };
+    }
+
+    // ---- Read-only data tools (no mutation, no undo) ---------------------
+    // Each returns JSON as the tool_result content — cheap for the model to
+    // parse, and the system prompt tells it never to paste raw JSON back to
+    // Arin. Every result is capped so a single call can't dump the whole
+    // dataset even in a worst-case prompt-injection scenario.
+
+    if (name === "get_finance_breakdown") {
+      const { start, end, category } = input || {};
+      const finance = working.finance || {};
+      const txns = finance.transactions || [];
+      const seeded = txns.length === 0;
+      const summary = seeded
+        ? FINANCE_SEED
+        : financeStats(
+            txns.filter((t) => (!start || t.date >= start) && (!end || t.date <= end)),
+            { start: start || finance.range?.start, end: end || finance.range?.end },
+            finance.overrides
+          );
+      let categories = summary.categories || [];
+      if (category) categories = categories.filter((c) => c.key === category);
+      const payload = {
+        seeded,
+        range: summary.range,
+        stats: summary.stats,
+        categories: categories.slice(0, 10).map((c) => ({
+          key: c.key,
+          label: c.label,
+          total: c.total,
+          perMonth: c.perMonth,
+          count: c.count,
+          topMerchants: (c.merchants || []).slice(0, 3).map((m) => ({ name: m.name, total: m.total, count: m.count })),
+        })),
+      };
+      return { state: working, toolResult: { ok: true, message: JSON.stringify(payload) } };
+    }
+
+    if (name === "search_transactions") {
+      const { query, start, end, limit } = input || {};
+      const txns = working.finance?.transactions || [];
+      if (!txns.length) {
+        return {
+          state: working,
+          toolResult: {
+            ok: true,
+            message: JSON.stringify({ note: "No CSV imported yet — only aggregate seeded data is available via get_finance_breakdown.", results: [] }),
+          },
+        };
+      }
+      const q = (query || "").toLowerCase();
+      const cap = Math.min(Math.max(1, limit || 20), 20);
+      const overrides = working.finance?.overrides;
+      const results = txns
+        .filter((t) => t.direction === "out")
+        .filter((t) => !q || (t.desc || "").toLowerCase().includes(q))
+        .filter((t) => (!start || t.date >= start) && (!end || t.date <= end))
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .slice(0, cap)
+        .map((t) => {
+          const cat = categorise(t, overrides).category;
+          return { date: t.date, merchant: prettyMerchant(t.desc), amount: Math.abs(t.amount), category: CATEGORY_LABELS[cat] || cat };
+        });
+      return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: results.length, results }) } };
+    }
+
+    if (name === "get_habit_history") {
+      const { habit_key, days } = input || {};
+      const habit = (working.habits || []).find((h) => h.key === habit_key);
+      if (!habit) return { state: working, toolResult: { ok: false, message: `No habit with key "${habit_key}" found.` } };
+      const n = Math.min(Math.max(1, days || 28), 90);
+      const yes = new Set(working.habitLog?.[habit_key] || []);
+      const no = new Set(working.habitNoLog?.[habit_key] || []);
+      const today = new Date();
+      const log = [];
+      let hits = 0;
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+        const iso = isoDate(d);
+        const status = yes.has(iso) ? "yes" : no.has(iso) ? "no" : "unanswered";
+        if (status === "yes") hits++;
+        log.push({ date: iso, status });
+      }
+      const weeklyTarget = habit.weeklyTarget ?? Math.round(((habit.target ?? 7) / (habit.period ?? 7)) * 7);
+      const payload = { habit: habit.label, days: n, hits, weeklyTarget, log };
+      return { state: working, toolResult: { ok: true, message: JSON.stringify(payload) } };
+    }
+
+    if (name === "list_tasks") {
+      const { column, status, pill, limit } = input || {};
+      const cap = Math.min(Math.max(1, limit || 30), 50);
+      const tasks = (working.tasks || [])
+        .filter((t) => !column || t.column === column)
+        .filter((t) => !status || t.status === status)
+        .filter((t) => !pill || t.pill === pill)
+        .slice(0, cap)
+        .map((t) => ({ id: t.id, text: t.text, column: t.column, pill: t.pill, status: t.status, due: t.due, priority: t.priority, isDecision: t.isDecision }));
+      return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: tasks.length, tasks }) } };
+    }
+
+    if (name === "remember") {
+      const { text } = input || {};
+      if (!text || !text.trim()) {
+        return { state: working, toolResult: { ok: false, message: "remember needs non-empty text." } };
+      }
+      const entry = { id: "mem_" + call.id, text: text.trim(), createdAt: new Date().toISOString() };
+      const nextState = { ...working, assistant: { ...working.assistant, memory: [...(working.assistant?.memory || []), entry] } };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `Remembered: "${entry.text}"` },
+        undo: { label: `Remembered "${entry.text}"`, onUndo: () => forgetMemory(entry.id) },
+        patch: { type: "memory_add", entry },
+      };
+    }
+
+    if (name === "get_weekly_review_data") {
+      const data = buildWeeklyReviewData(working);
+      // No undo — reading the review isn't a reversible action. It still
+      // carries a patch (marking the week reviewed) so the badge doesn't
+      // reappear for a week we've already surfaced, whether or not the
+      // model goes on to narrate it well.
+      return {
+        state: working,
+        toolResult: { ok: true, message: JSON.stringify(data) },
+        patch: { type: "review_consumed", week: data.week },
+      };
+    }
+
+    return { state: working, toolResult: { ok: false, message: `Unknown tool "${name}".` } };
+  };
 
   // Reply text streams into a ref (not persisted state) so tokens don't
   // trigger the debounced cloud save; only the finished reply is committed.
-  const finalizeAssistantReply = () => {
+  const finalizeAssistantLoop = (appliedActions, madeAnyToolCall, pendingReviewWeek) => {
     setAssistantStreaming(false);
-    setAssistantStreamText("");
     assistantAbortRef.current = null;
-    const text = assistantBufferRef.current;
+    pendingResolveRef.current = null;
+    const streamed = assistantBufferRef.current.trim();
     assistantBufferRef.current = "";
-    if (text.trim()) {
-      appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text, createdAt: new Date().toISOString() });
+    setAssistantStreamText("");
+    // A turn that actually did something must never end with zero visible
+    // trace — if the model never narrated (round cap hit, or the final
+    // round was tool-only), fall back to a plain summary of what was
+    // applied, or — if it was reads only — a generic acknowledgement so
+    // Arin isn't left staring at a chat that silently ate his message.
+    const finalText = streamed || appliedActions.join(" ") || (madeAnyToolCall ? "Got that — let me know if you'd like more detail." : "");
+    if (finalText) {
+      appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text: finalText, createdAt: new Date().toISOString() });
+    }
+    // Only mark the week reviewed once the model actually narrated something
+    // (`streamed`, not the generic fallback) — if it spent the whole round
+    // budget on tool calls and never got to summarize, the badge should stay
+    // up so Arin gets a real shot at seeing it next time, instead of the
+    // review silently vanishing with only "Got that" to show for it.
+    if (pendingReviewWeek && streamed) {
+      commitPatches([{ type: "review_consumed", week: pendingReviewWeek }]);
     }
   };
 
-  const sendAssistantMessage = (text) => {
+  const pendingResolveRef = useRef(null);
+  const stopRequestedRef = useRef(false);
+
+  // Cheap, transparent routing: most messages are simple lookups/actions and
+  // stay on the fast/cheap tier; anything that smells like it needs real
+  // synthesis (forecasting, comparisons, "why", planning) or the weekly
+  // review gets the smarter tier. A keyword heuristic, not a classifier
+  // call — easy to see why a message routed where it did, no extra
+  // round-trip cost to decide.
+  const SMART_TIER_PATTERN = /\b(forecast|compare|why|analy[sz]e|plan|correlat|trend|budget|review)\b/i;
+  const pickTier = (text) => (SMART_TIER_PATTERN.test(text) ? "smart" : "fast");
+
+  const runAssistantLoop = async (initialMessages, contextSnapshot, startState, tier) => {
+    let working = startState;
+    let messages = initialMessages;
+    const appliedActions = [];
+    let madeAnyToolCall = false;
+    let pendingReviewWeek = null; // set once get_weekly_review_data runs; committed in finalizeAssistantLoop, gated on real narration
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (stopRequestedRef.current) break;
+
+      const controller = new AbortController();
+      assistantAbortRef.current = controller;
+
+      const outcome = await new Promise((resolve) => {
+        pendingResolveRef.current = resolve;
+        const toolCalls = [];
+        streamChat({
+          messages,
+          context: contextSnapshot,
+          tier,
+          signal: controller.signal,
+          onDelta: (chunk) => {
+            assistantBufferRef.current += chunk;
+            setAssistantStreamText(assistantBufferRef.current);
+          },
+          onToolCall: (call) => toolCalls.push(call),
+          onDone: ({ stopReason }) => resolve({ stopReason, toolCalls }),
+          onError: (err) => resolve({ error: err }),
+        });
+      });
+      pendingResolveRef.current = null;
+
+      if (outcome.error) {
+        setAssistantError(outcome.error.message || "Something went wrong.");
+        break;
+      }
+      if (stopRequestedRef.current) break;
+
+      const { stopReason, toolCalls } = outcome;
+      if (stopReason !== "tool_use" || !toolCalls.length) break;
+      madeAnyToolCall = true;
+
+      // Anthropic requires the full assistant turn (text + every tool_use
+      // block) echoed back, followed by one user turn with every matching
+      // tool_result — never split across messages.
+      const assistantBlocks = [];
+      const streamedText = assistantBufferRef.current.trim();
+      if (streamedText) assistantBlocks.push({ type: "text", text: streamedText });
+      assistantBufferRef.current = "";
+      setAssistantStreamText("");
+
+      const toolResultBlocks = [];
+      const roundPatches = [];
+      const roundUndos = [];
+      for (const call of toolCalls) {
+        assistantBlocks.push({ type: "tool_use", id: call.id, name: call.name, input: call.input || {} });
+        if (call.error) {
+          toolResultBlocks.push({ type: "tool_result", tool_use_id: call.id, content: call.error, is_error: true });
+          continue;
+        }
+        const { state: nextWorking, toolResult, undo, patch } = applyToolCall(working, call);
+        working = nextWorking;
+        if (toolResult.ok) {
+          // Patches always commit, whether or not the call has an undo.
+          // review_consumed is the one exception — it's held back to
+          // finalizeAssistantLoop, which only commits it once real
+          // narration actually shipped (see there for why). Only
+          // mutations *with* an undo (the write tools) go into the
+          // fallback narration; a read tool's raw JSON isn't fit to show.
+          if (patch?.type === "review_consumed") pendingReviewWeek = patch.week;
+          else if (patch) roundPatches.push(patch);
+          if (undo) {
+            appliedActions.push(toolResult.message);
+            roundUndos.push(undo);
+          }
+        }
+        toolResultBlocks.push({
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: toolResult.message,
+          ...(toolResult.ok ? {} : { is_error: true }),
+        });
+      }
+
+      if (roundPatches.length) commitPatches(roundPatches);
+
+      // One toast per round, not one per action — showing a second toast
+      // immediately after the first (both synchronous, same round) would
+      // silently replace it before Arin ever saw it or could undo it.
+      if (roundUndos.length === 1) {
+        showUndo(roundUndos[0].label, roundUndos[0].onUndo);
+      } else if (roundUndos.length > 1) {
+        showUndo(`Applied ${roundUndos.length} changes`, () => {
+          for (let i = roundUndos.length - 1; i >= 0; i--) roundUndos[i].onUndo();
+        });
+      }
+
+      messages = [...messages, { role: "assistant", content: assistantBlocks }, { role: "user", content: toolResultBlocks }];
+    }
+
+    finalizeAssistantLoop(appliedActions, madeAnyToolCall, pendingReviewWeek);
+  };
+
+  const sendAssistantMessage = (text, { tier } = {}) => {
     const userMsg = { id: "msg_" + Date.now(), role: "user", text, createdAt: new Date().toISOString() };
     const history = [...(state.assistant?.messages || []), userMsg]
       .slice(-MAX_ASSISTANT_MESSAGES)
@@ -260,29 +706,22 @@ export default function Dashboard() {
     setAssistantStreaming(true);
     setAssistantStreamText("");
     assistantBufferRef.current = "";
+    stopRequestedRef.current = false;
 
-    const controller = new AbortController();
-    assistantAbortRef.current = controller;
-
-    streamChat({
-      messages: history,
-      context: contextSnapshot,
-      signal: controller.signal,
-      onDelta: (chunk) => {
-        assistantBufferRef.current += chunk;
-        setAssistantStreamText(assistantBufferRef.current);
-      },
-      onDone: finalizeAssistantReply,
-      onError: (err) => {
-        setAssistantError(err.message || "Something went wrong.");
-        finalizeAssistantReply();
-      },
-    });
+    runAssistantLoop(history, contextSnapshot, state, tier || pickTier(text));
   };
 
+  // Weekly review always gets the smarter tier — it's exactly the kind of
+  // multi-source synthesis (task/habit/finance + any gated correlation)
+  // pickTier's heuristic is meant to catch, forced rather than guessed.
+  const sendWeeklyReview = () => sendAssistantMessage("Give me my weekly review.", { tier: "smart" });
+
   const stopAssistant = () => {
+    stopRequestedRef.current = true;
     assistantAbortRef.current?.abort();
-    finalizeAssistantReply();
+    const resolve = pendingResolveRef.current;
+    pendingResolveRef.current = null;
+    if (resolve) resolve({ stopReason: "aborted" });
   };
 
   const today = new Date();
@@ -438,7 +877,15 @@ export default function Dashboard() {
 
         <SpanishButton practice={state.projects?.learning?.spanish?.practice} />
 
-        <AssistantButton onClick={() => setAssistantOpen(true)} isCompact={isCompact} />
+        <AssistantButton
+          onClick={() => setAssistantOpen(true)}
+          isCompact={isCompact}
+          reviewReady={isReviewReady(state.assistant?.lastReviewWeek)}
+          onReviewClick={() => {
+            setAssistantOpen(true);
+            sendWeeklyReview();
+          }}
+        />
         <AssistantPanel
           open={assistantOpen}
           onClose={() => setAssistantOpen(false)}
@@ -450,6 +897,8 @@ export default function Dashboard() {
           onStop={stopAssistant}
           isCompact={isCompact}
         />
+
+        {undo && <UndoToast label={undo.label} onUndo={undo.onUndo} />}
       </AuthGate>
     </LocalLock>
   );

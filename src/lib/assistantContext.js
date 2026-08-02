@@ -6,6 +6,9 @@
 import { financeStats } from "./financeStats.js";
 import { FINANCE_SEED } from "./financeSeed.js";
 import { isoDate } from "./habits.js";
+import { isReviewReady } from "./weeklyReview.js";
+
+const MAX_CONTEXT_MEMORY = 15;
 
 function todayLabel(due) {
   if (!due) return "no date";
@@ -24,25 +27,35 @@ function financeSummary(finance) {
   return lines.join(" ");
 }
 
+const MAX_CONTEXT_TASKS = 30;
+
 export function buildAssistantContext(state) {
   const tasks = state?.tasks || [];
   const today = isoDate(new Date());
 
-  const priorities = tasks.filter((t) => t.priority && t.status !== "done");
+  const allOpenTasks = tasks.filter((t) => t.status !== "done");
+  const openTasks = allOpenTasks.slice(0, MAX_CONTEXT_TASKS);
+  const truncatedCount = allOpenTasks.length - openTasks.length;
   const decisions = tasks.filter((t) => t.isDecision && t.status !== "done");
 
   const lines = [];
 
   lines.push(`Today's date: ${today}.`);
 
+  // Every task line carries its [task_id] so the assistant can reference it
+  // for set_task_done — not just the starred/priority ones. When the list is
+  // truncated, say so explicitly — otherwise a "how many tasks do I have"
+  // question gets answered from a silently-clipped count.
   lines.push(
-    priorities.length
-      ? `Open priority tasks:\n${priorities.map((t) => `- ${t.text} (${t.column}, due ${todayLabel(t.due)})`).join("\n")}`
-      : "No open priority tasks right now."
+    openTasks.length
+      ? `Open tasks:\n${openTasks
+          .map((t) => `- [${t.id}] ${t.text} (${t.column}, due ${todayLabel(t.due)}${t.priority ? ", priority" : ""})`)
+          .join("\n")}${truncatedCount > 0 ? `\n(+${truncatedCount} more open tasks not shown — use list_tasks for the rest.)` : ""}`
+      : "No open tasks right now."
   );
 
   if (decisions.length) {
-    lines.push(`Pending decisions:\n${decisions.map((t) => `- ${t.text}`).join("\n")}`);
+    lines.push(`Pending decisions:\n${decisions.map((t) => `- [${t.id}] ${t.text}`).join("\n")}`);
   }
 
   const habits = state?.habits || [];
@@ -55,7 +68,7 @@ export function buildAssistantContext(state) {
         const yes = (habitLog[h.key] || []).includes(today);
         const no = (habitNoLog[h.key] || []).includes(today);
         const status = yes ? "done" : no ? "skipped" : "not logged yet";
-        return `- ${h.label}: ${status} today`;
+        return `- ${h.label} (${h.key}): ${status} today`;
       });
     lines.push(`Habits today:\n${habitLines.join("\n")}`);
   }
@@ -64,6 +77,15 @@ export function buildAssistantContext(state) {
     lines.push(financeSummary(state?.finance));
   } catch {
     // Finance pipeline is best-effort context — never block the chat on it.
+  }
+
+  const memory = state?.assistant?.memory || [];
+  if (memory.length) {
+    lines.push(`Remembered facts/patterns from prior conversations:\n${memory.slice(-MAX_CONTEXT_MEMORY).map((m) => `- ${m.text}`).join("\n")}`);
+  }
+
+  if (isReviewReady(state?.assistant?.lastReviewWeek)) {
+    lines.push("A new weekly review is ready (last week hasn't been reviewed yet) — use get_weekly_review_data if asked for it.");
   }
 
   return lines.join("\n\n");

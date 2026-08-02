@@ -15,9 +15,159 @@
 // the function returns 503 and the widget shows an inline "not configured"
 // state, same convention as functions/api/analyze-food.js.
 
-const MODEL = "claude-haiku-4-5-20251001";
+// "fast" (default, cheap/quick) vs "smart" (deeper reasoning — weekly
+// reviews, and anything the client's routing heuristic flags as complex).
+// The client only ever sends the tier name, never a raw model id, so the
+// actual model mapping can change here without a client deploy.
+// A Map, not a plain object — a plain-object lookup on an
+// attacker-controlled key (e.g. tier: "constructor" or "__proto__") resolves
+// to an inherited Object.prototype member instead of undefined, silently
+// bypassing the DEFAULT_TIER fallback below.
+const MODELS = new Map([
+  ["fast", "claude-haiku-4-5-20251001"],
+  ["smart", "claude-sonnet-5"],
+]);
+const DEFAULT_TIER = "fast";
+
 const SYSTEM_PREFIX =
-  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You cannot edit anything yet — you can only discuss and advise.";
+  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You have four write actions — set_task_done, add_task, log_habit, remember — for when he asks you to change something or when you notice a fact/pattern genuinely worth keeping; confirm briefly in plain language after using one (except remember, which should be quiet/incidental). You also have five read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), list_tasks (tasks beyond the default snapshot, filterable), and get_weekly_review_data (a pre-computed weekly review — task/habit/finance summary plus any cross-domain pattern that already cleared strict statistical gates). For get_weekly_review_data specifically: only narrate patterns actually present in its `correlations` array — never suggest a pattern of your own, and if `correlations` is empty just say the week looked steady, don't invent one to fill the silence. Read tools return raw JSON — never paste any of it verbatim, always summarize in plain language. Use the [task_id] and (key) values from the context snapshot to address specific tasks and habits. Remembered facts/patterns from prior conversations appear in the snapshot too — use them, and call remember again if you notice something new worth keeping.";
+
+const TOOLS = [
+  {
+    name: "set_task_done",
+    description: "Mark an existing task done, or reopen a done task.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The [task_id] from the context snapshot." },
+        done: { type: "boolean", description: "true to mark done, false to reopen." },
+      },
+      required: ["task_id", "done"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "add_task",
+    description: "Add a new task to the Work or Personal column.",
+    input_schema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "The task text." },
+        column: { type: "string", enum: ["work", "personal"] },
+        priority: { type: "boolean", description: "Whether to also add it to the priorities bar." },
+        due: { type: ["string", "null"], description: "ISO date (YYYY-MM-DD), or null for no due date." },
+      },
+      required: ["text", "column"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "log_habit",
+    description: "Log a habit as done or skipped for a given day.",
+    input_schema: {
+      type: "object",
+      properties: {
+        habit_key: { type: "string", description: "The (key) of the habit from the context snapshot." },
+        answer: { type: "string", enum: ["yes", "no"] },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD). Defaults to today if omitted." },
+      },
+      required: ["habit_key", "answer"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_finance_breakdown",
+    description:
+      "Get a spend breakdown by category, with each category's top merchants, for a date range. Uses the imported Revolut statement if one exists, otherwise the seeded demo data.",
+    input_schema: {
+      type: "object",
+      properties: {
+        start: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for the full imported range." },
+        end: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for the full imported range." },
+        category: { type: "string", description: "Limit to one category key (from a prior breakdown). Omit for all categories." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "search_transactions",
+    description:
+      "Search imported transactions by merchant/description text. Returns individual rows (date, merchant, amount, category), capped at 20. Only returns results if a CSV has been imported — check the note field.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Text to match against the merchant/description." },
+        start: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for no lower bound." },
+        end: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for no upper bound." },
+        limit: { type: "integer", description: "Max rows to return. Default and max 20." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_habit_history",
+    description: "Get a habit's day-by-day log (yes/no/unanswered) and hit count over a recent window.",
+    input_schema: {
+      type: "object",
+      properties: {
+        habit_key: { type: "string", description: "The (key) of the habit from the context snapshot." },
+        days: { type: "integer", description: "How many days back from today to include. Default 28, max 90." },
+      },
+      required: ["habit_key"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "list_tasks",
+    description: "List tasks beyond the default context snapshot, optionally filtered by column, status, or category pill.",
+    input_schema: {
+      type: "object",
+      properties: {
+        column: { type: "string", enum: ["work", "personal"] },
+        status: { type: "string", enum: ["open", "done"] },
+        pill: { type: "string", description: "Category pill to filter by, e.g. CM, Admin." },
+        limit: { type: "integer", description: "Max tasks to return. Default 30, max 50." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "remember",
+    description:
+      "Save a short, durable fact or pattern about Arin worth keeping across future conversations — a stated preference, or a pattern you noticed (e.g. from a weekly review). Not for one-off details that don't matter later.",
+    input_schema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "The fact/pattern, as a short standalone sentence." },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_weekly_review_data",
+    description:
+      "Get the pre-computed weekly review: last week's task completions and stale priorities, this week's habit hit-rates, spend vs. each category's own average, and any cross-domain pattern that already cleared strict statistical gates (in `correlations` — usually empty, and that's expected).",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+];
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -36,12 +186,13 @@ export async function onRequestPost({ request, env }) {
   } catch {
     body = {};
   }
-  const { messages, context } = body || {};
+  const { messages, context, tier } = body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return json({ error: "Missing messages" }, 400);
   }
 
   const system = `${SYSTEM_PREFIX}\n\n${typeof context === "string" ? context : ""}`.trim();
+  const model = MODELS.get(tier) || MODELS.get(DEFAULT_TIER);
 
   try {
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -52,11 +203,12 @@ export async function onRequestPost({ request, env }) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
+        model,
+        max_tokens: 2048,
         stream: true,
         system,
         messages,
+        tools: TOOLS,
       }),
     });
 

@@ -17,7 +17,7 @@
 
 const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PREFIX =
-  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You can take three actions when asked: mark a task done or reopen it (set_task_done), add a new task (add_task), and log a habit as done or skipped for a day (log_habit). Use the [task_id] and (key) values from the context snapshot. After using a tool, confirm briefly in plain language what you did.";
+  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You have three write actions — set_task_done, add_task, log_habit — for when he asks you to change something; confirm briefly in plain language after using one. You also have four read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), and list_tasks (tasks beyond the default snapshot, filterable). Read tools return raw JSON — never paste it verbatim, always summarize it in plain language. Use the [task_id] and (key) values from the context snapshot to address specific tasks and habits.";
 
 const TOOLS = [
   {
@@ -61,6 +61,69 @@ const TOOLS = [
         date: { type: "string", description: "ISO date (YYYY-MM-DD). Defaults to today if omitted." },
       },
       required: ["habit_key", "answer"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_finance_breakdown",
+    description:
+      "Get a spend breakdown by category, with each category's top merchants, for a date range. Uses the imported Revolut statement if one exists, otherwise the seeded demo data.",
+    input_schema: {
+      type: "object",
+      properties: {
+        start: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for the full imported range." },
+        end: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for the full imported range." },
+        category: { type: "string", description: "Limit to one category key (from a prior breakdown). Omit for all categories." },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "search_transactions",
+    description:
+      "Search imported transactions by merchant/description text. Returns individual rows (date, merchant, amount, category), capped at 20. Only returns results if a CSV has been imported — check the note field.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Text to match against the merchant/description." },
+        start: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for no lower bound." },
+        end: { type: "string", description: "ISO date (YYYY-MM-DD). Omit for no upper bound." },
+        limit: { type: "integer", description: "Max rows to return. Default and max 20." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_habit_history",
+    description: "Get a habit's day-by-day log (yes/no/unanswered) and hit count over a recent window.",
+    input_schema: {
+      type: "object",
+      properties: {
+        habit_key: { type: "string", description: "The (key) of the habit from the context snapshot." },
+        days: { type: "integer", description: "How many days back from today to include. Default 28, max 90." },
+      },
+      required: ["habit_key"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "list_tasks",
+    description: "List tasks beyond the default context snapshot, optionally filtered by column, status, or category pill.",
+    input_schema: {
+      type: "object",
+      properties: {
+        column: { type: "string", enum: ["work", "personal"] },
+        status: { type: "string", enum: ["open", "done"] },
+        pill: { type: "string", description: "Category pill to filter by, e.g. CM, Admin." },
+        limit: { type: "integer", description: "Max tasks to return. Default 30, max 50." },
+      },
+      required: [],
       additionalProperties: false,
     },
     strict: true,

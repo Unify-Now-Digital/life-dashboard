@@ -10,6 +10,10 @@ import { loadWisdom } from "./lib/wisdom.js";
 import { streamChat } from "./lib/chatStream.js";
 import { buildAssistantContext } from "./lib/assistantContext.js";
 import { isoDate } from "./lib/habits.js";
+import { financeStats } from "./lib/financeStats.js";
+import { FINANCE_SEED } from "./lib/financeSeed.js";
+import { categorise, CATEGORY_LABELS } from "./lib/categorise.js";
+import { prettyMerchant } from "./lib/merchants.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -339,6 +343,106 @@ export default function Dashboard() {
       };
     }
 
+    // ---- Read-only data tools (no mutation, no undo) ---------------------
+    // Each returns JSON as the tool_result content — cheap for the model to
+    // parse, and the system prompt tells it never to paste raw JSON back to
+    // Arin. Every result is capped so a single call can't dump the whole
+    // dataset even in a worst-case prompt-injection scenario.
+
+    if (name === "get_finance_breakdown") {
+      const { start, end, category } = input || {};
+      const finance = working.finance || {};
+      const txns = finance.transactions || [];
+      const seeded = txns.length === 0;
+      const summary = seeded
+        ? FINANCE_SEED
+        : financeStats(
+            txns.filter((t) => (!start || t.date >= start) && (!end || t.date <= end)),
+            { start: start || finance.range?.start, end: end || finance.range?.end },
+            finance.overrides
+          );
+      let categories = summary.categories || [];
+      if (category) categories = categories.filter((c) => c.key === category);
+      const payload = {
+        seeded,
+        range: summary.range,
+        stats: summary.stats,
+        categories: categories.slice(0, 10).map((c) => ({
+          key: c.key,
+          label: c.label,
+          total: c.total,
+          perMonth: c.perMonth,
+          count: c.count,
+          topMerchants: (c.merchants || []).slice(0, 3).map((m) => ({ name: m.name, total: m.total, count: m.count })),
+        })),
+      };
+      return { state: working, toolResult: { ok: true, message: JSON.stringify(payload) } };
+    }
+
+    if (name === "search_transactions") {
+      const { query, start, end, limit } = input || {};
+      const txns = working.finance?.transactions || [];
+      if (!txns.length) {
+        return {
+          state: working,
+          toolResult: {
+            ok: true,
+            message: JSON.stringify({ note: "No CSV imported yet — only aggregate seeded data is available via get_finance_breakdown.", results: [] }),
+          },
+        };
+      }
+      const q = (query || "").toLowerCase();
+      const cap = Math.min(Math.max(1, limit || 20), 20);
+      const overrides = working.finance?.overrides;
+      const results = txns
+        .filter((t) => t.direction === "out")
+        .filter((t) => !q || (t.desc || "").toLowerCase().includes(q))
+        .filter((t) => (!start || t.date >= start) && (!end || t.date <= end))
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .slice(0, cap)
+        .map((t) => ({
+          date: t.date,
+          merchant: prettyMerchant(t.desc),
+          amount: Math.abs(t.amount),
+          category: CATEGORY_LABELS[categorise(t, overrides).category] || categorise(t, overrides).category,
+        }));
+      return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: results.length, results }) } };
+    }
+
+    if (name === "get_habit_history") {
+      const { habit_key, days } = input || {};
+      const habit = (working.habits || []).find((h) => h.key === habit_key);
+      if (!habit) return { state: working, toolResult: { ok: false, message: `No habit with key "${habit_key}" found.` } };
+      const n = Math.min(Math.max(1, days || 28), 90);
+      const yes = new Set(working.habitLog?.[habit_key] || []);
+      const no = new Set(working.habitNoLog?.[habit_key] || []);
+      const today = new Date();
+      const log = [];
+      let hits = 0;
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+        const iso = isoDate(d);
+        const status = yes.has(iso) ? "yes" : no.has(iso) ? "no" : "unanswered";
+        if (status === "yes") hits++;
+        log.push({ date: iso, status });
+      }
+      const weeklyTarget = habit.weeklyTarget ?? Math.round(((habit.target ?? 7) / (habit.period ?? 7)) * 7);
+      const payload = { habit: habit.label, days: n, hits, weeklyTarget, log };
+      return { state: working, toolResult: { ok: true, message: JSON.stringify(payload) } };
+    }
+
+    if (name === "list_tasks") {
+      const { column, status, pill, limit } = input || {};
+      const cap = Math.min(Math.max(1, limit || 30), 50);
+      const tasks = (working.tasks || [])
+        .filter((t) => !column || t.column === column)
+        .filter((t) => !status || t.status === status)
+        .filter((t) => !pill || t.pill === pill)
+        .slice(0, cap)
+        .map((t) => ({ id: t.id, text: t.text, column: t.column, pill: t.pill, status: t.status, due: t.due, priority: t.priority, isDecision: t.isDecision }));
+      return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: tasks.length, tasks }) } };
+    }
+
     return { state: working, toolResult: { ok: false, message: `Unknown tool "${name}".` } };
   };
 
@@ -411,6 +515,7 @@ export default function Dashboard() {
       setAssistantStreamText("");
 
       const toolResultBlocks = [];
+      const workingBeforeRound = working;
       for (const call of toolCalls) {
         assistantBlocks.push({ type: "tool_use", id: call.id, name: call.name, input: call.input || {} });
         if (call.error) {
@@ -419,9 +524,11 @@ export default function Dashboard() {
         }
         const { state: nextWorking, toolResult, undo } = applyToolCall(working, call);
         working = nextWorking;
-        if (toolResult.ok) {
+        if (toolResult.ok && undo) {
+          // Only mutations (write tools always carry an undo) go into the
+          // fallback narration — a read tool's raw JSON isn't fit to show.
           appliedActions.push(toolResult.message);
-          if (undo) showUndo(undo.label, undo.onUndo);
+          showUndo(undo.label, undo.onUndo);
         }
         toolResultBlocks.push({
           type: "tool_result",
@@ -431,7 +538,7 @@ export default function Dashboard() {
         });
       }
 
-      commitToolState(working);
+      if (working !== workingBeforeRound) commitToolState(working);
       messages = [...messages, { role: "assistant", content: assistantBlocks }, { role: "user", content: toolResultBlocks }];
     }
 

@@ -41,7 +41,7 @@ Format: this is a small chat window on his phone — 1-3 sentences by default, l
 
 Data: you can see a snapshot of his current tasks, habits, and finances below — ground every answer in it.
 
-Actions: four write tools — set_task_done, add_task, log_habit, remember — for when he asks you to change something, or when you notice a fact/pattern genuinely worth keeping; confirm briefly after using one, except remember, which should be quiet — fold it into whatever else you're already saying, don't call it out. Five read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), list_tasks (tasks beyond the default snapshot, filterable), and get_weekly_review_data (a pre-computed weekly review — task/habit/finance summary plus any cross-domain pattern that already cleared strict statistical gates; only narrate patterns actually present in its \`correlations\` array — never invent one, and if it's empty just say the week looked steady). Read tools return raw JSON — never paste any of it verbatim, always summarize in plain language.
+Actions: four write tools — set_task_done, add_task, log_habit, remember — for when he asks you to change something, or when you notice a fact/pattern genuinely worth keeping; confirm briefly after using one, except remember, which should be quiet — fold it into whatever else you're already saying, don't call it out. Six read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), list_tasks (tasks beyond the default snapshot, filterable), get_weekly_review_data (a pre-computed weekly review — task/habit/finance summary plus any cross-domain pattern that already cleared strict statistical gates; only narrate patterns actually present in its \`correlations\` array — never invent one, and if it's empty just say the week looked steady), and get_assistant_info (what you can do, what's changed recently, and your honest limitations — use it when he asks what you can do, what's new, or what you can't do; the changelog entries are hand-written for a plain-language read, so lean on their \`description\` field rather than paraphrasing the \`title\`). Read tools return raw JSON — never paste any of it verbatim, always summarize in plain language.
 
 References: use the [task_id] and (key) values from the snapshot to address specific tasks and habits. When you name a task Arin can act on — one you just modified, or one from a list/search result — wrap it as {{task:TASK_ID|short label}} (e.g. {{task:tsk_42|Fix the CM invoice}}) using its exact [task_id], so it renders as a tappable link; do this for every task reference, not just the first. Don't wrap habits or transactions this way, only tasks with a known id.
 
@@ -177,6 +177,20 @@ const TOOLS = [
     input_schema: {
       type: "object",
       properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_assistant_info",
+    description:
+      "Get what you (the assistant) can do, what's changed about you recently, and your honest known limitations — all hand-written for a plain-language read. Use when Arin asks what you can do, what's new/changed, or what you can't do.",
+    input_schema: {
+      type: "object",
+      properties: {
+        topic: { type: "string", enum: ["capabilities", "changelog", "limitations", "all"], description: "Which part to return. Default all." },
+      },
       required: [],
       additionalProperties: false,
     },

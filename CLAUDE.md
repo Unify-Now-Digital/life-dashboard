@@ -51,6 +51,7 @@ Defined in `src/lib/defaultState.js`; `migrate()` in `storage.js` upgrades older
 - **Add a task category (pill)**: extend `WORK_PILLS`/`PERSONAL_PILLS` + `PILL` in `tokens.js`.
 - **Tune finance categorisation**: edit rules/overrides in `categorise.js`; add merchant→domain entries in `merchants.js`.
 - **Change colours / spacing**: edit `src/lib/tokens.js` (accents) or `src/index.css` (light/dark neutrals). Don't hardcode hex values in components.
+- **Ship a change to the assistant** (a tool, the system prompt, or `AssistantPanel.jsx`): add a dated entry to `ASSISTANT_CHANGELOG` in `src/lib/assistantInfo.js`, written in plain language (it's read back to Arin verbatim via the `get_assistant_info` tool — no live GitHub access, this file *is* the assistant's self-awareness). Update `ASSISTANT_CAPABILITIES`/`ASSISTANT_LIMITATIONS` too if the change adds or removes either.
 
 ## Habit logic (important — not obvious)
 

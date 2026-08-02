@@ -4,9 +4,9 @@ import { normalizePractice, levelFor, streakLen, effectiveStreakDates } from "..
 
 // Floating shortcut to the focused Spanish-practice view — doubles as a glanceable
 // progress reminder (lifetime XP, level tier + bar, current streak) so the
-// dashboard nudges a jump to Spanish. Bottom-left, stacked above the camera
-// button. Navigates same-origin via the ?spanish flag (see host.js) so the
-// Supabase session carries over with no re-login.
+// dashboard nudges a jump to Spanish. Bottom-left. Navigates same-origin via
+// the ?spanish flag (see host.js) so the Supabase session carries over with
+// no re-login.
 export default function SpanishButton({ practice }) {
   const p = normalizePractice(practice, 60); // pure read — no write here
   const xp = p.xp || 0;
@@ -21,7 +21,7 @@ export default function SpanishButton({ practice }) {
       style={{
         position: "fixed",
         left: "max(12px, env(safe-area-inset-left))",
-        bottom: "calc(176px + env(safe-area-inset-bottom))",
+        bottom: "max(16px, env(safe-area-inset-bottom))",
         width: 196,
         boxSizing: "border-box",
         padding: "9px 12px 10px",

@@ -36,6 +36,7 @@ export function migrate(raw) {
   if (v < 9) s = migrateV8toV9(s);
   if (v < 10) s = migrateV9toV10(s);
   if (v < 11) s = migrateV10toV11(s);
+  if (v < 12) s = migrateV11toV12(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -545,6 +546,22 @@ function migrateV10toV11(s) {
   if (!out.assistant || typeof out.assistant !== "object") out.assistant = { ...defaultState.assistant };
   if (!Array.isArray(out.assistant.memory)) out.assistant.memory = [];
   if (out.assistant.lastReviewWeek === undefined) out.assistant.lastReviewWeek = null;
+  return out;
+}
+
+// v11 → v12: focus-first shell. Adds an optional `commitment` string to each
+// habit definition (mergeDefaults doesn't deep-merge new fields into
+// existing array-of-object items, so this needs an explicit backfill — see
+// the v8/v9 task migrations for the same lesson). Also switches the landing
+// screen to the new daily focus view: `ui.view` is reset to "focus" for
+// everyone, one time, since that's the point of this release — after that,
+// normal navigation persists whatever screen was last open.
+function migrateV11toV12(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (Array.isArray(out.habits)) {
+    out.habits = out.habits.map((h) => (h && "commitment" in h ? h : { ...h, commitment: null }));
+  }
+  out.ui = { ...(out.ui || {}), view: "focus" };
   return out;
 }
 

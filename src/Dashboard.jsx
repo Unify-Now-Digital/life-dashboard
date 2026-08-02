@@ -35,6 +35,7 @@ import TasksView from "./components/v2/TasksView.jsx";
 import TaskFocus from "./components/v2/TaskFocus.jsx";
 import FinanceLens from "./components/v2/FinanceLens.jsx";
 import HabitFooter from "./components/v2/HabitFooter.jsx";
+import DailyFocusView from "./components/v2/DailyFocusView.jsx";
 
 const LEARNING_META = { key: "learning", label: "Learning", color: "#854F0B" };
 
@@ -143,10 +144,15 @@ export default function Dashboard() {
         habitNoLog: { ...s.habitNoLog, [habit]: no },
       };
     });
+  // What Arin is holding himself to on a habit — surfaced verbatim in the
+  // daily focus hero sentence (dailyNudge.js). Editable inline from there.
+  const updateHabitCommitment = (key, commitment) =>
+    setState((s) => ({ ...s, habits: (s.habits || []).map((h) => (h.key === key ? { ...h, commitment } : h)) }));
 
   // ---- Tasks --------------------------------------------------------------
   const tasks = state.tasks || [];
-  const view = state.ui?.view || "tasks";
+  // 'focus' (the default landing screen) | 'tasks' | 'finance' | 'habits'.
+  const view = state.ui?.view || "focus";
   const setView = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), view: v } }));
   // Task layout (sort + grouping) — persisted so it sticks across loads/devices.
   const sortBy = state.ui?.sortBy || "due";
@@ -806,80 +812,105 @@ export default function Dashboard() {
   }
 
   // ---- Main V2 shell ------------------------------------------------------
+  // 'focus' is the hub: it renders alone, full-width, nothing else fighting
+  // for attention. Every other screen gets a lightweight top bar — a back
+  // link to focus plus lateral tabs, so Tasks/Finance/Habits stay one tap
+  // from each other without detouring through focus every time.
   return (
     <LocalLock>
       <AuthGate>
-        <div style={{ ...styles.page, paddingBottom: isDesktop ? 190 : 270 }}>
+        <div style={{ ...styles.page, paddingBottom: "calc(120px + env(safe-area-inset-bottom))" }}>
           <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} unifyHidden={unifyHidden} onToggleUnify={toggleUnify} />
 
           {localOnlyBanner}
 
-          <PrioritiesBar
-            priorities={priorities}
-            decisionsCount={decisionsCount}
-            decisionsActive={decisionsActive}
-            onToggleDecisions={() => setDecisionsActive((d) => !d)}
-            onOpenTask={(id) => setFocusId(id)}
-            onAddPriority={addPriority}
-            compact={isCompact}
-          />
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, rowGap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-            {/* Left: task sort / group controls (Tasks view only) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minHeight: 30 }}>
-              {view === "tasks" && (
-                <>
-                  <Segmented
-                    options={[{ value: "importance", label: "Priority" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]}
-                    value={sortBy}
-                    onChange={setSortBy}
-                    accent={C.accent}
-                    size="sm"
-                  />
-                  <Segmented
-                    options={[{ value: "none", label: "Flat" }, { value: "due", label: "Due" }, { value: "label", label: "Category" }]}
-                    value={groupMode}
-                    onChange={setGroupMode}
-                    accent={C.accent}
-                    size="sm"
-                  />
-                </>
-              )}
-            </div>
-            {/* Right: view tabs + theme */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: view === "focus" ? "flex-end" : "space-between", gap: 12, rowGap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+            {view !== "focus" && (
+              <button
+                onClick={() => setView("focus")}
+                style={{ background: "none", border: "none", padding: "4px 2px", fontSize: 12.5, color: C.textSecondary, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                {"‹ Focus"}
+              </button>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Segmented
-                options={[{ value: "tasks", label: "Tasks" }, { value: "finance", label: "Finance" }]}
-                value={view}
-                onChange={setView}
-                accent={C.accent}
-              />
+              {view !== "focus" && (
+                <Segmented
+                  options={[{ value: "tasks", label: "Tasks" }, { value: "finance", label: "Finance" }, { value: "habits", label: "Habits" }]}
+                  value={view}
+                  onChange={setView}
+                  accent={C.accent}
+                />
+              )}
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
             </div>
           </div>
 
-          {view === "tasks" ? (
-            <TasksView
-              tasks={tasks}
-              decisionsActive={decisionsActive}
-              isDesktop={isDesktop}
-              sortBy={sortBy}
-              groupMode={groupMode}
-              groupOrder={state.ui?.groupOrder || {}}
-              onOpen={(id) => setFocusId(id)}
-              onRecategorise={recategorise}
-              onAdd={addTask}
-              onDefer={deferTask}
-              onToggleDone={toggleDone}
-              onDelete={deleteTask}
-              onReorderGroups={reorderGroups}
+          {view === "focus" && (
+            <DailyFocusView
+              state={state}
+              onNavigate={setView}
+              onOpenTask={(id) => setFocusId(id)}
+              onLogHabit={(key, answer) => confirmHabit(key, isoDate(new Date()), answer)}
+              onEditCommitment={updateHabitCommitment}
             />
-          ) : (
+          )}
+
+          {view === "tasks" && (
+            <>
+              <PrioritiesBar
+                priorities={priorities}
+                decisionsCount={decisionsCount}
+                decisionsActive={decisionsActive}
+                onToggleDecisions={() => setDecisionsActive((d) => !d)}
+                onOpenTask={(id) => setFocusId(id)}
+                onAddPriority={addPriority}
+                compact={isCompact}
+              />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <Segmented
+                  options={[{ value: "importance", label: "Priority" }, { value: "due", label: "Due" }, { value: "added", label: "Added" }]}
+                  value={sortBy}
+                  onChange={setSortBy}
+                  accent={C.accent}
+                  size="sm"
+                />
+                <Segmented
+                  options={[{ value: "none", label: "Flat" }, { value: "due", label: "Due" }, { value: "label", label: "Category" }]}
+                  value={groupMode}
+                  onChange={setGroupMode}
+                  accent={C.accent}
+                  size="sm"
+                />
+              </div>
+
+              <TasksView
+                tasks={tasks}
+                decisionsActive={decisionsActive}
+                isDesktop={isDesktop}
+                sortBy={sortBy}
+                groupMode={groupMode}
+                groupOrder={state.ui?.groupOrder || {}}
+                onOpen={(id) => setFocusId(id)}
+                onRecategorise={recategorise}
+                onAdd={addTask}
+                onDefer={deferTask}
+                onToggleDone={toggleDone}
+                onDelete={deleteTask}
+                onReorderGroups={reorderGroups}
+              />
+            </>
+          )}
+
+          {view === "finance" && (
             <FinanceLens finance={state.finance} onImport={importTransactions} onClear={clearTransactions} />
           )}
-        </div>
 
-        <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} isDesktop={isDesktop} />
+          {view === "habits" && (
+            <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} isDesktop={isDesktop} docked={false} />
+          )}
+        </div>
 
         <TaskFocus
           task={focusTask}
@@ -893,7 +924,6 @@ export default function Dashboard() {
 
         <AssistantButton
           onClick={() => setAssistantOpen(true)}
-          isCompact={isCompact}
           reviewReady={isReviewReady(state.assistant?.lastReviewWeek)}
           onReviewClick={() => {
             setAssistantOpen(true);

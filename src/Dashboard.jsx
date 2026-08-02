@@ -15,6 +15,7 @@ import { FINANCE_SEED } from "./lib/financeSeed.js";
 import { categorise, CATEGORY_LABELS } from "./lib/categorise.js";
 import { prettyMerchant } from "./lib/merchants.js";
 import { buildWeeklyReviewData, isReviewReady } from "./lib/weeklyReview.js";
+import { ASSISTANT_CAPABILITIES, ASSISTANT_CHANGELOG, ASSISTANT_LIMITATIONS } from "./lib/assistantInfo.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -546,6 +547,19 @@ export default function Dashboard() {
         toolResult: { ok: true, message: JSON.stringify(data) },
         patch: { type: "review_consumed", week: data.week },
       };
+    }
+
+    if (name === "get_assistant_info") {
+      const { topic } = input || {};
+      const payload =
+        topic === "capabilities"
+          ? { capabilities: ASSISTANT_CAPABILITIES }
+          : topic === "changelog"
+            ? { changelog: ASSISTANT_CHANGELOG }
+            : topic === "limitations"
+              ? { limitations: ASSISTANT_LIMITATIONS }
+              : { capabilities: ASSISTANT_CAPABILITIES, changelog: ASSISTANT_CHANGELOG, limitations: ASSISTANT_LIMITATIONS };
+      return { state: working, toolResult: { ok: true, message: JSON.stringify(payload) } };
     }
 
     return { state: working, toolResult: { ok: false, message: `Unknown tool "${name}".` } };

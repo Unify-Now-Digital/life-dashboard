@@ -18,7 +18,6 @@ import { isoDate } from "./habits.js";
 import { categorise, CATEGORY_LABELS, EXCLUDED_FROM_SPEND, INCOME_CATEGORIES } from "./categorise.js";
 import { weeklyTargetFor } from "./habitStats.js";
 
-const MS_DAY = 86400000;
 const LOOKBACK_WEEKS = 12;
 const MIN_QUALIFYING_WEEKS = 4;
 const MIN_EFFECT = 0.75; // co-occurrence rate required among qualifying weeks
@@ -36,11 +35,23 @@ function parseISO(iso) {
   return new Date(y, m - 1, d);
 }
 
+// Calendar-day subtraction via setDate() — NOT `date.getTime() - n * MS_DAY`.
+// Fixed-millisecond arithmetic silently drifts by an hour across a DST
+// transition (e.g. stepping back 7/14/21 days from a date after a
+// spring-forward can land the result on the wrong calendar day once its
+// local fields are read back out), which would corrupt every week key
+// derived from it. setDate() operates on local calendar fields and the
+// Date engine resolves the wall-clock time correctly, so it's DST-safe.
+function addDays(date, n) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
 function mondayOf(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay(); // 0 = Sun .. 6 = Sat
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-  return d;
+  return addDays(d, day === 0 ? -6 : 1 - day);
 }
 
 export function weekKey(date) {
@@ -50,8 +61,7 @@ export function weekKey(date) {
 // The most recent *fully elapsed* week's Monday key, relative to `today`.
 // The current in-progress week is never eligible for review.
 export function lastCompletedWeekKey(today = new Date()) {
-  const thisMonday = mondayOf(today);
-  return isoDate(new Date(thisMonday.getTime() - 7 * MS_DAY));
+  return isoDate(addDays(mondayOf(today), -7));
 }
 
 export function isReviewReady(lastReviewWeek, today = new Date()) {
@@ -63,7 +73,7 @@ export function isReviewReady(lastReviewWeek, today = new Date()) {
 function recentWeekKeys(today, n) {
   const thisMonday = mondayOf(today);
   const keys = [];
-  for (let i = n; i >= 1; i--) keys.push(isoDate(new Date(thisMonday.getTime() - i * 7 * MS_DAY)));
+  for (let i = n; i >= 1; i--) keys.push(isoDate(addDays(thisMonday, -7 * i)));
   return keys;
 }
 
@@ -172,23 +182,37 @@ export function findCorrelations(
   return results;
 }
 
+// task.completedAt/createdAt are full UTC datetime strings
+// (new Date().toISOString()) — naively slicing the first 10 characters reads
+// off the *UTC* calendar date, which can be a different day than the local
+// one Arin actually experienced (e.g. completing something at 00:30 local
+// time in a UTC+ timezone is still the previous day in UTC). Parsing the
+// full datetime and reading local fields back out converts it to the same
+// local calendar `startISO`/`endISO`/`staleCutoff` are already expressed in.
+function localDateOf(isoDateTime) {
+  if (!isoDateTime) return null;
+  return isoDate(new Date(isoDateTime));
+}
+
 function taskWeeklySummary(tasks, reviewWeek, today) {
   const monday = parseISO(reviewWeek);
-  const sunday = new Date(monday.getTime() + 6 * MS_DAY);
+  const sunday = addDays(monday, 6);
   const startISO = isoDate(monday);
   const endISO = isoDate(sunday);
 
-  const completed = (tasks || []).filter(
-    (t) => t.completedAt && t.completedAt.slice(0, 10) >= startISO && t.completedAt.slice(0, 10) <= endISO
-  );
+  const completed = (tasks || []).filter((t) => {
+    const d = localDateOf(t.completedAt);
+    return d && d >= startISO && d <= endISO;
+  });
 
   // Stale priorities as of *today* (not scoped to the reviewed week) —
   // what's actionable right now is more useful than what was stale a week
   // ago.
-  const staleCutoff = isoDate(new Date(today.getTime() - STALE_PRIORITY_DAYS * MS_DAY));
-  const stalePriority = (tasks || []).filter(
-    (t) => t.status !== "done" && (t.priority || t.isDecision) && t.createdAt && t.createdAt.slice(0, 10) < staleCutoff
-  );
+  const staleCutoff = isoDate(addDays(today, -STALE_PRIORITY_DAYS));
+  const stalePriority = (tasks || []).filter((t) => {
+    const d = localDateOf(t.createdAt);
+    return t.status !== "done" && (t.priority || t.isDecision) && d && d < staleCutoff;
+  });
 
   return {
     completedCount: completed.length,

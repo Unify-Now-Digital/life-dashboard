@@ -33,7 +33,9 @@ export function buildAssistantContext(state) {
   const tasks = state?.tasks || [];
   const today = isoDate(new Date());
 
-  const openTasks = tasks.filter((t) => t.status !== "done").slice(0, MAX_CONTEXT_TASKS);
+  const allOpenTasks = tasks.filter((t) => t.status !== "done");
+  const openTasks = allOpenTasks.slice(0, MAX_CONTEXT_TASKS);
+  const truncatedCount = allOpenTasks.length - openTasks.length;
   const decisions = tasks.filter((t) => t.isDecision && t.status !== "done");
 
   const lines = [];
@@ -41,12 +43,14 @@ export function buildAssistantContext(state) {
   lines.push(`Today's date: ${today}.`);
 
   // Every task line carries its [task_id] so the assistant can reference it
-  // for set_task_done — not just the starred/priority ones.
+  // for set_task_done — not just the starred/priority ones. When the list is
+  // truncated, say so explicitly — otherwise a "how many tasks do I have"
+  // question gets answered from a silently-clipped count.
   lines.push(
     openTasks.length
       ? `Open tasks:\n${openTasks
           .map((t) => `- [${t.id}] ${t.text} (${t.column}, due ${todayLabel(t.due)}${t.priority ? ", priority" : ""})`)
-          .join("\n")}`
+          .join("\n")}${truncatedCount > 0 ? `\n(+${truncatedCount} more open tasks not shown — use list_tasks for the rest.)` : ""}`
       : "No open tasks right now."
   );
 

@@ -20,10 +20,14 @@
 // reviews, and anything the client's routing heuristic flags as complex).
 // The client only ever sends the tier name, never a raw model id, so the
 // actual model mapping can change here without a client deploy.
-const MODELS = {
-  fast: "claude-haiku-4-5-20251001",
-  smart: "claude-sonnet-5",
-};
+// A Map, not a plain object — a plain-object lookup on an
+// attacker-controlled key (e.g. tier: "constructor" or "__proto__") resolves
+// to an inherited Object.prototype member instead of undefined, silently
+// bypassing the DEFAULT_TIER fallback below.
+const MODELS = new Map([
+  ["fast", "claude-haiku-4-5-20251001"],
+  ["smart", "claude-sonnet-5"],
+]);
 const DEFAULT_TIER = "fast";
 
 const SYSTEM_PREFIX =
@@ -182,7 +186,7 @@ export default async function handler(req, res) {
   }
 
   const system = `${SYSTEM_PREFIX}\n\n${typeof context === "string" ? context : ""}`.trim();
-  const model = MODELS[tier] || MODELS[DEFAULT_TIER];
+  const model = MODELS.get(tier) || MODELS.get(DEFAULT_TIER);
 
   try {
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {

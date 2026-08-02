@@ -290,6 +290,12 @@ export default function Dashboard() {
         } else if (p.type === "memory_add") memoryAdds.push(p.entry);
         else if (p.type === "review_consumed") reviewWeekConsumed = p.week;
       }
+      // Append added tasks *before* applying status patches — a same-turn
+      // "add X, then mark X done" produces a task_add patch and a
+      // task_status patch for the same (not-yet-existing) id in one batch;
+      // applying status first would map over a task list that doesn't
+      // contain X yet and silently drop the status flip.
+      if (added.length) tasks = [...tasks, ...added];
       if (statusById.size) {
         tasks = tasks.map((t) => {
           if (!statusById.has(t.id)) return t;
@@ -297,7 +303,6 @@ export default function Dashboard() {
           return { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null };
         });
       }
-      if (added.length) tasks = [...tasks, ...added];
       if (memoryAdds.length) {
         const memory = [...(assistant.memory || []), ...memoryAdds].slice(-MEMORY_CAP);
         assistant = { ...assistant, memory };
@@ -548,7 +553,7 @@ export default function Dashboard() {
 
   // Reply text streams into a ref (not persisted state) so tokens don't
   // trigger the debounced cloud save; only the finished reply is committed.
-  const finalizeAssistantLoop = (appliedActions, madeAnyToolCall) => {
+  const finalizeAssistantLoop = (appliedActions, madeAnyToolCall, pendingReviewWeek) => {
     setAssistantStreaming(false);
     assistantAbortRef.current = null;
     pendingResolveRef.current = null;
@@ -563,6 +568,14 @@ export default function Dashboard() {
     const finalText = streamed || appliedActions.join(" ") || (madeAnyToolCall ? "Got that — let me know if you'd like more detail." : "");
     if (finalText) {
       appendAssistantMessage({ id: "msg_" + Date.now(), role: "assistant", text: finalText, createdAt: new Date().toISOString() });
+    }
+    // Only mark the week reviewed once the model actually narrated something
+    // (`streamed`, not the generic fallback) — if it spent the whole round
+    // budget on tool calls and never got to summarize, the badge should stay
+    // up so Arin gets a real shot at seeing it next time, instead of the
+    // review silently vanishing with only "Got that" to show for it.
+    if (pendingReviewWeek && streamed) {
+      commitPatches([{ type: "review_consumed", week: pendingReviewWeek }]);
     }
   };
 
@@ -583,6 +596,7 @@ export default function Dashboard() {
     let messages = initialMessages;
     const appliedActions = [];
     let madeAnyToolCall = false;
+    let pendingReviewWeek = null; // set once get_weekly_review_data runs; committed in finalizeAssistantLoop, gated on real narration
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (stopRequestedRef.current) break;
@@ -640,12 +654,14 @@ export default function Dashboard() {
         const { state: nextWorking, toolResult, undo, patch } = applyToolCall(working, call);
         working = nextWorking;
         if (toolResult.ok) {
-          // Patches always commit, whether or not the call has an undo —
-          // get_weekly_review_data patches (marks the week reviewed) with
-          // no undo attached. Only mutations *with* an undo (the write
-          // tools) go into the fallback narration; a read tool's raw JSON
-          // isn't fit to show.
-          if (patch) roundPatches.push(patch);
+          // Patches always commit, whether or not the call has an undo.
+          // review_consumed is the one exception — it's held back to
+          // finalizeAssistantLoop, which only commits it once real
+          // narration actually shipped (see there for why). Only
+          // mutations *with* an undo (the write tools) go into the
+          // fallback narration; a read tool's raw JSON isn't fit to show.
+          if (patch?.type === "review_consumed") pendingReviewWeek = patch.week;
+          else if (patch) roundPatches.push(patch);
           if (undo) {
             appliedActions.push(toolResult.message);
             roundUndos.push(undo);
@@ -675,7 +691,7 @@ export default function Dashboard() {
       messages = [...messages, { role: "assistant", content: assistantBlocks }, { role: "user", content: toolResultBlocks }];
     }
 
-    finalizeAssistantLoop(appliedActions, madeAnyToolCall);
+    finalizeAssistantLoop(appliedActions, madeAnyToolCall, pendingReviewWeek);
   };
 
   const sendAssistantMessage = (text, { tier } = {}) => {

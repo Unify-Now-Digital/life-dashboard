@@ -77,7 +77,7 @@ export async function streamChat({ messages, context, tier, onDelta, onToolCall,
         if (data.type === "content_block_start" && data.content_block?.type === "tool_use") {
           toolBlocks.set(data.index, { id: data.content_block.id, name: data.content_block.name, json: "" });
         } else if (data.type === "content_block_delta" && data.delta?.type === "text_delta") {
-          onDelta(data.delta.text);
+          onDelta(data.delta.text || "");
         } else if (data.type === "content_block_delta" && data.delta?.type === "input_json_delta") {
           const block = toolBlocks.get(data.index);
           if (block) block.json += data.delta.partial_json || "";

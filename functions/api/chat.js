@@ -15,9 +15,18 @@
 // the function returns 503 and the widget shows an inline "not configured"
 // state, same convention as functions/api/analyze-food.js.
 
-const MODEL = "claude-haiku-4-5-20251001";
+// "fast" (default, cheap/quick) vs "smart" (deeper reasoning — weekly
+// reviews, and anything the client's routing heuristic flags as complex).
+// The client only ever sends the tier name, never a raw model id, so the
+// actual model mapping can change here without a client deploy.
+const MODELS = {
+  fast: "claude-haiku-4-5-20251001",
+  smart: "claude-sonnet-5",
+};
+const DEFAULT_TIER = "fast";
+
 const SYSTEM_PREFIX =
-  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You have three write actions — set_task_done, add_task, log_habit — for when he asks you to change something; confirm briefly in plain language after using one. You also have four read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), and list_tasks (tasks beyond the default snapshot, filterable). Read tools return raw JSON — never paste it verbatim, always summarize it in plain language. Use the [task_id] and (key) values from the context snapshot to address specific tasks and habits.";
+  "You are Arin's personal life assistant, built into his life dashboard. Be concise, direct, and warm — no fluff, no corporate tone. You can see a snapshot of his current tasks, habits, and finances below; use it to give grounded, specific answers. You have four write actions — set_task_done, add_task, log_habit, remember — for when he asks you to change something or when you notice a fact/pattern genuinely worth keeping; confirm briefly in plain language after using one (except remember, which should be quiet/incidental). You also have five read tools for anything deeper than the snapshot: get_finance_breakdown (spend by category/merchant for a date range), search_transactions (individual imported transactions by merchant text), get_habit_history (a habit's day-by-day log over a window), list_tasks (tasks beyond the default snapshot, filterable), and get_weekly_review_data (a pre-computed weekly review — task/habit/finance summary plus any cross-domain pattern that already cleared strict statistical gates). For get_weekly_review_data specifically: only narrate patterns actually present in its `correlations` array — never suggest a pattern of your own, and if `correlations` is empty just say the week looked steady, don't invent one to fill the silence. Read tools return raw JSON — never paste any of it verbatim, always summarize in plain language. Use the [task_id] and (key) values from the context snapshot to address specific tasks and habits. Remembered facts/patterns from prior conversations appear in the snapshot too — use them, and call remember again if you notice something new worth keeping.";
 
 const TOOLS = [
   {
@@ -128,6 +137,32 @@ const TOOLS = [
     },
     strict: true,
   },
+  {
+    name: "remember",
+    description:
+      "Save a short, durable fact or pattern about Arin worth keeping across future conversations — a stated preference, or a pattern you noticed (e.g. from a weekly review). Not for one-off details that don't matter later.",
+    input_schema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "The fact/pattern, as a short standalone sentence." },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "get_weekly_review_data",
+    description:
+      "Get the pre-computed weekly review: last week's task completions and stale priorities, this week's habit hit-rates, spend vs. each category's own average, and any cross-domain pattern that already cleared strict statistical gates (in `correlations` — usually empty, and that's expected).",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 function json(data, status = 200) {
@@ -147,12 +182,13 @@ export async function onRequestPost({ request, env }) {
   } catch {
     body = {};
   }
-  const { messages, context } = body || {};
+  const { messages, context, tier } = body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return json({ error: "Missing messages" }, 400);
   }
 
   const system = `${SYSTEM_PREFIX}\n\n${typeof context === "string" ? context : ""}`.trim();
+  const model = MODELS[tier] || MODELS[DEFAULT_TIER];
 
   try {
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -163,8 +199,8 @@ export async function onRequestPost({ request, env }) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1536,
+        model,
+        max_tokens: 2048,
         stream: true,
         system,
         messages,

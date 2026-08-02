@@ -35,6 +35,7 @@ export function migrate(raw) {
   if (v < 8) s = migrateV7toV8(s);
   if (v < 9) s = migrateV8toV9(s);
   if (v < 10) s = migrateV9toV10(s);
+  if (v < 11) s = migrateV10toV11(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -528,6 +529,22 @@ function migrateV9toV10(s) {
   if (!out.assistant || typeof out.assistant !== "object" || !Array.isArray(out.assistant.messages)) {
     out.assistant = { ...defaultState.assistant };
   }
+  return out;
+}
+
+// v10 → v11: weekly review. Adds `assistant.memory` (durable facts/patterns
+// the assistant chooses to remember) and `assistant.lastReviewWeek` (the
+// Monday-date key of the last completed weekly review), plus a `completedAt`
+// timestamp on tasks (stamped going forward whenever status flips to "done" —
+// see updateTask/toggleDone in Dashboard.jsx). Existing tasks simply have no
+// completedAt, which correctly reflects that we don't know when they were
+// completed. mergeDefaults would backfill assistant.memory/lastReviewWeek
+// anyway; this step keeps the changelog explicit.
+function migrateV10toV11(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (!out.assistant || typeof out.assistant !== "object") out.assistant = { ...defaultState.assistant };
+  if (!Array.isArray(out.assistant.memory)) out.assistant.memory = [];
+  if (out.assistant.lastReviewWeek === undefined) out.assistant.lastReviewWeek = null;
   return out;
 }
 

@@ -6,6 +6,9 @@
 import { financeStats } from "./financeStats.js";
 import { FINANCE_SEED } from "./financeSeed.js";
 import { isoDate } from "./habits.js";
+import { isReviewReady } from "./weeklyReview.js";
+
+const MAX_CONTEXT_MEMORY = 15;
 
 function todayLabel(due) {
   if (!due) return "no date";
@@ -70,6 +73,15 @@ export function buildAssistantContext(state) {
     lines.push(financeSummary(state?.finance));
   } catch {
     // Finance pipeline is best-effort context — never block the chat on it.
+  }
+
+  const memory = state?.assistant?.memory || [];
+  if (memory.length) {
+    lines.push(`Remembered facts/patterns from prior conversations:\n${memory.slice(-MAX_CONTEXT_MEMORY).map((m) => `- ${m.text}`).join("\n")}`);
+  }
+
+  if (isReviewReady(state?.assistant?.lastReviewWeek)) {
+    lines.push("A new weekly review is ready (last week hasn't been reviewed yet) — use get_weekly_review_data if asked for it.");
   }
 
   return lines.join("\n\n");

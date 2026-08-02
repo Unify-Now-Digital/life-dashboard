@@ -14,6 +14,7 @@ import { financeStats } from "./lib/financeStats.js";
 import { FINANCE_SEED } from "./lib/financeSeed.js";
 import { categorise, CATEGORY_LABELS } from "./lib/categorise.js";
 import { prettyMerchant } from "./lib/merchants.js";
+import { buildWeeklyReviewData, isReviewReady } from "./lib/weeklyReview.js";
 
 import Header from "./components/Header.jsx";
 import AuthGate from "./components/AuthGate.jsx";
@@ -152,11 +153,23 @@ export default function Dashboard() {
   const groupMode = state.ui?.groupMode || "label";
   const setGroupMode = (v) => setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupMode: v } }));
 
+  // Whenever a patch flips `status`, stamp/clear `completedAt` alongside it —
+  // the weekly review's task summary depends on knowing *when* a task was
+  // actually completed, not just its current state.
+  const withCompletedAt = (task, patch) =>
+    "status" in patch ? { ...patch, completedAt: patch.status === "done" ? new Date().toISOString() : null } : patch;
   const updateTask = (id, patch) =>
-    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
+    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, ...withCompletedAt(t, patch) } : t)) }));
   const deleteTask = (id) => setState((s) => ({ ...s, tasks: (s.tasks || []).filter((t) => t.id !== id) }));
   const toggleDone = (id) =>
-    setState((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
+    setState((s) => ({
+      ...s,
+      tasks: (s.tasks || []).map((t) => {
+        if (t.id !== id) return t;
+        const status = t.status === "done" ? "open" : "done";
+        return { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null };
+      }),
+    }));
   const reorderGroups = (column, mode, keys) =>
     setState((s) => ({ ...s, ui: { ...(s.ui || {}), groupOrder: { ...(s.ui?.groupOrder || {}), [`${mode}:${column}`]: keys } } }));
   const addTask = (column, text, extra = {}) =>
@@ -176,6 +189,7 @@ export default function Dashboard() {
           meta: null,
           status: "open",
           createdAt: new Date().toISOString(),
+          completedAt: null,
           notes: "",
         },
       ],
@@ -211,6 +225,7 @@ export default function Dashboard() {
           meta: null,
           status: "open",
           createdAt: new Date().toISOString(),
+          completedAt: null,
           notes: "",
         },
       ],
@@ -241,6 +256,8 @@ export default function Dashboard() {
       const messages = [...(s.assistant?.messages || []), msg].slice(-MAX_ASSISTANT_MESSAGES);
       return { ...s, assistant: { ...(s.assistant || {}), messages } };
     });
+  const forgetMemory = (id) =>
+    setState((s) => ({ ...s, assistant: { ...(s.assistant || {}), memory: (s.assistant?.memory || []).filter((m) => m.id !== id) } }));
 
   // Applies one round's worth of tool-call patches against the *latest*
   // state by id/key — same pattern as updateTask/addTask/confirmHabit —
@@ -248,13 +265,18 @@ export default function Dashboard() {
   // That distinction matters here specifically: a wholesale replace would
   // silently discard any edit Arin made by hand in the UI while a
   // multi-round tool loop was still in flight.
+  const MEMORY_CAP = 30;
+
   const commitPatches = (patches) =>
     setState((s) => {
       let tasks = s.tasks || [];
       let habitLog = s.habitLog || {};
       let habitNoLog = s.habitNoLog || {};
+      let assistant = s.assistant || {};
       const statusById = new Map();
       const added = [];
+      const memoryAdds = [];
+      let reviewWeekConsumed = null;
       for (const p of patches) {
         if (p.type === "task_status") statusById.set(p.taskId, p.status);
         else if (p.type === "task_add") added.push(p.task);
@@ -265,11 +287,23 @@ export default function Dashboard() {
           if (p.answer === "no") no.push(p.dateISO);
           habitLog = { ...habitLog, [p.key]: yes };
           habitNoLog = { ...habitNoLog, [p.key]: no };
-        }
+        } else if (p.type === "memory_add") memoryAdds.push(p.entry);
+        else if (p.type === "review_consumed") reviewWeekConsumed = p.week;
       }
-      if (statusById.size) tasks = tasks.map((t) => (statusById.has(t.id) ? { ...t, status: statusById.get(t.id) } : t));
+      if (statusById.size) {
+        tasks = tasks.map((t) => {
+          if (!statusById.has(t.id)) return t;
+          const status = statusById.get(t.id);
+          return { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null };
+        });
+      }
       if (added.length) tasks = [...tasks, ...added];
-      return { ...s, tasks, habitLog, habitNoLog };
+      if (memoryAdds.length) {
+        const memory = [...(assistant.memory || []), ...memoryAdds].slice(-MEMORY_CAP);
+        assistant = { ...assistant, memory };
+      }
+      if (reviewWeekConsumed) assistant = { ...assistant, lastReviewWeek: reviewWeekConsumed };
+      return { ...s, tasks, habitLog, habitNoLog, assistant };
     });
 
   const showUndo = (label, onUndo) => {
@@ -296,9 +330,10 @@ export default function Dashboard() {
       if (!task) return { state: working, toolResult: { ok: false, message: `No task with id "${task_id}" found.` } };
       const prevStatus = task.status;
       const status = done ? "done" : "open";
+      const completedAt = status === "done" ? new Date().toISOString() : null;
       const nextState = {
         ...working,
-        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status } : t)),
+        tasks: working.tasks.map((t) => (t.id === task_id ? { ...t, status, completedAt } : t)),
       };
       return {
         state: nextState,
@@ -331,6 +366,7 @@ export default function Dashboard() {
         meta: null,
         status: "open",
         createdAt: new Date().toISOString(),
+        completedAt: null,
         notes: "",
       };
       const nextState = { ...working, tasks: [...(working.tasks || []), task] };
@@ -479,6 +515,34 @@ export default function Dashboard() {
       return { state: working, toolResult: { ok: true, message: JSON.stringify({ count: tasks.length, tasks }) } };
     }
 
+    if (name === "remember") {
+      const { text } = input || {};
+      if (!text || !text.trim()) {
+        return { state: working, toolResult: { ok: false, message: "remember needs non-empty text." } };
+      }
+      const entry = { id: "mem_" + call.id, text: text.trim(), createdAt: new Date().toISOString() };
+      const nextState = { ...working, assistant: { ...working.assistant, memory: [...(working.assistant?.memory || []), entry] } };
+      return {
+        state: nextState,
+        toolResult: { ok: true, message: `Remembered: "${entry.text}"` },
+        undo: { label: `Remembered "${entry.text}"`, onUndo: () => forgetMemory(entry.id) },
+        patch: { type: "memory_add", entry },
+      };
+    }
+
+    if (name === "get_weekly_review_data") {
+      const data = buildWeeklyReviewData(working);
+      // No undo — reading the review isn't a reversible action. It still
+      // carries a patch (marking the week reviewed) so the badge doesn't
+      // reappear for a week we've already surfaced, whether or not the
+      // model goes on to narrate it well.
+      return {
+        state: working,
+        toolResult: { ok: true, message: JSON.stringify(data) },
+        patch: { type: "review_consumed", week: data.week },
+      };
+    }
+
     return { state: working, toolResult: { ok: false, message: `Unknown tool "${name}".` } };
   };
 
@@ -505,7 +569,16 @@ export default function Dashboard() {
   const pendingResolveRef = useRef(null);
   const stopRequestedRef = useRef(false);
 
-  const runAssistantLoop = async (initialMessages, contextSnapshot, startState) => {
+  // Cheap, transparent routing: most messages are simple lookups/actions and
+  // stay on the fast/cheap tier; anything that smells like it needs real
+  // synthesis (forecasting, comparisons, "why", planning) or the weekly
+  // review gets the smarter tier. A keyword heuristic, not a classifier
+  // call — easy to see why a message routed where it did, no extra
+  // round-trip cost to decide.
+  const SMART_TIER_PATTERN = /\b(forecast|compare|why|analy[sz]e|plan|correlat|trend|budget|review)\b/i;
+  const pickTier = (text) => (SMART_TIER_PATTERN.test(text) ? "smart" : "fast");
+
+  const runAssistantLoop = async (initialMessages, contextSnapshot, startState, tier) => {
     let working = startState;
     let messages = initialMessages;
     const appliedActions = [];
@@ -523,6 +596,7 @@ export default function Dashboard() {
         streamChat({
           messages,
           context: contextSnapshot,
+          tier,
           signal: controller.signal,
           onDelta: (chunk) => {
             assistantBufferRef.current += chunk;
@@ -565,12 +639,17 @@ export default function Dashboard() {
         }
         const { state: nextWorking, toolResult, undo, patch } = applyToolCall(working, call);
         working = nextWorking;
-        if (toolResult.ok && undo) {
-          // Only mutations (write tools always carry an undo) go into the
-          // fallback narration — a read tool's raw JSON isn't fit to show.
-          appliedActions.push(toolResult.message);
-          roundUndos.push(undo);
+        if (toolResult.ok) {
+          // Patches always commit, whether or not the call has an undo —
+          // get_weekly_review_data patches (marks the week reviewed) with
+          // no undo attached. Only mutations *with* an undo (the write
+          // tools) go into the fallback narration; a read tool's raw JSON
+          // isn't fit to show.
           if (patch) roundPatches.push(patch);
+          if (undo) {
+            appliedActions.push(toolResult.message);
+            roundUndos.push(undo);
+          }
         }
         toolResultBlocks.push({
           type: "tool_result",
@@ -599,7 +678,7 @@ export default function Dashboard() {
     finalizeAssistantLoop(appliedActions, madeAnyToolCall);
   };
 
-  const sendAssistantMessage = (text) => {
+  const sendAssistantMessage = (text, { tier } = {}) => {
     const userMsg = { id: "msg_" + Date.now(), role: "user", text, createdAt: new Date().toISOString() };
     const history = [...(state.assistant?.messages || []), userMsg]
       .slice(-MAX_ASSISTANT_MESSAGES)
@@ -613,8 +692,13 @@ export default function Dashboard() {
     assistantBufferRef.current = "";
     stopRequestedRef.current = false;
 
-    runAssistantLoop(history, contextSnapshot, state);
+    runAssistantLoop(history, contextSnapshot, state, tier || pickTier(text));
   };
+
+  // Weekly review always gets the smarter tier — it's exactly the kind of
+  // multi-source synthesis (task/habit/finance + any gated correlation)
+  // pickTier's heuristic is meant to catch, forced rather than guessed.
+  const sendWeeklyReview = () => sendAssistantMessage("Give me my weekly review.", { tier: "smart" });
 
   const stopAssistant = () => {
     stopRequestedRef.current = true;
@@ -777,7 +861,15 @@ export default function Dashboard() {
 
         <SpanishButton practice={state.projects?.learning?.spanish?.practice} />
 
-        <AssistantButton onClick={() => setAssistantOpen(true)} isCompact={isCompact} />
+        <AssistantButton
+          onClick={() => setAssistantOpen(true)}
+          isCompact={isCompact}
+          reviewReady={isReviewReady(state.assistant?.lastReviewWeek)}
+          onReviewClick={() => {
+            setAssistantOpen(true);
+            sendWeeklyReview();
+          }}
+        />
         <AssistantPanel
           open={assistantOpen}
           onClose={() => setAssistantOpen(false)}

@@ -4,9 +4,12 @@
 // see api/chat.js / functions/api/chat.js — so all the parsing lives here,
 // in exactly one place).
 //
-// streamChat({ messages, context, onDelta, onToolCall, onDone, onError, signal })
+// streamChat({ messages, context, tier, onDelta, onToolCall, onDone, onError, signal })
 //   messages: [{ role: 'user'|'assistant', content: string|array }]
 //   context:  string — see assistantContext.js
+//   tier:     "fast" (default) | "smart" — which model tier to use; the
+//     server maps this to an actual model id (see api/chat.js), so the
+//     client only ever names the tier, never a raw model string.
 //   (tool definitions are hardcoded server-side in api/chat.js /
 //   functions/api/chat.js, so the client never sends them)
 //   onDelta(text): called with each incremental chunk of assistant text
@@ -17,13 +20,13 @@
 //   onError(err): called on a network/parse/upstream error
 //   signal:   an AbortController signal, for the panel's stop button
 
-export async function streamChat({ messages, context, onDelta, onToolCall, onDone, onError, signal }) {
+export async function streamChat({ messages, context, tier, onDelta, onToolCall, onDone, onError, signal }) {
   let res;
   try {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, context }),
+      body: JSON.stringify({ messages, context, tier }),
       signal,
     });
   } catch (err) {

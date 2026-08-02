@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 // Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
 // carries a category `pill`, an optional `meta` urgency flag, and the
@@ -15,6 +15,7 @@ const T = (id, text, column, pill, due, meta, extra = {}) => ({
   priority: !!extra.priority, isDecision: !!extra.isDecision,
   importance: extra.importance || 1, // 1 low · 2 medium · 3 high
   due, meta, status: "open", createdAt: "2026-06-21T09:00:00.000Z", notes: extra.notes || "",
+  completedAt: null, // stamped when status flips to "done" — feeds the weekly review's task summary
 });
 const seedTasks = () => [
   // Work
@@ -100,7 +101,11 @@ export const defaultState = {
   // Floating assistant widget — synced chat history with the personal AI
   // assistant. `messages`: [{ id, role: 'user'|'assistant', text, createdAt }].
   // Capped to the most recent ~40 entries on append (see Dashboard.jsx).
-  assistant: { messages: [] },
+  // `memory`: [{ id, text, createdAt }] — durable facts/patterns the
+  // assistant chose to remember (via the `remember` tool), capped ~30,
+  // included in every context snapshot. `lastReviewWeek`: the Monday-date
+  // (YYYY-MM-DD) key of the last completed weekly review, or null.
+  assistant: { messages: [], memory: [], lastReviewWeek: null },
 
   // Today's Top 3 — three ad-hoc priority slots, directly editable in the
   // TopThree component. Auto-filled when a Work todo is starred (which also

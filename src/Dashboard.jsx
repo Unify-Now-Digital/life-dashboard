@@ -41,8 +41,12 @@ const LEARNING_META = { key: "learning", label: "Learning", color: "#854F0B" };
 
 function useViewport() {
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  const [height, setHeight] = useState(typeof window !== "undefined" ? window.innerHeight : 900);
   useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
+    const onResize = () => {
+      setWidth(window.innerWidth);
+      setHeight(window.innerHeight);
+    };
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     return () => {
@@ -50,7 +54,12 @@ function useViewport() {
       window.removeEventListener("orientationchange", onResize);
     };
   }, []);
-  return { width, isDesktop: width >= 760, isCompact: width < 560 };
+  // isCompact also gates the floating buttons' footprint (icon-only vs. full
+  // card) — width alone missed a real case: a phone rotated to landscape
+  // (e.g. 844×390) is plenty wide but has little height, so the full-size
+  // Spanish button had nowhere to go but on top of content. A short viewport
+  // counts as compact regardless of width.
+  return { width, isDesktop: width >= 760, isCompact: width < 560 || height < 500 };
 }
 
 export default function Dashboard() {

@@ -10,7 +10,7 @@ export default function UndoToast({ label, onUndo }) {
         bottom: 80,
         left: "50%",
         transform: "translateX(-50%)",
-        background: "rgba(255,255,255,0.95)",
+        background: C.card,
         backdropFilter: "saturate(180%) blur(20px)",
         WebkitBackdropFilter: "saturate(180%) blur(20px)",
         color: C.text,

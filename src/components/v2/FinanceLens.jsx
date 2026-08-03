@@ -221,7 +221,21 @@ export default function FinanceLens({ finance, onImport, onClear }) {
           Import CSV
         </button>
         {finance?.transactions?.length > 0 && (
-          <button onClick={onClear} title="Revert to the seeded export" style={{ border: "none", background: "transparent", color: C.textTertiary, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>reset</button>
+          <button
+            onClick={() => {
+              // Otherwise a stale status line (e.g. "Imported 4
+              // transactions...") keeps describing data that no longer
+              // exists for the rest of its ~6s window, while the stat
+              // cards underneath have already reverted to the seed.
+              clearTimeout(importStatusTimerRef.current);
+              setImportStatus(null);
+              onClear();
+            }}
+            title="Revert to the seeded export"
+            style={{ border: "none", background: "transparent", color: C.textTertiary, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            reset
+          </button>
         )}
         <Segmented options={[{ value: "monthly", label: "Monthly" }, { value: "weekly", label: "Weekly" }]} value={rate} onChange={setRate} accent={C.accent} size="sm" />
       </div>

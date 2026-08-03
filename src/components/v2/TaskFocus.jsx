@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { C, ACCENT } from "../../lib/tokens";
 import { PillSelect } from "./Pill.jsx";
 import { metaFromDue } from "../../lib/taskDates.js";
@@ -6,6 +6,17 @@ import { metaFromDue } from "../../lib/taskDates.js";
 // Compact right-side focus drawer for a single task. Quick done / delete live in
 // the header; notes / due / importance / flags below. Spec §4.
 export default function TaskFocus({ task, onClose, onUpdate, onDelete, onDefer }) {
+  // Hooks run unconditionally every render (the `if (!task)` early return is
+  // below this), so the null-guard lives inside the effect body instead.
+  useEffect(() => {
+    if (!task) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [task, onClose]);
+
   if (!task) return null;
   const col = task.column;
   const done = task.status === "done";

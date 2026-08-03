@@ -29,13 +29,50 @@ function RotateBtn({ onClick }) {
   );
 }
 
-export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden, onToggleUnify }) {
+// `compact`: the focus screen's own header — date/greeting collapse to one
+// line, and the day counter / lock link / Unify sparkline all drop (they're
+// still one tap away via the other screens' full Header). The wisdom quote
+// stays: it's the one thing here that's actually a "today" nudge, not
+// decoration, and costs almost no vertical space. This exists because the
+// full header was measurably why the floating buttons clipped the nav list
+// on short mobile viewports — see CLAUDE.md "Daily focus".
+export default function Header({ today, dayOfYear, wisdom, onRotate, unifyHidden, onToggleUnify, compact }) {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const dateStr = `${days[today.getDay()]}, ${today.getDate()} ${months[today.getMonth()]}`;
   const hour = today.getHours();
   const greet =
     hour < 5 ? "Late night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  if (compact) {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.005em" }}>
+          <span style={{ color: C.textTertiary, fontWeight: 500 }}>{dateStr}</span>
+          <span style={{ color: C.textTertiary }}> · </span>
+          <span>{greet}, Arin.</span>
+        </div>
+        {wisdom?.text && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+            <CategoryPill category={wisdom.category} />
+            <span
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: 13.5,
+                color: C.textSecondary,
+                fontStyle: "italic",
+                lineHeight: 1.5,
+              }}
+            >
+              {"“"}{wisdom.text}{"”"}
+            </span>
+            <span style={{ flex: 1, minWidth: 8 }} />
+            {onRotate && <RotateBtn onClick={onRotate} />}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ marginBottom: 22 }}>

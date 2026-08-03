@@ -8,17 +8,31 @@
 //
 // Severity ranges are designed to land in the same rough 0–110 band for
 // both kinds so a mixed sort is meaningful:
-//   habit severity = 100 − 28-day run-rate (habitStats.js)
+//   habit severity = 100 − 28-day run-rate (habitStats.js), capped at 65
+//                     if the habit has never once been logged (see
+//                     NEVER_LOGGED_SEVERITY_CAP) — "worth starting" reads
+//                     differently from "actively failing," even though the
+//                     raw run-rate math can't otherwise tell them apart.
 //   task  severity = min(daysOverdue, 4) × 10
 //                     + (priority ? 30 : 0)
 //                     + (isDecision ? 20 : 0)
 //                     + (dueToday && !overdue ? 15 : 0)
+// A true severity tie (rare once the cap above is in place) is broken by
+// staleness — days since last log (habits) or days overdue (tasks) — not
+// by priority a second time (already baked into severity) or array order.
 
 import { habitStats } from "./habitStats.js";
 import { streakFor, isoDate } from "./habits.js";
 
 export const SEVERITY_BAND = { RED: 70, AMBER: 40 };
 export const GHOST_STREAK_THRESHOLD = 3;
+// A habit with zero logs ever (never a yes, never a no) reads as "worth
+// starting," not "actively failing" — the raw 100-runRate formula can't
+// tell those apart (both score 100), which on a fresh habit crowded out a
+// genuinely overdue+priority task on nothing but array-order luck. Capping
+// at 65 keeps it visible and amber rather than red; a single real "no"
+// answer is enough to let its true severity through uncapped.
+const NEVER_LOGGED_SEVERITY_CAP = 65;
 const TOP_N = 3;
 const OVERFLOW_N = 2;
 
@@ -50,7 +64,25 @@ export function taskSeverity(task, today = new Date()) {
 
 export function habitSeverity(habit, habitLog, habitNoLog, today = new Date()) {
   const stats = habitStats(habit.key, habitLog, habitNoLog, habit, today);
-  return { severity: 100 - stats.runRate, ...stats };
+  const neverLogged = !(habitLog[habit.key]?.length) && !(habitNoLog[habit.key]?.length);
+  const rawSeverity = 100 - stats.runRate;
+  const severity = neverLogged ? Math.min(rawSeverity, NEVER_LOGGED_SEVERITY_CAP) : rawSeverity;
+  return { severity, neverLogged, ...stats };
+}
+
+// Days since the most recent log entry (yes or no) for a habit — the
+// tiebreak signal for section 2: whoever's been neglected longest wins a
+// true severity tie, a rule a user can actually reconstruct. A habit with
+// no log at all is treated as maximally stale (Infinity), since there's no
+// "last touched" date to measure from.
+function habitStaleness(habitKey, habitLog, habitNoLog, today) {
+  const dates = [...(habitLog[habitKey] || []), ...(habitNoLog[habitKey] || [])];
+  if (!dates.length) return Infinity;
+  let latest = dates[0];
+  for (const d of dates) if (d > latest) latest = d;
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const d = new Date(latest + "T00:00:00");
+  return Math.round((base - d) / 86400000);
 }
 
 function taskStatLine(overdue, dueToday, isDecision) {
@@ -87,6 +119,7 @@ export function buildDailyFocus(state, today = new Date()) {
       commitment: habit.commitment || null,
       streak,
       lossPreview: streak >= GHOST_STREAK_THRESHOLD,
+      staleness: habitStaleness(habit.key, habitLog, habitNoLog, today),
       habit,
     });
   }
@@ -102,11 +135,14 @@ export function buildDailyFocus(state, today = new Date()) {
       band: bandFor(severity),
       ringPercent: null,
       statLine: taskStatLine(overdue, dueToday, task.isDecision),
+      staleness: overdue,
       task,
     });
   }
 
-  candidates.sort((a, b) => b.severity - a.severity);
+  // Severity decides the ranking; staleness only arbitrates a true tie —
+  // whoever's gone longest without attention wins, not array order.
+  candidates.sort((a, b) => b.severity - a.severity || b.staleness - a.staleness);
 
   const items = candidates.slice(0, TOP_N).map((c, i) => ({ ...c, rank: i + 1, tier: i + 1 }));
   const overflow = candidates.slice(TOP_N, TOP_N + OVERFLOW_N);

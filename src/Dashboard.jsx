@@ -835,7 +835,7 @@ export default function Dashboard() {
     <LocalLock>
       <AuthGate>
         <div style={{ ...styles.page, paddingBottom: "calc(120px + env(safe-area-inset-bottom))" }}>
-          <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} unifyHidden={unifyHidden} onToggleUnify={toggleUnify} />
+          <Header today={today} dayOfYear={dayOfYear} wisdom={wisdom} onRotate={rotateWisdom} unifyHidden={unifyHidden} onToggleUnify={toggleUnify} compact={view === "focus"} />
 
           {localOnlyBanner}
 

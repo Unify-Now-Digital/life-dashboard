@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { C, ACCENT, styles, QUOTES, tint } from "./lib/tokens";
 import { defaultState } from "./lib/defaultState";
-import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily } from "./lib/storage";
+import { loadFromCache, loadFromCloud, saveState, flushQueue, rollDaily, landOnFocus } from "./lib/storage";
 import { isSupabaseEnabled } from "./lib/supabase";
 import { isSpanishHost, mainHref } from "./lib/host.js";
 import { getTheme, setTheme as persistTheme } from "./lib/theme.js";
@@ -63,7 +63,7 @@ function useViewport() {
 }
 
 export default function Dashboard() {
-  const [state, setStateRaw] = useState(() => rollDaily(loadFromCache() || defaultState));
+  const [state, setStateRaw] = useState(() => landOnFocus(rollDaily(loadFromCache() || defaultState)));
   const { isDesktop, isCompact } = useViewport();
 
   const [theme, setThemeState] = useState(getTheme);
@@ -105,7 +105,7 @@ export default function Dashboard() {
     loadFromCloud().then((cloud) => {
       if (!alive) return;
       if (cloud) {
-        const rolled = rollDaily(cloud);
+        const rolled = landOnFocus(rollDaily(cloud));
         setStateRaw(rolled);
         if (rolled !== cloud) saveState(rolled);
       } else {

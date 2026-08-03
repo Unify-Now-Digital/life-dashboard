@@ -569,7 +569,10 @@ function migrateV11toV12(s) {
 // `todayDate` isn't today, reset the day-scoped fields and stamp the new date.
 // Today's Top 3 are ad-hoc daily priorities, so they clear each morning; the
 // originating Work todos keep their stars. Dated data (journal, habits, food,
-// finance history) is untouched.
+// finance history) is untouched. `ui.view` resets to "focus" too — it's the
+// *daily* landing screen, not a one-time default, so leaving it wherever you
+// last navigated would mean re-opening the app on a new day shows yesterday's
+// screen instead of today's ranked priorities.
 export function rollDaily(state) {
   if (!state || typeof state !== "object") return state;
   const today = new Date().toISOString().slice(0, 10);
@@ -577,6 +580,7 @@ export function rollDaily(state) {
   return {
     ...state,
     todayDate: today,
+    ui: { ...(state.ui || {}), view: "focus" },
     topThree: (state.topThree || []).map((slot) => ({
       ...slot,
       title: "",

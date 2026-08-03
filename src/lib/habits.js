@@ -5,8 +5,8 @@ export function isoDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function isoYesterday() {
-  const d = new Date();
+export function isoYesterday(today = new Date()) {
+  const d = new Date(today);
   d.setDate(d.getDate() - 1);
   return isoDate(d);
 }
@@ -21,13 +21,13 @@ export function statusFor(habit, dateISO, habitLog, habitNoLog) {
 // Streak = number of consecutive YES days ending at the most recent answered day.
 // Walks backwards from yesterday. Stops on the first NO or the first unanswered day
 // that is NOT yesterday (yesterday being unanswered shouldn't break a streak yet).
-export function streakFor(habit, habitLog, habitNoLog) {
-  const yesISO = isoYesterday();
+export function streakFor(habit, habitLog, habitNoLog, today = new Date()) {
+  const yesISO = isoYesterday(today);
   const yesStatus = statusFor(habit, yesISO, habitLog, habitNoLog);
 
   // If yesterday is unanswered, look at the day before to compute current streak.
   // Streak is "what's locked in already".
-  let cursor = new Date();
+  let cursor = new Date(today);
   cursor.setDate(cursor.getDate() - 1); // start at yesterday
   if (yesStatus === "unanswered") {
     cursor.setDate(cursor.getDate() - 1); // shift to day-before-yesterday

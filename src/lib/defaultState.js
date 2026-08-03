@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 // Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
 // carries a category `pill`, an optional `meta` urgency flag, and the
@@ -66,12 +66,15 @@ export const defaultState = {
   // Habit definitions — the single source of truth for which habits are
   // tracked. Add/retire a habit here (no code change). `target`/`period`/`sub`
   // drive the weekly progress display in Habits.jsx; StickyHabits uses `label`.
-  // Logs below are keyed by `key`.
+  // Logs below are keyed by `key`. `commitment` is an optional free-text
+  // quote — what Arin is holding himself to on this habit (e.g. "fluency by
+  // September") — surfaced verbatim in the daily focus hero sentence when
+  // set; null renders nothing (see dailyFocus.js / dailyNudge.js).
   habits: [
-    { key: "spanish", label: "Spanish", active: true, target: 7, period: 7, sub: "daily" },
-    { key: "gym", label: "Gym", active: true, target: 5, period: 7, sub: "5x / week" },
-    { key: "clean", label: "Clean", active: true, target: 3, period: 7, sub: "3x / week" },
-    { key: "sleep", label: "Sleep", active: true, target: 7, period: 7, sub: "8h+ daily" },
+    { key: "spanish", label: "Spanish", active: true, target: 7, period: 7, sub: "daily", commitment: null },
+    { key: "gym", label: "Gym", active: true, target: 5, period: 7, sub: "5x / week", commitment: null },
+    { key: "clean", label: "Clean", active: true, target: 3, period: 7, sub: "3x / week", commitment: null },
+    { key: "sleep", label: "Sleep", active: true, target: 7, period: 7, sub: "8h+ daily", commitment: null },
   ],
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },
@@ -92,11 +95,12 @@ export const defaultState = {
     importedAt: null,
   },
 
-  // V2 shell UI state. `view` is the active top-level tab; `theme` is the
+  // V2 shell UI state. `view` is the active top-level screen — 'focus' (the
+  // default landing screen) | 'tasks' | 'finance' | 'habits'. `theme` is the
   // synced light/dark preference (null = follow device). `unifyTrendHidden`
   // hides the header Unify sparkline; `groupOrder` stores custom task-group
   // ordering keyed by `${groupMode}:${column}`.
-  ui: { view: "tasks", theme: null, sectionOrder: [], unifyTrendHidden: false, groupOrder: {}, sortBy: "due", groupMode: "label" },
+  ui: { view: "focus", theme: null, sectionOrder: [], unifyTrendHidden: false, groupOrder: {}, sortBy: "due", groupMode: "label" },
 
   // Floating assistant widget — synced chat history with the personal AI
   // assistant. `messages`: [{ id, role: 'user'|'assistant', text, createdAt }].

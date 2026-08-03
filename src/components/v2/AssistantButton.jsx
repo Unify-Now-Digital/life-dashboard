@@ -3,25 +3,22 @@ import { C, ACCENT } from "../../lib/tokens";
 
 // Floating trigger for the personal-assistant chat panel. Bottom-right,
 // mirroring SpanishButton's fixed/safe-area/z-index conventions on the
-// opposite corner, clear of HabitFooter. No idle pulse/bounce — a static,
-// always-available FAB.
+// opposite corner. No idle pulse/bounce — a static, always-available FAB.
 //
-// HabitFooter switches to a 2x2 grid on mobile (~300px tall, vs. a single
-// ~150px row on desktop), so the clearance needed above it differs sharply
-// by breakpoint — a single fixed offset would sit the button under the
-// footer on phones.
+// HabitFooter is no longer permanently docked (focus-first shell — see
+// CLAUDE.md) so this only needs to clear the safe area, not a fixed footer.
 // `reviewReady` + `onReviewClick`: when a new weekly review is available, a
 // small dot badge appears in the button's corner. It's a distinct tap
 // target (own onClick, stops propagation) so opening the assistant
 // normally never auto-triggers the review — only deliberately tapping the
 // badge does.
-export default function AssistantButton({ onClick, isCompact, reviewReady, onReviewClick }) {
+export default function AssistantButton({ onClick, reviewReady, onReviewClick }) {
   return (
     <div
       style={{
         position: "fixed",
         right: "max(12px, env(safe-area-inset-right))",
-        bottom: isCompact ? "calc(320px + env(safe-area-inset-bottom))" : "calc(176px + env(safe-area-inset-bottom))",
+        bottom: "max(16px, env(safe-area-inset-bottom))",
         width: 56,
         height: 56,
         zIndex: 90,

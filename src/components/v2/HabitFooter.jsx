@@ -88,11 +88,31 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
   );
 }
 
-// Docked habit footer (version C), permanent across all views. Desktop: one
-// row of cards; mobile: 2×2 grid.
-export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, isDesktop }) {
+// Habit cards grid — either docked as a permanent fixed footer, or rendered
+// in-flow as the Habits sub-page's full-detail content (`docked={false}`,
+// the focus-first shell's default — see CLAUDE.md). Desktop: one row of
+// cards; mobile: 2×2 grid.
+export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, isDesktop, docked = true }) {
   const list = (habits && habits.length ? habits : []).filter((h) => h.active !== false);
   if (!list.length) return null;
+
+  const grid = (
+    <div
+      style={{
+        maxWidth: 1080,
+        margin: "0 auto",
+        display: isDesktop ? "flex" : "grid",
+        gridTemplateColumns: isDesktop ? undefined : "1fr 1fr",
+        gap: 10,
+      }}
+    >
+      {list.map((h) => (
+        <HabitCard key={h.key} habit={h} habitLog={habitLog} habitNoLog={habitNoLog} onConfirm={onConfirm} />
+      ))}
+    </div>
+  );
+
+  if (!docked) return grid;
 
   return (
     <div
@@ -107,19 +127,7 @@ export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, i
         borderTop: `0.5px solid ${C.border}`,
       }}
     >
-      <div
-        style={{
-          maxWidth: 1080,
-          margin: "0 auto",
-          display: isDesktop ? "flex" : "grid",
-          gridTemplateColumns: isDesktop ? undefined : "1fr 1fr",
-          gap: 10,
-        }}
-      >
-        {list.map((h) => (
-          <HabitCard key={h.key} habit={h} habitLog={habitLog} habitNoLog={habitNoLog} onConfirm={onConfirm} />
-        ))}
-      </div>
+      {grid}
     </div>
   );
 }

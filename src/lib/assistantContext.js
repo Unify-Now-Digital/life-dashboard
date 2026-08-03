@@ -84,7 +84,7 @@ export function buildAssistantContext(state) {
     lines.push(`Remembered facts/patterns from prior conversations:\n${memory.slice(-MAX_CONTEXT_MEMORY).map((m) => `- ${m.text}`).join("\n")}`);
   }
 
-  if (isReviewReady(state?.assistant?.lastReviewWeek)) {
+  if (isReviewReady(state?.assistant?.lastReviewWeek, state)) {
     lines.push("A new weekly review is ready (last week hasn't been reviewed yet) — use get_weekly_review_data if asked for it.");
   }
 

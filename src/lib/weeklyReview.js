@@ -64,7 +64,24 @@ export function lastCompletedWeekKey(today = new Date()) {
   return isoDate(addDays(mondayOf(today), -7));
 }
 
-export function isReviewReady(lastReviewWeek, today = new Date()) {
+// Whether there's anything worth reviewing at all — a task ever completed, a
+// habit ever logged (yes or no), or a finance CSV ever imported. A brand-new
+// blob with `lastReviewWeek: null` and no activity would otherwise read as
+// "ready" on day one (lastCompletedWeekKey() never returns null), badging a
+// review with nothing behind it.
+export function hasReviewableActivity(state) {
+  const tasks = state?.tasks || [];
+  if (tasks.some((t) => t.completedAt)) return true;
+  const habitLog = state?.habitLog || {};
+  const habitNoLog = state?.habitNoLog || {};
+  if (Object.values(habitLog).some((arr) => (arr || []).length > 0)) return true;
+  if (Object.values(habitNoLog).some((arr) => (arr || []).length > 0)) return true;
+  if ((state?.finance?.transactions || []).length > 0) return true;
+  return false;
+}
+
+export function isReviewReady(lastReviewWeek, state, today = new Date()) {
+  if (!hasReviewableActivity(state)) return false;
   return lastCompletedWeekKey(today) !== lastReviewWeek;
 }
 

@@ -591,6 +591,20 @@ export function rollDaily(state) {
   };
 }
 
+// Lands on the focus screen for every fresh app open, not just once a
+// calendar day. rollDaily()'s ui.view reset above depends on `todayDate`
+// not matching today — which means a user who already opened the app once
+// today (rolling that stamp over) gets no further reset until the next
+// day, even freshly deployed code included: the stamp was already
+// consumed under whatever ui.view-reset logic existed at the time. This
+// has no persisted gate to exhaust — Dashboard.jsx calls it at both state
+// sources on mount (the local-cache initializer and the async cloud
+// fetch), so whichever one ends up applied still lands on focus.
+export function landOnFocus(state) {
+  if (!state || typeof state !== "object") return state;
+  return { ...state, ui: { ...(state.ui || {}), view: "focus" } };
+}
+
 // ----- load ----------------------------------------------------------------
 export function loadFromCache() {
   try {

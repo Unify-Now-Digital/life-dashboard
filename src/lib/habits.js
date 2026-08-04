@@ -57,6 +57,20 @@ export function hasUnanswered(habit, habitLog, habitNoLog) {
 // Goal length used to size the visual ring fill. Default: 30-day cycle.
 export const STREAK_GOAL = 30;
 
+// Slug for a new habit's `key` — every habitLog/habitNoLog entry, the
+// dailyFocus ranking, and the assistant's log_habit tool all key off this,
+// so it has to be stable and unique. Collides against every existing key
+// (active or archived) so a reused/retired key's old log history is never
+// silently inherited by a new habit of the same name.
+export function slugifyHabitKey(label, existingKeys = []) {
+  const base = (label || "habit").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "habit";
+  const taken = new Set(existingKeys);
+  let key = base;
+  let i = 2;
+  while (taken.has(key)) key = `${base}_${i++}`;
+  return key;
+}
+
 // Returns the last `days` statuses for a habit, oldest first, ending at yesterday.
 export function historyFor(habit, habitLog, habitNoLog, days = 7) {
   const out = [];

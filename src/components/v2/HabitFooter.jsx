@@ -1,5 +1,5 @@
 import React from "react";
-import { C, HABIT, RUNRATE } from "../../lib/tokens";
+import { C, HABIT, RUNRATE, ACCENT, tint } from "../../lib/tokens";
 import { habitStats } from "../../lib/habitStats.js";
 
 // Tap cycles a day's state: unanswered → yes → no → clear.
@@ -54,13 +54,63 @@ function Sparkline({ values, width = 150, height = 22 }) {
   );
 }
 
-function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
+// Same star glyph PrioritiesBar uses for tasks — one visual language for
+// "priority" across the app, not a habit-specific icon.
+// Sits as a corner badge on the card, not inline in the icon/label/rate row —
+// that row is already tight in the 2-column mobile grid, and a 4th item
+// there truncated every label down to a single letter ("S…" for both
+// Spanish and Sleep, ambiguous). A corner badge costs no row width.
+function StarButton({ on, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={on ? "Remove priority" : "Mark priority"}
+      aria-label={on ? "Remove priority" : "Mark priority"}
+      style={{
+        position: "absolute",
+        top: -7,
+        right: -7,
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        flexShrink: 0,
+        border: `1.5px solid ${on ? ACCENT.priorities : C.border}`,
+        background: on ? ACCENT.priorities : C.bg,
+        color: on ? "#fff" : C.textTertiary,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        padding: 0,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2.5l2.9 6 6.6.6-5 4.3 1.5 6.4L12 16.9 6 19.8l1.5-6.4-5-4.3 6.6-.6z" />
+      </svg>
+    </button>
+  );
+}
+
+function HabitCard({ habit, habitLog, habitNoLog, onConfirm, onTogglePriority }) {
   const stats = habitStats(habit.key, habitLog, habitNoLog, habit);
   const good = stats.runRate >= 80;
   const rateColor = good ? RUNRATE.good : RUNRATE.warn;
   const rateBg = good ? RUNRATE.goodBg : RUNRATE.warnBg;
+  const starred = !!habit.priority;
   return (
-    <div style={{ flex: "1 1 0", minWidth: 0, background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
+    <div
+      style={{
+        position: "relative",
+        flex: "1 1 0",
+        minWidth: 0,
+        background: starred ? tint(ACCENT.priorities, 0.06) : C.card,
+        border: `0.5px solid ${starred ? ACCENT.priorities : C.border}`,
+        borderRadius: 12,
+        padding: "12px 14px",
+      }}
+    >
+      {onTogglePriority && <StarButton on={starred} onClick={() => onTogglePriority(habit.key)} />}
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
         <span style={{ width: 28, height: 28, borderRadius: 8, background: C.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <HabitIcon habitKey={habit.key} color={C.text} />
@@ -92,7 +142,7 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm }) {
 // in-flow as the Habits sub-page's full-detail content (`docked={false}`,
 // the focus-first shell's default — see CLAUDE.md). Desktop: one row of
 // cards; mobile: 2×2 grid.
-export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, isDesktop, docked = true }) {
+export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, onTogglePriority, isDesktop, docked = true }) {
   const list = (habits && habits.length ? habits : []).filter((h) => h.active !== false);
   if (!list.length) return null;
 
@@ -107,7 +157,7 @@ export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, i
       }}
     >
       {list.map((h) => (
-        <HabitCard key={h.key} habit={h} habitLog={habitLog} habitNoLog={habitNoLog} onConfirm={onConfirm} />
+        <HabitCard key={h.key} habit={h} habitLog={habitLog} habitNoLog={habitNoLog} onConfirm={onConfirm} onTogglePriority={onTogglePriority} />
       ))}
     </div>
   );

@@ -4,7 +4,7 @@
 // place; the v4→v5 step reshapes Finance (accounts/revenue), parses legacy
 // Relationships/Upcoming display strings, and drops removed fields.
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 // Seed tasks for the V2 Tasks view (Work | Personal). A flat list; each task
 // carries a category `pill`, an optional `meta` urgency flag, and the
@@ -69,12 +69,15 @@ export const defaultState = {
   // Logs below are keyed by `key`. `commitment` is an optional free-text
   // quote — what Arin is holding himself to on this habit (e.g. "fluency by
   // September") — surfaced verbatim in the daily focus hero sentence when
-  // set; null renders nothing (see dailyFocus.js / dailyNudge.js).
+  // set; null renders nothing (see dailyFocus.js / dailyNudge.js). `priority`
+  // mirrors a task's priority flag — a starred habit skips the never-logged
+  // severity cap and gets a flat severity bonus, so it competes for the top-3
+  // slot on its own terms instead of only via a genuinely poor run-rate.
   habits: [
-    { key: "spanish", label: "Spanish", active: true, target: 7, period: 7, sub: "daily", commitment: null },
-    { key: "gym", label: "Gym", active: true, target: 5, period: 7, sub: "5x / week", commitment: null },
-    { key: "clean", label: "Clean", active: true, target: 3, period: 7, sub: "3x / week", commitment: null },
-    { key: "sleep", label: "Sleep", active: true, target: 7, period: 7, sub: "8h+ daily", commitment: null },
+    { key: "spanish", label: "Spanish", active: true, target: 7, period: 7, sub: "daily", commitment: null, priority: false },
+    { key: "gym", label: "Gym", active: true, target: 5, period: 7, sub: "5x / week", commitment: null, priority: false },
+    { key: "clean", label: "Clean", active: true, target: 3, period: 7, sub: "3x / week", commitment: null, priority: false },
+    { key: "sleep", label: "Sleep", active: true, target: 7, period: 7, sub: "8h+ daily", commitment: null, priority: false },
   ],
   habitLog: { gym: [], spanish: [], clean: [], sleep: [] },
   habitNoLog: { gym: [], spanish: [], clean: [], sleep: [] },

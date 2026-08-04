@@ -157,6 +157,11 @@ export default function Dashboard() {
   // daily focus hero sentence (dailyNudge.js). Editable inline from there.
   const updateHabitCommitment = (key, commitment) =>
     setState((s) => ({ ...s, habits: (s.habits || []).map((h) => (h.key === key ? { ...h, commitment } : h)) }));
+  // Mirrors a task's priority flag — see dailyFocus.js: a starred habit skips
+  // the never-logged severity cap and gets a flat bonus, so it competes for
+  // the top-3 slot on its own terms instead of only via a poor run-rate.
+  const toggleHabitPriority = (key) =>
+    setState((s) => ({ ...s, habits: (s.habits || []).map((h) => (h.key === key ? { ...h, priority: !h.priority } : h)) }));
 
   // ---- Tasks --------------------------------------------------------------
   const tasks = state.tasks || [];
@@ -932,7 +937,7 @@ export default function Dashboard() {
           )}
 
           {view === "habits" && (
-            <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} isDesktop={isDesktop} docked={false} />
+            <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} onTogglePriority={toggleHabitPriority} isDesktop={isDesktop} docked={false} />
           )}
         </div>
 

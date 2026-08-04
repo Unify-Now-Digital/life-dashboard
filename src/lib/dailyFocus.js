@@ -33,6 +33,12 @@ export const GHOST_STREAK_THRESHOLD = 3;
 // at 65 keeps it visible and amber rather than red; a single real "no"
 // answer is enough to let its true severity through uncapped.
 const NEVER_LOGGED_SEVERITY_CAP = 65;
+// A starred habit (habit.priority) mirrors a priority task: it skips the
+// never-logged cap above entirely (worth starting *and* important beats
+// the amber treatment) and gets a flat bonus once it has a real run-rate,
+// so it keeps outranking a same-urgency non-priority habit rather than
+// only ever winning by having a worse track record.
+const PRIORITY_SEVERITY_BONUS = 20;
 const TOP_N = 3;
 const OVERFLOW_N = 2;
 
@@ -66,7 +72,8 @@ export function habitSeverity(habit, habitLog, habitNoLog, today = new Date()) {
   const stats = habitStats(habit.key, habitLog, habitNoLog, habit, today);
   const neverLogged = !(habitLog[habit.key]?.length) && !(habitNoLog[habit.key]?.length);
   const rawSeverity = 100 - stats.runRate;
-  const severity = neverLogged ? Math.min(rawSeverity, NEVER_LOGGED_SEVERITY_CAP) : rawSeverity;
+  let severity = neverLogged && !habit.priority ? Math.min(rawSeverity, NEVER_LOGGED_SEVERITY_CAP) : rawSeverity;
+  if (habit.priority) severity = Math.min(100, severity + PRIORITY_SEVERITY_BONUS);
   return { severity, neverLogged, ...stats };
 }
 
@@ -117,6 +124,7 @@ export function buildDailyFocus(state, today = new Date()) {
       ringPercent: runRate,
       statLine: `${hits}/${targetOccurrences} this month`,
       commitment: habit.commitment || null,
+      priority: !!habit.priority,
       streak,
       lossPreview: streak >= GHOST_STREAK_THRESHOLD,
       staleness: habitStaleness(habit.key, habitLog, habitNoLog, today),

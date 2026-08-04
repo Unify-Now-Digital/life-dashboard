@@ -37,6 +37,7 @@ export function migrate(raw) {
   if (v < 10) s = migrateV9toV10(s);
   if (v < 11) s = migrateV10toV11(s);
   if (v < 12) s = migrateV11toV12(s);
+  if (v < 13) s = migrateV12toV13(s);
 
   // Ensure every key from defaultState exists, additively.
   s = mergeDefaults(s, defaultState);
@@ -562,6 +563,18 @@ function migrateV11toV12(s) {
     out.habits = out.habits.map((h) => (h && "commitment" in h ? h : { ...h, commitment: null }));
   }
   out.ui = { ...(out.ui || {}), view: "focus" };
+  return out;
+}
+
+// v12 → v13: habit priority flag. Same lesson as v11→v12 — mergeDefaults
+// won't backfill a new field into existing array-of-object items, so this
+// needs an explicit pass. Existing habits default to not-priority; nothing
+// about the ranking changes for anyone until they star one.
+function migrateV12toV13(s) {
+  const out = JSON.parse(JSON.stringify(s));
+  if (Array.isArray(out.habits)) {
+    out.habits = out.habits.map((h) => (h && "priority" in h ? h : { ...h, priority: false }));
+  }
   return out;
 }
 

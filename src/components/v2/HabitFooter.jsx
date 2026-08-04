@@ -107,16 +107,16 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm, onTogglePriority })
         background: starred ? tint(ACCENT.priorities, 0.06) : C.card,
         border: `0.5px solid ${starred ? ACCENT.priorities : C.border}`,
         borderRadius: 12,
-        padding: "12px 14px",
+        padding: "12px 12px",
       }}
     >
       {onTogglePriority && <StarButton on={starred} onClick={() => onTogglePriority(habit.key)} />}
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <span style={{ width: 28, height: 28, borderRadius: 8, background: C.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span style={{ width: 26, height: 26, borderRadius: 8, background: C.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <HabitIcon habitKey={habit.key} color={C.text} />
         </span>
         <span style={{ fontSize: 14.5, fontWeight: 600, color: C.text, whiteSpace: "nowrap", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{habit.label}</span>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: rateColor, background: rateBg, borderRadius: 999, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: rateColor, background: rateBg, borderRadius: 999, padding: "2px 7px", fontVariantNumeric: "tabular-nums" }}>
           {stats.runRate}%
         </span>
       </div>

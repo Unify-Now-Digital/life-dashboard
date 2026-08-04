@@ -634,59 +634,56 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
           background: "linear-gradient(#e8e5de,#e8e5dee0 70%,#e8e5de00)",
         }}
       >
-        <div style={{ position: "relative", width: "100%", maxWidth: 680, display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "100%", maxWidth: 680, display: "flex", alignItems: "center", gap: 6 }}>
           <a
             href={mainHref()}
             title="Volver al panel"
             style={{
-              position: "absolute",
-              left: 0,
-              top: "50%",
-              transform: "translateY(-50%)",
+              flexShrink: 0,
               color: T.faint,
               fontSize: 12,
               fontWeight: 600,
               textDecoration: "none",
               fontFamily: T.ui,
               padding: "6px 2px",
+              whiteSpace: "nowrap",
             }}
           >
-            ‹ Panel
+            ‹ Focus
           </a>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: 5,
-              background: "#fff",
-              border: "1px solid #d9d4ca",
-              borderRadius: 999,
-              boxShadow: "0 2px 10px rgba(40,30,15,.06)",
-              maxWidth: "100%",
-              overflowX: "auto",
-            }}
-          >
-            {DECK_ORDER.map((key) => {
-              const active = deck === key;
-              const n = dueCountFor(key);
-              return (
-                <button key={key} onClick={() => switchDeck(key)} style={pillStyle(active)}>
-                  {DECK_META[key].label}
-                  <span style={badgeStyle(active, n)}>{n}</span>
-                </button>
-              );
-            })}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: 5,
+                background: "#fff",
+                border: "1px solid #d9d4ca",
+                borderRadius: 999,
+                boxShadow: "0 2px 10px rgba(40,30,15,.06)",
+                maxWidth: "100%",
+                overflowX: "auto",
+              }}
+            >
+              {DECK_ORDER.map((key) => {
+                const active = deck === key;
+                const n = dueCountFor(key);
+                return (
+                  <button key={key} onClick={() => switchDeck(key)} style={pillStyle(active)}>
+                    {DECK_META[key].label}
+                    <span style={badgeStyle(active, n)}>{n}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {onMore && (
             <button
               onClick={onMore}
               title="Turkish & reading"
               style={{
-                position: "absolute",
-                right: 0,
-                top: "50%",
-                transform: "translateY(-50%)",
+                flexShrink: 0,
                 border: "none",
                 background: "transparent",
                 color: T.faint,
@@ -695,6 +692,7 @@ export default function SpanishPractice({ state, setState, onMore, localOnlyBann
                 cursor: "pointer",
                 fontFamily: T.ui,
                 padding: "6px 2px",
+                whiteSpace: "nowrap",
               }}
             >
               más ▸

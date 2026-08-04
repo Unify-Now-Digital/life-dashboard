@@ -9,7 +9,7 @@ import { addDays, metaFromDue } from "./lib/taskDates.js";
 import { loadWisdom } from "./lib/wisdom.js";
 import { streamChat } from "./lib/chatStream.js";
 import { buildAssistantContext } from "./lib/assistantContext.js";
-import { isoDate } from "./lib/habits.js";
+import { isoDate, slugifyHabitKey } from "./lib/habits.js";
 import { financeStats } from "./lib/financeStats.js";
 import { FINANCE_SEED } from "./lib/financeSeed.js";
 import { categorise, CATEGORY_LABELS } from "./lib/categorise.js";
@@ -162,6 +162,35 @@ export default function Dashboard() {
   // the top-3 slot on its own terms instead of only via a poor run-rate.
   const toggleHabitPriority = (key) =>
     setState((s) => ({ ...s, habits: (s.habits || []).map((h) => (h.key === key ? { ...h, priority: !h.priority } : h)) }));
+  // New habits are always weekly-cadence (period: 7) — the UI only ever asks
+  // "how many times a week," matching every seeded habit today. `key` is
+  // slugified from the label and de-duped against every existing key
+  // (active or archived), so a retired habit's old log history can never be
+  // silently inherited by a new one sharing its name.
+  const addHabit = (label, timesPerWeek) => {
+    const trimmed = (label || "").trim();
+    if (!trimmed) return;
+    const target = Math.min(7, Math.max(1, Math.round(timesPerWeek) || 7));
+    setState((s) => {
+      const key = slugifyHabitKey(trimmed, (s.habits || []).map((h) => h.key));
+      const habit = {
+        key,
+        label: trimmed,
+        active: true,
+        target,
+        period: 7,
+        sub: target >= 7 ? "daily" : `${target}x / week`,
+        commitment: null,
+        priority: false,
+      };
+      return {
+        ...s,
+        habits: [...(s.habits || []), habit],
+        habitLog: { ...s.habitLog, [key]: [] },
+        habitNoLog: { ...s.habitNoLog, [key]: [] },
+      };
+    });
+  };
 
   // ---- Tasks --------------------------------------------------------------
   const tasks = state.tasks || [];
@@ -937,7 +966,7 @@ export default function Dashboard() {
           )}
 
           {view === "habits" && (
-            <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} onTogglePriority={toggleHabitPriority} isDesktop={isDesktop} docked={false} />
+            <HabitFooter habits={state.habits} habitLog={state.habitLog} habitNoLog={state.habitNoLog} onConfirm={confirmHabit} onTogglePriority={toggleHabitPriority} onAddHabit={addHabit} isDesktop={isDesktop} docked={false} />
           )}
         </div>
 

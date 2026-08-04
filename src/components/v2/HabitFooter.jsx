@@ -102,7 +102,11 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm, onTogglePriority })
     <div
       style={{
         position: "relative",
-        flex: "1 1 0",
+        // flex-basis only matters in the desktop flex row (the mobile 2-col
+        // layout is a CSS grid, which ignores it) — a real basis + wrap on
+        // the container lets a 5th+ habit move to a new row instead of
+        // every card getting squeezed arbitrarily narrow forever.
+        flex: "1 1 200px",
         minWidth: 0,
         background: starred ? tint(ACCENT.priorities, 0.06) : C.card,
         border: `0.5px solid ${starred ? ACCENT.priorities : C.border}`,
@@ -138,13 +142,58 @@ function HabitCard({ habit, habitLog, habitNoLog, onConfirm, onTogglePriority })
   );
 }
 
+// Two sequential prompts (name, then weekly frequency) rather than a form —
+// matches the commitment editor's existing prompt-based pattern elsewhere on
+// this screen family, and needs far less code than an inline form for two
+// fields. Cancelling either prompt (native `null` return) is a true no-op.
+function AddHabitTile({ onAdd }) {
+  const handleClick = () => {
+    const label = window.prompt("New habit name:");
+    if (label === null) return;
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const raw = window.prompt(`How many times a week for "${trimmed}"? (1-7)`, "7");
+    if (raw === null) return;
+    const target = parseInt(raw, 10);
+    if (!Number.isFinite(target)) return;
+    onAdd(trimmed, target);
+  };
+  return (
+    <button
+      onClick={handleClick}
+      style={{
+        flex: "1 1 200px",
+        minWidth: 0,
+        minHeight: 132,
+        border: `0.5px dashed ${C.borderStrong}`,
+        background: "transparent",
+        borderRadius: 12,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        color: C.accent,
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      <span style={{ fontSize: 20, lineHeight: 1 }}>+</span>
+      <span style={{ fontSize: 12.5, fontWeight: 500 }}>Add habit</span>
+    </button>
+  );
+}
+
 // Habit cards grid — either docked as a permanent fixed footer, or rendered
 // in-flow as the Habits sub-page's full-detail content (`docked={false}`,
-// the focus-first shell's default — see CLAUDE.md). Desktop: one row of
-// cards; mobile: 2×2 grid.
-export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, onTogglePriority, isDesktop, docked = true }) {
+// the focus-first shell's default — see CLAUDE.md). Desktop: a wrapping flex
+// row (so a 5th+ habit drops to a new row instead of squeezing everyone);
+// mobile: 2×2(+) grid.
+export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, onTogglePriority, onAddHabit, isDesktop, docked = true }) {
   const list = (habits && habits.length ? habits : []).filter((h) => h.active !== false);
-  if (!list.length) return null;
+  // Only bail out entirely when there's neither a habit to show nor a way to
+  // add one — otherwise archiving every habit would leave no path back in.
+  if (!list.length && !onAddHabit) return null;
 
   const grid = (
     <div
@@ -152,6 +201,7 @@ export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, o
         maxWidth: 1080,
         margin: "0 auto",
         display: isDesktop ? "flex" : "grid",
+        flexWrap: isDesktop ? "wrap" : undefined,
         gridTemplateColumns: isDesktop ? undefined : "1fr 1fr",
         gap: 10,
       }}
@@ -159,6 +209,7 @@ export default function HabitFooter({ habits, habitLog, habitNoLog, onConfirm, o
       {list.map((h) => (
         <HabitCard key={h.key} habit={h} habitLog={habitLog} habitNoLog={habitNoLog} onConfirm={onConfirm} onTogglePriority={onTogglePriority} />
       ))}
+      {onAddHabit && <AddHabitTile onAdd={onAddHabit} />}
     </div>
   );
 

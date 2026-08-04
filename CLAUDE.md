@@ -44,7 +44,7 @@ Defined in `src/lib/defaultState.js`; `migrate()` in `storage.js` upgrades older
 - `tasks: [{ id, text, column:'work'|'personal', pill, priority, isDecision, due, meta, status:'open'|'done', notes, createdAt }]` — flat list for the Tasks view. Priorities bar, the Decisions filter, and the focus screen's task-severity scoring all derive from this.
 - `finance: { transactions, range:{start,end}, overrides, importedAt }` — the imported Revolut statement for the lens. Empty `transactions` ⇒ the seeded fallback (`financeSeed.js`) renders.
 - `ui: { view:'focus'|'tasks'|'finance'|'habits' }` — active screen; `focus` is the default.
-- Habits: `habits` (definitions, with `target`/`period`/`commitment`), plus `habitLog`/`habitNoLog` (see below). `commitment` is an optional free-text quote — what Arin is holding himself to on that habit — surfaced on the focus screen's hero card when set.
+- Habits: `habits` (definitions, with `target`/`period`/`commitment`/`priority`), plus `habitLog`/`habitNoLog` (see below). `commitment` is an optional free-text quote — what Arin is holding himself to on that habit — surfaced on the focus screen's hero card when set. `priority` mirrors a task's priority flag, toggled via the star button on the Habits screen's cards — see "Daily focus ranking" below for its effect.
 
 ## Common tasks
 
@@ -67,8 +67,9 @@ Confirmation was historically **retrospective** (you confirmed "yesterday", neve
 
 `src/lib/dailyFocus.js` is pure computation, no fetching. It scores every active habit and open task on a comparable ~0-110 scale and sorts descending:
 
-- **Habit severity** = `100 − 28-day run-rate` (reuses `habitStats.js`'s existing run-rate, so a habit with zero recent misses scores near 0, one with zero hits scores near 100).
+- **Habit severity** = `100 − 28-day run-rate` (reuses `habitStats.js`'s existing run-rate, so a habit with zero recent misses scores near 0, one with zero hits scores near 100) — **capped at 65** if the habit has never once been logged (no yes, no no), so "worth starting" reads as amber, not the same red as "actively failing"; one real log lets its true severity through uncapped. A **priority** habit (`habit.priority`) skips that cap entirely and gets a flat **+20** bonus (clamped to 100) on top of its real severity, so it competes for the top-3 slot on its own terms rather than only via a poor run-rate.
 - **Task severity** = `min(daysOverdue, 4) × 10 + (priority ? 30 : 0) + (isDecision ? 20 : 0) + (dueToday && !overdue ? 15 : 0)`. A task with none of these (no due date, not flagged) scores 0 and never competes for a focus slot.
+- A true severity tie is broken by **staleness** — days since last log (habits) or days overdue (tasks), not priority a second time or array order.
 
 The ranking is genuinely mixed — there's no reserved slot per category, so on a bad week the top 3 can be all habits (or all tasks). That's a deliberate tradeoff Arin accepted over a guaranteed-slot-per-category rule; if it ever feels wrong in practice, that's the knob to revisit, not the formula's constants.
 

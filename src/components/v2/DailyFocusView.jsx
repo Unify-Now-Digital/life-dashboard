@@ -106,6 +106,14 @@ function HeroSentence({ item }) {
   );
 }
 
+function PriorityStar() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill={ACCENT.priorities} stroke={ACCENT.priorities} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+      <path d="M12 2.5l2.9 6 6.6.6-5 4.3 1.5 6.4L12 16.9 6 19.8l1.5-6.4-5-4.3 6.6-.6z" />
+    </svg>
+  );
+}
+
 function StreakBadge({ streak }) {
   return (
     <span
@@ -142,7 +150,8 @@ function HeroCard({ item, total, onPrimary, onOpenCard, onEditCommitment }) {
           {ringLabel(item)}
         </Ring>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+            {item.priority && <PriorityStar />}
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.label}</span>
             {item.lossPreview && <StreakBadge streak={item.streak} />}
           </div>
@@ -229,7 +238,8 @@ function TierCard({ item, tier, onOpenCard, onPrimary }) {
         {ringLabel(item)}
       </Ring>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: small ? 11.5 : 12.5, fontWeight: small ? 500 : 600, color: C.text, display: "flex", alignItems: "center" }}>
+        <div style={{ fontSize: small ? 11.5 : 12.5, fontWeight: small ? 500 : 600, color: C.text, display: "flex", alignItems: "center", gap: 5 }}>
+          {item.priority && <PriorityStar />}
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.label}</span>
           {item.lossPreview && <StreakBadge streak={item.streak} />}
         </div>

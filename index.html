@@ -7,6 +7,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- PWA: installable Calma (Spanish view) — required for Web Push on iOS,
+         where push is only delivered to a Home-Screen-installed PWA. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <!-- Fonts for the focused Spanish "Calma" session (Instrument Serif display,
          Hanken Grotesk UI, Spline Sans Mono inputs). The main dashboard keeps
          system fonts; these only render on the Spanish view. -->

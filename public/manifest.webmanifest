@@ -1,0 +1,18 @@
+{
+  "name": "Calma — práctica de español",
+  "short_name": "Calma",
+  "description": "Tu sesión diaria de español, en calma.",
+  "start_url": "/?spanish",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "es",
+  "dir": "ltr",
+  "theme_color": "#c8861f",
+  "background_color": "#e8e5de",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
